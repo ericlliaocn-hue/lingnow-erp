@@ -1,0 +1,60 @@
+package com.txly.romance.admin.controller;
+
+import com.txly.romance.admin.manager.${ClassName}Manager;
+import ${packageName}.${moduleName}.entity.${ClassName};
+import com.txly.romance.common.vo.PageResult;
+import com.txly.romance.common.vo.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * ${functionName}管理控制器
+ *
+ * @author ${author}
+ * @date ${datetime}
+ */
+@Tag(name = "${functionName}管理", description = "${functionName}管理接口")
+@RestController
+@RequestMapping("/${moduleName}/${businessName}")
+@RequiredArgsConstructor
+public class ${ClassName}Controller {
+
+    private final ${ClassName}Manager ${className}Manager;
+
+    @Operation(summary = "查询${functionName}列表")
+    @GetMapping("/list")
+    public Result<PageResult<${ClassName}>> list(${ClassName} ${className}) {
+        return Result.success(${className}Manager.select${ClassName}List(${className}));
+    }
+
+    @Operation(summary = "查询${functionName}详细")
+    @GetMapping(value = "/{${pkColumn.javaField}}")
+    public Result<${ClassName}> getInfo(@PathVariable("${pkColumn.javaField}") ${pkColumn.javaType} ${pkColumn.javaField}) {
+        return Result.success(${className}Manager.select${ClassName}ById(${pkColumn.javaField}));
+    }
+
+    @Operation(summary = "新增${functionName}")
+    @PostMapping
+    public Result<Void> add(@RequestBody ${ClassName} ${className}) {
+            ${className}Manager.insert${ClassName}(${className});
+        return Result.success();
+    }
+
+    @Operation(summary = "修改${functionName}")
+    @PutMapping
+    public Result<Void> edit(@RequestBody ${ClassName} ${className}) {
+            ${className}Manager.update${ClassName}(${className});
+        return Result.success();
+    }
+
+    @Operation(summary = "删除${functionName}")
+    @DeleteMapping("/{${pkColumn.javaField}s}")
+    public Result<Void> remove(@PathVariable ${pkColumn.javaType}[] ${pkColumn.javaField}s) {
+            ${className}Manager.delete${ClassName}ByIds(${pkColumn.javaField}s);
+        return Result.success();
+    }
+}

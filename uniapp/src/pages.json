@@ -1,0 +1,105 @@
+{
+  "pages": [
+    {
+      "path": "pages/business/home/index",
+      "style": {
+        "navigationBarTitleText": "首页",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/business/category/index",
+      "style": {
+        "navigationBarTitleText": "分类",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/business/cart/index",
+      "style": {
+        "navigationBarTitleText": "购物车",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/business/order/index",
+      "style": {
+        "navigationBarTitleText": "订单",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/business/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/business/product/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/business/checkout/index",
+      "style": {
+        "navigationBarTitleText": "确认下单",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/register/index",
+      "style": {
+        "navigationBarTitleText": "注册"
+      }
+    },
+    {
+      "path": "pages/forget/index",
+      "style": {
+        "navigationBarTitleText": "忘记密码"
+      }
+    },
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "业务端",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F8F8F8"
+  },
+  "tabBar": {
+    "color": "#909399",
+    "selectedColor": "#FF6F61",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/business/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/business/category/index",
+        "text": "分类"
+      },
+      {
+        "pagePath": "pages/business/cart/index",
+        "text": "购物车"
+      },
+      {
+        "pagePath": "pages/business/order/index",
+        "text": "订单"
+      },
+      {
+        "pagePath": "pages/business/mine/index",
+        "text": "我的"
+      }
+    ]
+  }
+}

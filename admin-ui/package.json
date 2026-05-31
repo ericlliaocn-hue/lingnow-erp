@@ -1,0 +1,37 @@
+{
+  "name": "admin-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@types/tinycolor2": "^1.4.6",
+    "@vueuse/core": "^14.1.0",
+    "apexcharts": "^5.3.6",
+    "axios": "^1.13.2",
+    "echarts": "^6.0.0",
+    "element-plus": "^2.12.0",
+    "json-bigint": "^1.0.0",
+    "pinia": "^3.0.4",
+    "tinycolor2": "^1.6.0",
+    "vue": "^3.5.24",
+    "vue-router": "^4.6.4",
+    "vue3-apexcharts": "^1.10.0",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/json-bigint": "^1.0.4",
+    "@types/node": "^24.10.4",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "sass": "^1.97.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vue-tsc": "^3.1.4"
+  }
+}

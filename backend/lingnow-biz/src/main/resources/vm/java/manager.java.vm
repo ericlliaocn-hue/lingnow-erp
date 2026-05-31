@@ -1,0 +1,44 @@
+package com.txly.romance.admin.manager;
+
+import ${packageName}.${moduleName}.entity.${ClassName};
+import ${packageName}.${moduleName}.service.${ClassName}Service;
+import com.txly.romance.common.vo.PageResult;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * ${functionName}Manager
+ *
+ * @author ${author}
+ * @date ${datetime}
+ */
+@Component
+@RequiredArgsConstructor
+public class ${ClassName}Manager {
+
+    private final ${ClassName}Service ${className}Service;
+
+    public PageResult<${ClassName}> select${ClassName}List(${ClassName} ${className}) {
+        // TODO: Implement page query
+        return new PageResult<>();
+    }
+
+    public ${ClassName} select${ClassName}ById(${pkColumn.javaType} ${pkColumn.javaField}) {
+        return ${className}Service.getById(${pkColumn.javaField});
+    }
+
+    public void insert${ClassName}(${ClassName} ${className}) {
+            ${className}Service.save(${className});
+    }
+
+    public void update${ClassName}(${ClassName} ${className}) {
+            ${className}Service.updateById(${className});
+    }
+
+    public void delete${ClassName}ByIds(${pkColumn.javaType}[] ${pkColumn.javaField}s) {
+            ${className}Service.removeBatchByIds(Arrays.asList(${pkColumn.javaField}s));
+    }
+}

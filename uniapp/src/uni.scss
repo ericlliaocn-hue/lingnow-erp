@@ -1,0 +1,81 @@
+/**
+ * 这里是uni-app内置的常用样式变量
+ *
+ * uni-app 官方扩展插件及插件市场（https://ext.dcloud.net.cn）上很多三方插件均使用了这些样式变量
+ * 如果你是插件开发者，建议你使用scss预处理，并在插件代码中直接使用这些变量（无需 import 这个文件），方便用户通过搭积木的方式开发整体风格一致的App
+ *
+ */
+
+/* 颜色变量 */
+
+/* 行为相关颜色 - 极致可爱（好事发生）主题 */
+$uni-color-primary: var(--primary-color); /* 业务主色 - 主色调 */
+$uni-color-success: var(--success-color); /* 浅绿 */
+$uni-color-warning: var(--warning-color); /* 柿子黄/橙 */
+$uni-color-error: var(--error-color); /* 柔和红 */
+
+/* 辅助色 */
+$uni-color-secondary: var(--secondary-color); /* 杏色 */
+$uni-color-accent: #81C784; /* 深一点的绿 */
+$uni-color-bg-soft: #F1F8E9; /* 背景极浅绿 */
+
+/* 文字基本颜色 */
+$uni-text-color: var(--text-color); // 基本色
+$uni-text-color-inverse: var(--text-color-inverse); // 反色
+$uni-text-color-grey: var(--sub-text); // 辅助色
+$uni-text-color-placeholder: var(--sub-text); // 占位符颜色
+$uni-text-color-disable: var(--sub-text); // 禁用色
+
+/* 背景颜色 */
+$uni-bg-color: var(--bg-color);
+$uni-bg-color-grey: var(--search-bg);
+$uni-bg-color-hover: var(--bg-color-hover, #f1f1f1);
+$uni-bg-color-mask: rgba(0, 0, 0, 0.4);
+
+/* 边框颜色 */
+$uni-border-color: var(--border-color);
+
+/* 尺寸变量 */
+
+/* 文字尺寸 */
+$uni-font-size-sm: 12px;
+$uni-font-size-base: 14px;
+$uni-font-size-lg: 16px;
+
+/* 图片尺寸 */
+$uni-img-size-sm: 20px;
+$uni-img-size-base: 26px;
+$uni-img-size-lg: 40px;
+
+/* Border Radius - 极致圆润 */
+$uni-border-radius-sm: 10px;
+$uni-border-radius-base: 20px;
+$uni-border-radius-lg: 30px;
+$uni-border-radius-circle: 50%;
+$uni-border-radius-huge: 999px; /* 胶囊圆角 */
+
+/* 水平间距 */
+$uni-spacing-row-sm: 6px;
+$uni-spacing-row-base: 12px;
+$uni-spacing-row-lg: 18px;
+
+/* 垂直间距 */
+$uni-spacing-col-sm: 6px;
+$uni-spacing-col-base: 12px;
+$uni-spacing-col-lg: 18px;
+
+/* 透明度 */
+$uni-opacity-disabled: 0.3;
+
+/* 文章场景相关 */
+$uni-color-title: #4E342E;
+$uni-font-size-title: 22px;
+$uni-color-subtitle: #6D4C41;
+$uni-font-size-subtitle: 18px;
+$uni-color-paragraph: #5D4037;
+$uni-font-size-paragraph: 16px;
+
+/* 自定义阴影 - 柔和浮起感 */
+$uni-shadow-base: 0 4px 16px rgba(var(--primary-color-rgb), 0.2);
+$uni-shadow-hover: 0 8px 24px rgba(var(--primary-color-rgb), 0.35);
+$uni-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);

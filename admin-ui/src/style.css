@@ -1,0 +1,790 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: var(--el-text-color-primary);
+  background-color: var(--el-bg-color);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 默认间距变量 */
+  --app-spacing: 13px;
+  --card-padding: 13px;
+  --base-font-size: 14px;
+
+  /* 覆盖 Element Plus 默认字体大小 */
+  --el-font-size-base: 14px;
+  --el-font-size-small: 12px;
+  --el-font-size-medium: 14px;
+  --el-font-size-large: 16px;
+  --el-font-size-extra-large: 18px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--el-bg-color);
+  transition: background-color 0.3s, font-size 0.3s;
+  font-family: inherit;
+  font-size: var(--base-font-size, 14px);
+}
+
+/* 确保所有文本元素都使用基础字体大小 */
+#app {
+  width: 100%;
+  height: 100%;
+  font-size: inherit;
+}
+
+/* 标题字体大小根据基础大小缩放 */
+h1 {
+  font-size: calc(var(--base-font-size, 16px) * 2);
+}
+
+h2 {
+  font-size: calc(var(--base-font-size, 16px) * 1.75);
+}
+
+h3 {
+  font-size: calc(var(--base-font-size, 16px) * 1.5);
+}
+
+h4 {
+  font-size: calc(var(--base-font-size, 16px) * 1.25);
+}
+
+h5, h6 {
+  font-size: calc(var(--base-font-size, 16px) * 1.1);
+}
+
+p, div, span, a, button, input, textarea, label {
+  font-size: inherit;
+}
+
+html.dark body {
+  background-color: #161C24 !important;
+}
+
+/* Element Plus 容器暗色模式 */
+html.dark .el-container {
+  background-color: transparent !important;
+}
+
+html.dark .el-header {
+  background-color: #161C24 !important;
+}
+
+html.dark .el-main {
+  background-color: #161C24 !important;
+}
+
+html.dark .el-aside {
+  background-color: #161C24;
+}
+
+/* 全局菜单项样式调整 (覆盖 Element Plus 默认值) */
+/* 增加权重：使用 .el-menu 前缀，并分别针对 span 和 title */
+.el-menu .el-menu-item, 
+.el-menu .el-sub-menu__title,
+.el-menu .el-menu-item span,
+.el-menu .el-sub-menu__title span {
+  height: 56px !important;
+  line-height: 56px !important;
+  font-size: 13px !important;
+}
+
+/* TagsView 全局背景色控制 */
+.tags-view-outer {
+  background-color: #F9FAFB;
+  transition: background-color 0.3s;
+}
+
+html.dark .tags-view-outer {
+  background-color: #161C24 !important;
+}
+
+/* 强制菜单悬停变色 (全局覆盖，解决多级菜单文字颜色问题) */
+/* 针对所有层级的菜单项（包括 el-sub-menu 和 el-menu-item） */
+/* 1. 针对 SubMenu (父级菜单) */
+.el-sub-menu__title:hover,
+.el-sub-menu__title:hover * {
+  color: var(--el-color-primary) !important;
+}
+
+/* 2. 针对 MenuItem (子菜单/叶子节点)，排除激活状态 */
+.el-menu-item:not(.is-active):hover,
+.el-menu-item:not(.is-active):hover * {
+  color: var(--el-color-primary) !important;
+}
+
+/* 暗黑模式同理 */
+html.dark .el-sub-menu__title:hover,
+html.dark .el-sub-menu__title:hover *,
+html.dark .el-menu-item:not(.is-active):hover,
+html.dark .el-menu-item:not(.is-active):hover * {
+  color: var(--el-color-primary) !important;
+}
+
+/* 统一页面布局样式 Standard Page Layout */
+.app-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--app-spacing);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.search-wrapper {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+/* 修正搜索栏底部间距，使上下视觉平衡
+   Top Padding: 12px (adjusted)
+   Bottom: Padding-Bottom (2px) + FormItem Margin (10px) = 12px
+*/
+.search-wrapper .el-card__body {
+  padding: 12px 12px 2px 12px !important;
+}
+
+/* 紧凑模式下的搜索表单项间距 */
+.search-wrapper .el-form-item {
+  margin-bottom: 10px !important;
+  margin-right: 16px !important; /* 稍微缩小水平间距 */
+}
+
+/* 调整搜索按钮栏的左边距，使其更紧凑 */
+.search-wrapper .el-form-item:last-child {
+  margin-right: 0 !important;
+}
+
+.table-wrapper {
+  margin-top: 10px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: none;
+}
+
+/* 确保 table-wrapper 下的 el-card__body 充满并使用 flex 布局 */
+.table-wrapper .el-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 10px 10px 0 10px !important;
+  min-height: 0; /* 关键：防止 flex 子元素溢出 */
+  height: 100%; /* 确保高度占满 */
+  box-sizing: border-box;
+}
+
+/* 强制在 .app-container 下的 .table-wrapper 的 body 必须是 flex */
+.app-container .table-wrapper .el-card__body {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  padding: 10px 10px 0 10px !important;
+}
+
+/* 分页组件容器居中 */
+.pagination-container {
+  margin-top: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.el-icon {
+  font-size: 22px;
+}
+
+.el-menu--popup .el-menu-item {
+  height: 54px !important;
+  line-height: 54px !important;
+}
+
+/* 菜单暗色模式 */
+html.dark .el-menu {
+  background-color: #161C24;
+  border-right: none !important;
+}
+
+html.dark .el-menu-item {
+  background-color: transparent !important;
+  color: #919EAB !important;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px; /* Increased from 4px */
+  border-radius: 8px;
+}
+
+html.dark .el-menu-item .el-icon,
+html.dark .el-sub-menu__title .el-icon {
+  font-size: 22px;
+  margin-right: 12px;
+}
+
+/* 移除旧的暗黑模式 hover 定义，避免冲突 */
+html.dark .el-menu-item:hover,
+html.dark .el-sub-menu__title:hover {
+  background-color: rgba(145, 158, 171, 0.08) !important;
+  /* color: #fff !important;  <-- REMOVE THIS */
+}
+
+/* 移除旧的暗黑模式 nav-section-title 定义 */
+/* html.dark .el-sub-menu__title:hover .nav-section-title {
+  color: #fff !important;
+} */
+
+html.dark .el-menu-item.is-active {
+  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--el-color-primary) !important;
+}
+
+html.dark .logo-container {
+  background-color: #161C24 !important;
+  color: #fff !important;
+  border-bottom: 1px solid rgba(145, 158, 171, 0.08);
+}
+
+/* Popover 暗色模式 */
+html.dark .el-popover {
+  background-color: #212B36 !important;
+  border: 1px solid rgba(145, 158, 171, 0.08) !important;
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.24) !important;
+}
+
+html.dark .el-popover.el-popper {
+  background-color: #212B36 !important;
+}
+
+/* 通知 Popover */
+.notification-popover {
+  padding: 0 !important;
+}
+
+html.dark .notification-popover {
+  background-color: #212B36 !important;
+}
+
+/* ApexCharts 全局样式 */
+.apexcharts-text,
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label {
+  fill: #919EAB !important;
+  font-size: 12px !important;
+}
+
+.apexcharts-gridline {
+  stroke: rgba(145, 158, 171, 0.12) !important;
+}
+
+.apexcharts-legend-text {
+  color: #919EAB !important;
+}
+
+/* Notification Popover 全局样式 */
+.notification-popover {
+  padding: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 0 2px rgba(145, 158, 171, 0.24), 0 12px 24px -4px rgba(145, 158, 171, 0.12) !important;
+}
+
+:global(.dark) .notification-popover {
+  background: rgba(33, 43, 54, 0.9) !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.24), 0 12px 24px -4px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Notification Drawer 全局样式 - 防止页面内容移动 */
+.notification-drawer.el-drawer {
+  position: fixed !important;
+}
+
+.notification-drawer .el-drawer__header {
+  margin-bottom: 0;
+  padding: 0;
+  background: #161C24;
+}
+
+.notification-drawer .el-drawer__body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: #161C24;
+}
+
+.notification-drawer .el-overlay,
+.notification-modal {
+  background-color: rgba(22, 28, 36, 0.8) !important;
+  position: fixed !important;
+}
+
+/* 关键：防止body被添加样式导致内容移动 */
+body.el-popup-parent--hidden {
+  padding-right: 0 !important;
+  overflow: auto !important;
+}
+
+:global(.dark) .notification-drawer .el-drawer__header,
+:global(.dark) .notification-drawer .el-drawer__body {
+  background: #161C24 !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Auth Layout Dark Mode Overrides - Global to ensure priority */
+html.dark .auth-side {
+  background: linear-gradient(135deg, rgba(145, 158, 171, 0.08), rgba(145, 158, 171, 0.02)),
+              #1c252e !important;
+  background-size: cover !important;
+  background-position: center !important;
+  border-right: 1px dashed rgba(145, 158, 171, 0.08) !important;
+}
+
+html.dark .auth-title {
+  color: #FFFFFF !important;
+}
+
+html.dark .auth-subtitle {
+  color: #919eab !important;
+}
+
+html.dark .auth-content {
+  background-color: #141a21 !important;
+}
+
+/* Ensure Login Form styles in Dark Mode */
+html.dark .login-wrapper .title {
+  color: #FFFFFF !important;
+}
+
+html.dark .login-wrapper .subtitle,
+html.dark .login-wrapper .forgot-link {
+  color: #919EAB !important;
+  /* grey[500] */
+}
+
+/* Force White for "Need Help?" in Dark Mode */
+html.dark .help-link {
+  color: #FFFFFF !important;
+}
+
+/* Force White Button in Dark Mode (Minimals Style) */
+html.dark .login-btn {
+  background-color: #FFFFFF !important;
+  color: #212B36 !important;
+  border-color: #FFFFFF !important;
+}
+
+html.dark .login-btn:hover {
+  background-color: #C4CDD5 !important;
+  border-color: #C4CDD5 !important;
+}
+
+html.dark .el-input__wrapper {
+  background-color: rgba(145, 158, 171, 0.08) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(145, 158, 171, 0.2) !important;
+}
+
+html.dark .el-input__wrapper:hover {
+  border-color: rgba(145, 158, 171, 0.32) !important;
+}
+
+html.dark .el-input__wrapper.is-focus {
+  border-color: #fff !important;
+  box-shadow: 0 0 0 1px #fff !important;
+}
+
+html.dark .el-input__inner {
+  color: #FFFFFF !important;
+}
+
+html.dark .el-input__inner::placeholder {
+  color: #637381 !important;
+}
+
+/* 全局对话框暗色模式适配 */
+html.dark .el-dialog {
+  background-color: #1c252e !important;
+  border: 1px solid rgba(145, 158, 171, 0.12);
+}
+
+html.dark .el-dialog__header {
+  background-color: #1c252e !important;
+  border-bottom: 1px solid rgba(145, 158, 171, 0.12);
+}
+
+html.dark .el-dialog__title {
+  color: #fff !important;
+}
+
+html.dark .el-dialog__body {
+  background-color: #1c252e !important;
+  color: #fff !important;
+}
+
+html.dark .el-dialog__footer {
+  background-color: #1c252e !important;
+  border-top: 1px solid rgba(145, 158, 171, 0.12);
+}
+
+html.dark .el-dialog__close {
+  color: #919eab !important;
+}
+
+html.dark .el-dialog__close:hover {
+  color: #fff !important;
+}
+
+/* 表格表头行高缩小 (通过减少 padding) */
+.el-table th.el-table__cell {
+  padding: 13px 0 !important;
+}
+
+/* 表格内容行高调整 */
+.el-table td.el-table__cell {
+  padding: 13px 0 !important;
+}
+
+/* 表格暗色模式 */
+html.dark .el-table {
+  background-color: #1c252e !important;
+  color: #fff !important;
+}
+
+html.dark .el-table th {
+  background-color: #141a21 !important;
+  color: #919eab !important;
+}
+
+html.dark .el-table tr {
+  background-color: #1c252e !important;
+}
+
+html.dark .el-table tr:hover > td {
+  background-color: rgba(145, 158, 171, 0.08) !important;
+}
+
+html.dark .el-table td {
+  border-bottom: 1px solid rgba(145, 158, 171, 0.12) !important;
+}
+
+/* 修复暗色模式下表格固定列背景透明导致文字重叠的问题 */
+html.dark .el-table .el-table__cell.is-fixed-left,
+html.dark .el-table .el-table__cell.is-fixed-right,
+html.dark .el-table .el-table-fixed-column--left,
+html.dark .el-table .el-table-fixed-column--right {
+  background-color: #1c252e !important;
+}
+
+html.dark .el-table th.el-table__cell.is-fixed-left,
+html.dark .el-table th.el-table__cell.is-fixed-right,
+html.dark .el-table th.el-table-fixed-column--left,
+html.dark .el-table th.el-table-fixed-column--right {
+  background-color: #141a21 !important;
+}
+
+/* Fixed column hover state must be opaque solid color to prevent transparency */
+html.dark .el-table tr:hover > td.el-table__cell.is-fixed-left,
+html.dark .el-table tr:hover > td.el-table__cell.is-fixed-right,
+html.dark .el-table tr:hover > td.el-table-fixed-column--left,
+html.dark .el-table tr:hover > td.el-table-fixed-column--right {
+  background-color: #252f38 !important;
+}
+
+/* 按钮暗色模式 */
+html.dark .el-button--primary:not(.is-link) {
+  background-color: var(--el-color-primary) !important;
+  border-color: var(--el-color-primary) !important;
+  color: #fff !important;
+}
+
+html.dark .el-button--primary:not(.is-link):hover {
+  background-color: var(--el-color-primary-light-3) !important;
+  border-color: var(--el-color-primary-light-3) !important;
+}
+
+html.dark .el-button--primary.is-link {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+html.dark .el-button--primary.is-link:hover {
+  color: #00A76F !important;
+}
+
+/* 全局 Loading 动画优化 */
+.el-loading-spinner .circular {
+  animation: loading-rotate 2s linear infinite !important;
+}
+
+.el-loading-spinner .path {
+  stroke-linecap: round !important;
+  animation: loading-dash 1.5s ease-in-out infinite !important;
+}
+
+@keyframes loading-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loading-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+/* 全屏 Loading */
+.el-loading-mask {
+  background-color: rgba(22, 28, 36, 0.48) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+html.dark .el-loading-mask {
+  background-color: rgba(22, 28, 36, 0.72) !important;
+}
+
+.el-loading-spinner {
+  margin-top: -32px;
+}
+
+.el-loading-spinner .el-loading-text {
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+/* Alert 暗色模式 */
+html.dark .el-alert {
+  background-color: rgba(145, 158, 171, 0.12) !important;
+  border-color: rgba(145, 158, 171, 0.2) !important;
+}
+
+html.dark .el-alert__title {
+  color: #fff !important;
+}
+
+html.dark .el-alert__description {
+  color: #919eab !important;
+}
+
+/* Element Plus 组件字体大小继承 */
+.el-button,
+.el-input,
+.el-input__inner,
+.el-textarea__inner,
+.el-select,
+.el-table,
+.el-dialog,
+.el-drawer,
+.el-menu,
+.el-form-item__label,
+.el-form-item__content,
+.el-message,
+.el-notification {
+  font-size: inherit !important;
+}
+
+.el-button--large {
+  font-size: var(--el-font-size-large, 18px) !important;
+}
+
+.el-button--small {
+  font-size: var(--el-font-size-small, 14px) !important;
+}
+
+.el-input--large .el-input__inner {
+  font-size: var(--el-font-size-large, 18px) !important;
+}
+
+.el-input--small .el-input__inner {
+  font-size: var(--el-font-size-small, 14px) !important;
+}
+
+/* RTL 支持 */
+html[dir="rtl"],
+html.rtl {
+  direction: rtl;
+}
+
+html.rtl body,
+body[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+/* RTL 布局翻转 */
+html.rtl .auth-layout {
+  flex-direction: row-reverse;
+}
+
+html.rtl .auth-side {
+  border-right: none;
+  border-left: 1px dashed rgba(145, 158, 171, 0.24);
+}
+
+/* ApexCharts 样式优化 */
+.apexcharts-tooltip {
+  background: #fff !important;
+  border: 1px solid rgba(145, 158, 171, 0.24) !important;
+  box-shadow: 0 0 2px rgba(145, 158, 171, 0.24), 0 12px 24px -4px rgba(145, 158, 171, 0.12) !important;
+}
+
+.dark .apexcharts-tooltip {
+  background: #1c252e !important;
+  border-color: rgba(145, 158, 171, 0.12) !important;
+  color: #fff !important;
+}
+
+.apexcharts-tooltip-text {
+  color: #212b36 !important;
+}
+
+.dark .apexcharts-tooltip-text {
+  color: #fff !important;
+}
+
+/* 暗色模式统一卡片背景 */
+.dark .chart-card,
+.dark .list-card,
+.dark .invoice-card,
+.dark .related-card,
+.dark .featured-card {
+  background: rgba(33, 43, 54, 0.4) !important;
+  border: 1px solid rgba(145, 158, 171, 0.08) !important;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.24), 0 12px 24px -4px rgba(0, 0, 0, 0.24) !important;
+}
+
+html.dark.rtl .auth-side {
+  border-left: 1px dashed rgba(145, 158, 171, 0.08);
+}
+
+html.rtl .drawer-header,
+html.rtl .header-actions,
+html.rtl .control-grid,
+html.rtl .layout-grid,
+html.rtl .color-grid,
+html.rtl .font-grid,
+html.rtl .presets-grid {
+  direction: rtl;
+}
+
+html.rtl .el-drawer__header {
+  text-align: right;
+}
+
+html.rtl .el-form-item__label {
+  text-align: right;
+}
+
+html.rtl .subtitle,
+html.rtl .form-label {
+  flex-direction: row-reverse;
+}
+
+/* RTL Element Plus 组件调整 */
+html.rtl .el-input-group__prepend {
+  border-right: 0;
+  border-left: 1px solid var(--el-border-color);
+}
+
+html.rtl .el-input-group__append {
+  border-left: 0;
+  border-right: 1px solid var(--el-border-color);
+}
+
+html.rtl .el-button + .el-button {
+  margin-left: 0;
+  margin-right: 12px;
+}
+
+html.rtl .el-drawer.rtl {
+  left: 0;
+  right: auto;
+}
+
+html.rtl .settings-drawer {
+  direction: rtl;
+}
+
+html.rtl .login-wrapper {
+  direction: rtl;
+}
+
+html.rtl .social-login {
+  direction: rtl;
+}
+
+/* 对比度增强 */
+html.contrast-bold {
+  --el-border-width: 2px;
+}
+
+html.contrast-bold .el-input__wrapper {
+  border-width: 2px !important;
+}
+
+html.contrast-bold .el-button {
+  border-width: 2px !important;
+  font-weight: 700 !important;
+}
+
+html.contrast-bold .el-dialog {
+  border-width: 2px !important;
+}
+
+/* 紧凑布局 */
+html.compact-layout .drawer-content,
+html.compact-layout .auth-content,
+html.compact-layout .login-wrapper {
+  padding: var(--app-spacing) !important;
+}
+
+html.compact-layout .control-card,
+html.compact-layout .block-section {
+  padding: var(--card-padding) !important;
+}
+
+html.compact-layout .el-form-item {
+  margin-bottom: 16px !important;
+}
+
+html.compact-layout h1,
+html.compact-layout h2,
+html.compact-layout h3,
+html.compact-layout h4 {
+  margin-bottom: 12px !important;
+}

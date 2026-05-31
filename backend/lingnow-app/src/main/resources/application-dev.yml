@@ -1,0 +1,41 @@
+# 开发环境配置
+spring:
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${LINGNOW_DB_URL:jdbc:mysql://localhost:3306/lingnow_base?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${LINGNOW_DB_USERNAME:root}
+    password: ${LINGNOW_DB_PASSWORD:}
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+
+  # Redis 配置
+  data:
+    redis:
+      host: ${LINGNOW_REDIS_HOST:localhost}
+      port: ${LINGNOW_REDIS_PORT:9786}
+      password: ${LINGNOW_REDIS_PASSWORD:}
+      database: ${LINGNOW_APP_REDIS_DATABASE:11}
+      timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+
+# 日志配置
+logging:
+  level:
+    cc.lingnow: debug
+    org.springframework: info

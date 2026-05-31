@@ -1,0 +1,246 @@
+<template>
+  <div class="app-container">
+    <el-card shadow="never" class="search-wrapper">
+      <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+          #foreach($column in $columns)
+              #if($column.isQuery == "1")
+                <el-form-item label="${column.columnComment}" prop="${column.javaField}">
+                  <el-input
+                      v-model="queryParams.${column.javaField}"
+                      placeholder="请输入${column.columnComment}"
+                      clearable
+                      style="width: 240px"
+                      @keyup.enter="handleQuery"
+                  />
+                </el-form-item>
+              #end
+          #end
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="never" class="table-wrapper">
+      <template #header>
+        <div class="card-header">
+          <el-button type="primary" plain icon="Plus" @click="handleAdd"
+                     v-permission="['${moduleName}:${businessName}:add']">新增
+          </el-button>
+          <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate"
+                     v-permission="['${moduleName}:${businessName}:edit']">修改
+          </el-button>
+          <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete"
+                     v-permission="['${moduleName}:${businessName}:remove']">删除
+          </el-button>
+        </div>
+      </template>
+
+      <el-table v-loading="loading" :data="${businessName}List" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="55" align="center"/>
+          #foreach($column in $columns)
+              #if($column.isList == "1")
+                  #if($column.javaField == ${pkColumn.javaField})
+                    <el-table-column label="${column.columnComment}" align="center" prop="${column.javaField}"/>
+                  #else
+                    <el-table-column label="${column.columnComment}" align="center" prop="${column.javaField}"/>
+                  #end
+              #end
+          #end
+        <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+          <template #default="scope">
+            <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
+                       v-permission="['${moduleName}:${businessName}:edit']">修改
+            </el-button>
+            <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)"
+                       v-permission="['${moduleName}:${businessName}:remove']">删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-container mt-4 flex justify-end">
+        <el-pagination
+            v-show="total>0"
+            v-model:current-page="queryParams.current"
+            v-model:page-size="queryParams.size"
+            :page-sizes="[10, 20, 30, 50]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            @size-change="getList"
+            @current-change="getList"
+        />
+      </div>
+    </el-card>
+
+    <!-- 添加或修改${functionName}对话框 -->
+    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
+      <el-form ref="${businessName}Ref" :model="form" :rules="rules" label-width="80px">
+          #foreach($column in $columns)
+              #if($column.isEdit == "1")
+                  #if($column.isPk != "1")
+                    <el-form-item label="${column.columnComment}" prop="${column.javaField}">
+                      <el-input v-model="form.${column.javaField}" placeholder="请输入${column.columnComment}"/>
+                    </el-form-item>
+                  #end
+              #end
+          #end
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitForm">确 定</el-button>
+          <el-button @click="cancel">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup name="${ClassName}" lang="ts">
+  import {getCurrentInstance, onMounted, reactive, ref, toRefs} from 'vue';
+
+  import {add${ClassName}, del${ClassName}, get${ClassName}, list${ClassName}, update${ClassName}} from "@/api/";
+  import {ElMessage, ElMessageBox} from 'element-plus';
+
+  const {proxy} = getCurrentInstance() as any;
+
+  const ${businessName}List = ref([]);
+  const open = ref(false);
+  const loading = ref(true);
+  const showSearch = ref(true);
+  const ids = ref<number[]>([]);
+  const single = ref(true);
+  const multiple = ref(true);
+  const total = ref(0);
+  const title = ref("");
+
+  const data = reactive({
+    form: {},
+    queryParams: {
+      current: 1,
+      size: 10,
+        #foreach($column in $columns)
+            #if($column.isQuery == "1")
+                    ${column.javaField}: undefined,
+            #end
+        #end
+    },
+    rules: {
+        #foreach($column in $columns)
+            #if($column.isRequired == "1")
+                    ${column.javaField}: [
+                {required: true, message: "${column.columnComment}不能为空", trigger: "blur"}
+              ],
+            #end
+        #end
+    }
+  });
+
+  const {queryParams, form, rules} = toRefs(data);
+
+  /** 查询${functionName}列表 */
+  function getList() {
+    loading.value = true;
+    list${ClassName}(queryParams.value).then((response: any) => {
+            ${businessName}List.value = response.records;
+      total.value = response.total;
+      loading.value = false;
+    });
+  }
+
+  /** 取消按钮 */
+  function cancel() {
+    open.value = false;
+    reset();
+  }
+
+  /** 表单重置 */
+  function reset() {
+    form.value = {
+        #foreach($column in $columns)
+            #if($column.isEdit == "1")
+                    ${column.javaField}: undefined,
+            #end
+        #end
+    };
+    proxy.resetForm("${businessName}Ref");
+  }
+
+  /** 搜索按钮操作 */
+  function handleQuery() {
+    queryParams.value.current = 1;
+    getList();
+  }
+
+  /** 重置按钮操作 */
+  function resetQuery() {
+    proxy.resetForm("queryRef");
+    handleQuery();
+  }
+
+  /** 多选框选中数据 */
+  function handleSelectionChange(selection: any[]) {
+    ids.value = selection.map(item => item.${pkColumn.javaField});
+    single.value = selection.length != 1;
+    multiple.value = !selection.length;
+  }
+
+  /** 新增按钮操作 */
+  function handleAdd() {
+    reset();
+    open.value = true;
+    title.value = "添加${functionName}";
+  }
+
+  /** 修改按钮操作 */
+  function handleUpdate(row: any) {
+    reset();
+    const ${pkColumn.javaField} = row.${pkColumn.javaField} || ids.value;
+    get${ClassName}(${pkColumn.javaField}).then((response: any) => {
+      form.value = response;
+      open.value = true;
+      title.value = "修改${functionName}";
+    });
+  }
+
+  /** 提交按钮 */
+  function submitForm() {
+    proxy.refs["${businessName}Ref"].validate((valid: boolean) => {
+      if (valid) {
+        if (form.value.${pkColumn.javaField} != null) {
+          update${ClassName}(form.value).then(() => {
+            ElMessage.success("修改成功");
+            open.value = false;
+            getList();
+          });
+        } else {
+          add${ClassName}(form.value).then(() => {
+            ElMessage.success("新增成功");
+            open.value = false;
+            getList();
+          });
+        }
+      }
+    });
+  }
+
+  /** 删除按钮操作 */
+  function handleDelete(row: any) {
+    const ${pkColumn.javaField}s = row.${pkColumn.javaField} || ids.value;
+    ElMessageBox.confirm('是否确认删除${functionName}编号为"' + ${pkColumn.javaField}s + '"的数据项？', '警告', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(function () {
+      return del${ClassName}(${pkColumn.javaField}s);
+    }).then(() => {
+      getList();
+      ElMessage.success("删除成功");
+    })
+  }
+
+  onMounted(() => {
+    getList();
+  });
+</script>

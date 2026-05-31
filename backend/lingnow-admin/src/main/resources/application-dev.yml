@@ -1,0 +1,31 @@
+# 开发环境配置（基座专用数据库，Redis 使用独立 database）
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${LINGNOW_DB_URL:jdbc:mysql://localhost:3306/lingnow_base?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${LINGNOW_DB_USERNAME:root}
+    password: ${LINGNOW_DB_PASSWORD:}
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+
+  #  # SQL 初始化
+  #  sql:
+  #    init:
+  #      mode: always
+  #      schema-locations: classpath:db/schema.sql
+  #      continue-on-error: true
+
+  data:
+    redis:
+      host: ${LINGNOW_REDIS_HOST:localhost}
+      port: ${LINGNOW_REDIS_PORT:9786}
+      password: ${LINGNOW_REDIS_PASSWORD:}
+      database: ${LINGNOW_ADMIN_REDIS_DATABASE:1}
+
+logging:
+  level:
+    cc.lingnow: debug

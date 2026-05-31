@@ -1,0 +1,622 @@
+-- LingNow System Initialization SQL
+-- ---------------------------------------------------------
+
+-- 0. Database Creation
+-- ---------------------------------------------------------
+CREATE DATABASE IF NOT EXISTS `lingnow_base` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `lingnow_base`;
+
+-- ---------------------------------------------------------
+-- 1. Core System Tables (Foundational Infrastructure)
+-- ---------------------------------------------------------
+
+-- System User
+CREATE TABLE IF NOT EXISTS `sys_user`
+(
+    `user_id`         bigint(20)   NOT NULL COMMENT '主键ID',
+    `username`        varchar(64)  NOT NULL COMMENT '用户名',
+    `password`        varchar(128) NOT NULL COMMENT '密码',
+    `nickname`        varchar(64)  DEFAULT NULL COMMENT '昵称',
+    `email`           varchar(64)  DEFAULT NULL COMMENT '邮箱',
+    `phone`           varchar(32)  DEFAULT NULL COMMENT '手机号',
+    `avatar`          varchar(255) DEFAULT NULL COMMENT '头像',
+    `gender`          tinyint(1)   DEFAULT '2' COMMENT '性别 (0-女 1-男 2-其他)',
+    `birthday`        date         DEFAULT NULL COMMENT '生日',
+    `region`          varchar(128) DEFAULT NULL COMMENT '所在地区',
+    `status`          tinyint(1)   DEFAULT '1' COMMENT '状态 (1-正常 0-禁用)',
+    `dept_id`         varchar(64)  DEFAULT NULL COMMENT '部门ID',
+    `create_time`     datetime     DEFAULT NULL,
+    `update_time`     datetime     DEFAULT NULL,
+    `create_by`       varchar(64)  DEFAULT NULL,
+    `update_by`       varchar(64)  DEFAULT NULL,
+    `del_flag`        tinyint(1)   DEFAULT '0' COMMENT '删除标记 (0-未删除 1-已删除)',
+    PRIMARY KEY (`user_id`),
+    UNIQUE KEY `idx_username` (`username`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='用户实体';
+
+-- System Role
+CREATE TABLE IF NOT EXISTS `sys_role`
+(
+    `role_id`     bigint(20)  NOT NULL COMMENT '主键ID',
+    `role_name`   varchar(64) NOT NULL COMMENT '角色名称',
+    `role_key`    varchar(64) NOT NULL COMMENT '角色权限字符串',
+    `sort_order`  int(11)      DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   DEFAULT '1' COMMENT '角色状态 (1正常 0停用)',
+    `data_scope`  tinyint(1)   DEFAULT '1' COMMENT '数据范围',
+    `remark`      varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`role_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='系统角色实体';
+
+-- System Menu
+CREATE TABLE IF NOT EXISTS `sys_menu`
+(
+    `menu_id`     bigint(20)  NOT NULL COMMENT '菜单ID',
+    `parent_id`   bigint(20)   DEFAULT '0' COMMENT '父菜单ID',
+    `menu_name`   varchar(64) NOT NULL COMMENT '菜单名称',
+    `menu_type`   tinyint(1)   DEFAULT '0' COMMENT '菜单类型：0目录 1菜单 2按钮',
+    `icon`        varchar(128) DEFAULT NULL COMMENT '菜单图标',
+    `path`        varchar(255) DEFAULT NULL COMMENT '路由地址',
+    `component`   varchar(255) DEFAULT NULL COMMENT '组件路径',
+    `permission`  varchar(128) DEFAULT NULL COMMENT '权限标识',
+    `sort_order`  int(11)      DEFAULT '0' COMMENT '显示顺序',
+    `visible`     tinyint(1)   DEFAULT '1' COMMENT '是否可见：0隐藏 1显示',
+    `status`      tinyint(1)   DEFAULT '1' COMMENT '状态：0禁用 1启用',
+    `is_cache`    char(1)      DEFAULT 'N' COMMENT '是否缓存：Y缓存 N不缓存',
+    `remark`      varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`menu_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='系统菜单实体';
+
+-- System File Config
+CREATE TABLE IF NOT EXISTS `sys_file_config`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '主键ID',
+    `platform`    varchar(32) NOT NULL COMMENT '平台: LOCAL, MINIO, ALIYUN, TENCENT, QINIU, REST',
+    `config_json` text COMMENT '配置信息(JSON)',
+    `is_active`   tinyint(1)   DEFAULT '0' COMMENT '是否启用: 0-否, 1-是',
+    `remark`      varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0' COMMENT '删除标记 (0-未删除 1-已删除)',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='文件存储配置实体';
+
+-- System File
+CREATE TABLE IF NOT EXISTS `sys_file`
+(
+    `id`            bigint(20)   NOT NULL COMMENT '主键ID',
+    `file_name`     varchar(255) DEFAULT NULL COMMENT '原始文件名',
+    `file_path`     varchar(500) DEFAULT NULL COMMENT '文件存储路径',
+    `file_url`      varchar(500) DEFAULT NULL COMMENT '文件访问URL',
+    `file_size`     bigint(20)   DEFAULT NULL COMMENT '文件大小',
+    `file_suffix`   varchar(32)  DEFAULT NULL COMMENT '文件后缀',
+    `storage_type`  varchar(32)  DEFAULT NULL COMMENT '存储类型',
+    `business_id`   bigint(20)   DEFAULT NULL COMMENT '业务ID',
+    `business_type` varchar(64)  DEFAULT NULL COMMENT '业务类型',
+    `create_time`   datetime     DEFAULT NULL,
+    `update_time`   datetime     DEFAULT NULL,
+    `create_by`     varchar(64)  DEFAULT NULL,
+    `update_by`     varchar(64)  DEFAULT NULL,
+    `del_flag`      tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='文件信息实体';
+
+-- System Dictionary Type
+CREATE TABLE IF NOT EXISTS `sys_dict_type`
+(
+    `dict_id`     bigint(20) NOT NULL COMMENT '字典主键',
+    `dict_name`   varchar(100) DEFAULT '' COMMENT '字典名称',
+    `dict_type`   varchar(100) DEFAULT '' COMMENT '字典类型',
+    `status`      tinyint(1)   DEFAULT '1' COMMENT '状态（1正常 0停用）',
+    `remark`      varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`dict_id`),
+    UNIQUE KEY `idx_dict_type` (`dict_type`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='字典类型表';
+
+-- System Dictionary Data
+CREATE TABLE IF NOT EXISTS `sys_dict_data`
+(
+    `dict_code`   bigint(20) NOT NULL COMMENT '字典编码',
+    `dict_sort`   int(11)      DEFAULT '0' COMMENT '字典排序',
+    `dict_label`  varchar(100) DEFAULT '' COMMENT '字典标签',
+    `dict_value`  varchar(100) DEFAULT '' COMMENT '字典键值',
+    `dict_type`   varchar(100) DEFAULT '' COMMENT '字典类型',
+    `css_class`   varchar(100) DEFAULT NULL COMMENT '样式属性',
+    `list_class`  varchar(100) DEFAULT NULL COMMENT '表格回显样式',
+    `is_default`  char(1)      DEFAULT 'N' COMMENT '是否默认（Y是 N否）',
+    `status`      tinyint(1)   DEFAULT '1' COMMENT '状态（1正常 0停用）',
+    `remark`      varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`dict_code`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='字典数据表';
+
+-- System Configuration
+CREATE TABLE IF NOT EXISTS `sys_config`
+(
+    `config_id`    bigint(20) NOT NULL COMMENT '参数主键',
+    `config_name`  varchar(100) DEFAULT '' COMMENT '参数名称',
+    `config_key`   varchar(100) DEFAULT '' COMMENT '参数键名',
+    `config_value` varchar(500) DEFAULT '' COMMENT '参数键值',
+    `config_type`  char(1)      DEFAULT 'N' COMMENT '系统内置（Y是 N否）',
+    `remark`       varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time`  datetime     DEFAULT NULL,
+    `update_time`  datetime     DEFAULT NULL,
+    `create_by`    varchar(64)  DEFAULT NULL,
+    `update_by`    varchar(64)  DEFAULT NULL,
+    `del_flag`     tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`config_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='参数配置表';
+
+-- System Department
+CREATE TABLE IF NOT EXISTS `sys_dept`
+(
+    `dept_id`       bigint(20) NOT NULL COMMENT '部门ID',
+    `parent_id`     varchar(64)  DEFAULT '0' COMMENT '父部门ID',
+    `ancestors`     varchar(200) DEFAULT '' COMMENT '祖级列表',
+    `dept_name`     varchar(30)  DEFAULT '' COMMENT '部门名称',
+    `order_num`     int(11)      DEFAULT '0' COMMENT '显示顺序',
+    `leader`        varchar(20)  DEFAULT NULL COMMENT '负责人',
+    `phone`         varchar(11)  DEFAULT NULL COMMENT '联系电话',
+    `email`         varchar(50)  DEFAULT NULL COMMENT '邮箱',
+    `category_code` varchar(64)  DEFAULT NULL COMMENT '类别编码',
+    `region`        varchar(128) DEFAULT NULL COMMENT '地区',
+    `status`        tinyint(1)   DEFAULT '1' COMMENT '部门状态（1正常 0停用）',
+    `create_time`   datetime     DEFAULT NULL,
+    `update_time`   datetime     DEFAULT NULL,
+    `create_by`     varchar(64)  DEFAULT NULL,
+    `update_by`     varchar(64)  DEFAULT NULL,
+    `del_flag`      tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`dept_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='部门表';
+
+-- Role Menu Join
+CREATE TABLE IF NOT EXISTS `sys_role_menu`
+(
+    `role_id` bigint(20) NOT NULL,
+    `menu_id` bigint(20) NOT NULL,
+    PRIMARY KEY (`role_id`, `menu_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='角色和菜单关联';
+
+-- User Role Join
+CREATE TABLE IF NOT EXISTS `sys_user_role`
+(
+    `user_id` bigint(20) NOT NULL,
+    `role_id` bigint(20) NOT NULL,
+    PRIMARY KEY (`user_id`, `role_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='用户和角色关联';
+
+-- User Post Join
+CREATE TABLE IF NOT EXISTS `sys_user_post`
+(
+    `user_id` bigint(20) NOT NULL,
+    `post_id` bigint(20) NOT NULL,
+    PRIMARY KEY (`user_id`, `post_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='用户和岗位关联';
+
+-- Login Log
+CREATE TABLE IF NOT EXISTS `sys_login_log`
+(
+    `info_id`        bigint(20) NOT NULL AUTO_INCREMENT COMMENT '访问ID',
+    `user_name`      varchar(64)  DEFAULT NULL COMMENT '用户账号',
+    `ipaddr`         varchar(128) DEFAULT NULL COMMENT '登录IP地址',
+    `login_location` varchar(255) DEFAULT NULL COMMENT '登录地点',
+    `browser`        varchar(64)  DEFAULT NULL COMMENT '浏览器类型',
+    `os`             varchar(64)  DEFAULT NULL COMMENT '操作系统',
+    `status`         tinyint(1)   DEFAULT '1' COMMENT '登录状态（1成功 0失败）',
+    `msg`            varchar(1000) DEFAULT NULL COMMENT '提示消息',
+    `login_time`     datetime     DEFAULT NULL COMMENT '访问时间',
+    `create_time`    datetime     DEFAULT NULL,
+    `update_time`    datetime     DEFAULT NULL,
+    `create_by`      varchar(64)  DEFAULT NULL,
+    `update_by`      varchar(64)  DEFAULT NULL,
+    `del_flag`       tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`info_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='系统访问记录';
+
+-- System Operational Log
+CREATE TABLE IF NOT EXISTS `sys_oper_log`
+(
+    `oper_id`        bigint(20) NOT NULL AUTO_INCREMENT COMMENT '日志主键',
+    `title`          varchar(64)   DEFAULT NULL COMMENT '模块标题',
+    `business_type`  int(11)       DEFAULT '0' COMMENT '业务类型',
+    `method`         varchar(128)  DEFAULT NULL COMMENT '方法名称',
+    `request_method` varchar(20)   DEFAULT NULL COMMENT '请求方式',
+    `operator_type`  int(11)       DEFAULT '0' COMMENT '操作类别',
+    `oper_name`      varchar(64)   DEFAULT NULL COMMENT '操作人员',
+    `dept_name`      varchar(64)   DEFAULT NULL COMMENT '部门名称',
+    `oper_url`       varchar(255)  DEFAULT NULL COMMENT '请求URL',
+    `oper_ip`        varchar(128)  DEFAULT NULL COMMENT '主机地址',
+    `oper_location`  varchar(255)  DEFAULT NULL COMMENT '操作地点',
+    `oper_param`     varchar(2000) DEFAULT NULL COMMENT '请求参数',
+    `json_result`    varchar(2000) DEFAULT NULL COMMENT '返回参数',
+    `status`         tinyint(1)    DEFAULT '1' COMMENT '操作状态（1正常 0异常）',
+    `error_msg`      varchar(2000) DEFAULT NULL COMMENT '错误消息',
+    `oper_time`      datetime      DEFAULT NULL COMMENT '操作时间',
+    `cost_time`      bigint(20)    DEFAULT '0' COMMENT '消耗时间',
+    `create_time`    datetime      DEFAULT NULL,
+    `update_time`    datetime      DEFAULT NULL,
+    `create_by`      varchar(64)   DEFAULT NULL,
+    `update_by`      varchar(64)   DEFAULT NULL,
+    `del_flag`       tinyint(1)    DEFAULT '0',
+    PRIMARY KEY (`oper_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='操作日志记录';
+
+-- System Error Log
+CREATE TABLE IF NOT EXISTS `sys_error_log`
+(
+    `id`             bigint(20) NOT NULL COMMENT '主键ID',
+    `trace_id`       varchar(64)    DEFAULT NULL COMMENT '追踪ID',
+    `user_id`        bigint(20)     DEFAULT NULL COMMENT '用户ID',
+    `user_name`      varchar(64)    DEFAULT NULL COMMENT '用户名称',
+    `request_method` varchar(20)    DEFAULT NULL COMMENT '请求方式',
+    `request_url`    varchar(255)   DEFAULT NULL COMMENT '请求URL',
+    `request_params` varchar(2000)  DEFAULT NULL COMMENT '请求参数',
+    `ip`             varchar(128)   DEFAULT NULL COMMENT 'IP地址',
+    `error_msg`      varchar(2000)  DEFAULT NULL COMMENT '错误信息',
+    `error_stack`    longtext COMMENT '堆栈信息',
+    `create_time`    datetime      DEFAULT NULL,
+    `update_time`    datetime      DEFAULT NULL,
+    `create_by`      varchar(64)   DEFAULT NULL,
+    `update_by`      varchar(64)   DEFAULT NULL,
+    `del_flag`       tinyint(1)    DEFAULT '0',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='错误日志记录';
+
+-- System Slow SQL Log
+CREATE TABLE IF NOT EXISTS `sys_slow_sql_log`
+(
+    `id`             bigint(20) NOT NULL COMMENT '主键ID',
+    `trace_id`       varchar(64)   DEFAULT NULL COMMENT '追踪ID',
+    `user_id`        bigint(20)    DEFAULT NULL COMMENT '用户ID',
+    `user_name`      varchar(64)   DEFAULT NULL COMMENT '用户名称',
+    `execution_time` bigint(20)    DEFAULT NULL COMMENT '执行时长(ms)',
+    `sql_statement`  longtext COMMENT 'SQL语句',
+    `create_time`    datetime     DEFAULT NULL,
+    `update_time`    datetime     DEFAULT NULL,
+    `create_by`      varchar(64)  DEFAULT NULL,
+    `update_by`      varchar(64)  DEFAULT NULL,
+    `del_flag`       tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='慢SQL日志记录';
+
+-- System User Notification
+CREATE TABLE IF NOT EXISTS `sys_user_notification`
+(
+    `id`          bigint(20) NOT NULL COMMENT '主键ID',
+    `user_id`     bigint(20)    DEFAULT NULL COMMENT '接收用户ID',
+    `title`       varchar(128)  DEFAULT NULL COMMENT '标题',
+    `content`     varchar(1000) DEFAULT NULL COMMENT '内容',
+    `type`        varchar(32)   DEFAULT NULL COMMENT '类型',
+    `is_read`     tinyint(1)    DEFAULT '0' COMMENT '是否已读',
+    `biz_id`      bigint(20)    DEFAULT NULL COMMENT '业务ID',
+    `biz_type`    varchar(64)   DEFAULT NULL COMMENT '业务类型',
+    `create_time` datetime      DEFAULT NULL,
+    `update_time` datetime      DEFAULT NULL,
+    `create_by`   varchar(64)   DEFAULT NULL,
+    `update_by`   varchar(64)   DEFAULT NULL,
+    `del_flag`    tinyint(1)    DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_read` (`user_id`, `is_read`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='用户系统通知';
+
+-- System Social User
+CREATE TABLE IF NOT EXISTS `sys_social_user`
+(
+    `id`          bigint(20) NOT NULL COMMENT '主键ID',
+    `user_id`     bigint(20) NOT NULL COMMENT '用户ID',
+    `provider`    varchar(32)  DEFAULT NULL COMMENT '第三方平台',
+    `open_id`     varchar(128) DEFAULT NULL COMMENT '平台OpenID',
+    `union_id`    varchar(128) DEFAULT NULL COMMENT '平台UnionID',
+    `nickname`    varchar(128) DEFAULT NULL COMMENT '平台昵称',
+    `avatar`      varchar(255) DEFAULT NULL COMMENT '平台头像',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_provider_openid` (`provider`, `open_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='社交账号绑定实体';
+
+-- System Post
+CREATE TABLE IF NOT EXISTS `sys_post`
+(
+    `post_id`     bigint(20)  NOT NULL COMMENT '岗位ID',
+    `dept_id`     bigint(20)   DEFAULT NULL COMMENT '部门ID',
+    `post_code`   varchar(64) NOT NULL COMMENT '岗位编码',
+    `post_name`   varchar(64) NOT NULL COMMENT '岗位名称',
+    `post_sort`   int(11)      DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   DEFAULT '1' COMMENT '状态（1正常 0停用）',
+    `remark`      varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`post_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='岗位表';
+
+-- System Notice
+CREATE TABLE IF NOT EXISTS `sys_notice`
+(
+    `notice_id`      bigint(20)   NOT NULL COMMENT '公告ID',
+    `notice_title`   varchar(128) NOT NULL COMMENT '公告标题',
+    `notice_type`    char(1)      NOT NULL COMMENT '公告类型（1通知 2公告）',
+    `notice_content` longtext COMMENT '公告内容',
+    `status`         tinyint(1)   DEFAULT '1' COMMENT '公告状态（1正常 0关闭）',
+    `remark`         varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time`    datetime     DEFAULT NULL,
+    `update_time`    datetime     DEFAULT NULL,
+    `create_by`      varchar(64)  DEFAULT NULL,
+    `update_by`      varchar(64)  DEFAULT NULL,
+    `del_flag`       tinyint(1)   DEFAULT '0',
+    PRIMARY KEY (`notice_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='通知公告表';
+
+-- System Scheduled Job
+CREATE TABLE IF NOT EXISTS `sys_job`
+(
+    `job_id`          bigint(20)   NOT NULL COMMENT '任务ID',
+    `job_name`        varchar(64)  NOT NULL COMMENT '任务名称',
+    `job_group`       varchar(64)  NOT NULL DEFAULT 'DEFAULT' COMMENT '任务组名',
+    `invoke_target`   varchar(500) NOT NULL COMMENT '调用目标字符串',
+    `cron_expression` varchar(255) NOT NULL COMMENT 'Cron执行表达式',
+    `misfire_policy`  varchar(32)  NOT NULL DEFAULT 'DO_NOTHING' COMMENT '错过执行策略',
+    `concurrent`      char(1)      NOT NULL DEFAULT 'N' COMMENT '是否并发执行（Y允许 N禁止）',
+    `status`          tinyint(1)   NOT NULL DEFAULT '0' COMMENT '任务状态（1正常 0暂停）',
+    `remark`          varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time`     datetime              DEFAULT NULL,
+    `update_time`     datetime              DEFAULT NULL,
+    `create_by`       varchar(64)           DEFAULT NULL,
+    `update_by`       varchar(64)           DEFAULT NULL,
+    `del_flag`        tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`job_id`),
+    KEY `idx_job_status` (`status`),
+    KEY `idx_job_group` (`job_group`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='定时任务调度表';
+
+-- System Scheduled Job Log
+CREATE TABLE IF NOT EXISTS `sys_job_log`
+(
+    `job_log_id`    bigint(20)   NOT NULL COMMENT '任务日志ID',
+    `job_id`        bigint(20)            DEFAULT NULL COMMENT '任务ID',
+    `job_name`      varchar(64)  NOT NULL COMMENT '任务名称',
+    `job_group`     varchar(64)  NOT NULL COMMENT '任务组名',
+    `invoke_target` varchar(500) NOT NULL COMMENT '调用目标字符串',
+    `job_message`   varchar(500)          DEFAULT NULL COMMENT '日志信息',
+    `status`        tinyint(1)   NOT NULL DEFAULT '1' COMMENT '执行状态（1成功 0失败）',
+    `exception_info` longtext COMMENT '异常信息',
+    `start_time`    datetime              DEFAULT NULL COMMENT '开始时间',
+    `end_time`      datetime              DEFAULT NULL COMMENT '结束时间',
+    `duration_ms`   bigint(20)            DEFAULT NULL COMMENT '执行耗时毫秒',
+    `create_time`   datetime              DEFAULT NULL,
+    `update_time`   datetime              DEFAULT NULL,
+    `create_by`     varchar(64)           DEFAULT NULL,
+    `update_by`     varchar(64)           DEFAULT NULL,
+    `del_flag`      tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`job_log_id`),
+    KEY `idx_job_log_job_id` (`job_id`),
+    KEY `idx_job_log_start_time` (`start_time`),
+    KEY `idx_job_log_status` (`status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='定时任务调度日志表';
+
+-- ---------------------------------------------------------
+-- 2. Initial Seed Data (Admin Account & Roles)
+-- ---------------------------------------------------------
+
+-- Default Admin User
+-- Note: Password is salted BCrypt
+INSERT IGNORE INTO `sys_user`
+(`user_id`, `username`, `password`, `nickname`, `status`, `create_time`, `del_flag`)
+VALUES (1, 'admin', '$2a$10$a2pcS0rGCTLO.tR9UbvlnuXmHH5O/d/iXmSOENmr90Gvcd.plM9Au', '超级管理员', 1, NOW(), 0);
+
+-- Default Super Admin Role
+INSERT IGNORE INTO `sys_role`
+(`role_id`, `role_name`, `role_key`, `sort_order`, `status`, `create_time`, `del_flag`)
+VALUES (1, '超级管理员', 'admin', 1, 1, NOW(), 0);
+
+-- Default Department
+INSERT IGNORE INTO `sys_dept`
+(`dept_id`, `parent_id`, `ancestors`, `dept_name`, `order_num`, `leader`, `phone`, `email`, `status`, `create_time`, `del_flag`)
+VALUES (1, '0', '0', '总部', 1, NULL, NULL, NULL, 1, NOW(), 0);
+
+-- Default Post
+INSERT IGNORE INTO `sys_post`
+(`post_id`, `dept_id`, `post_code`, `post_name`, `post_sort`, `status`, `create_time`, `del_flag`)
+VALUES (1, 1, 'admin', '管理员', 1, 1, NOW(), 0);
+
+-- Assign User to Role
+INSERT IGNORE INTO `sys_user_role` (`user_id`, `role_id`)
+VALUES (1, 1);
+
+-- Assign User to Post
+INSERT IGNORE INTO `sys_user_post` (`user_id`, `post_id`)
+VALUES (1, 1);
+
+-- Default Menus
+INSERT IGNORE INTO `sys_menu`
+(`menu_id`, `parent_id`, `menu_name`, `menu_type`, `icon`, `path`, `component`, `permission`, `sort_order`, `visible`, `status`, `is_cache`, `create_time`, `del_flag`)
+VALUES
+(1000, 0, '数据看板', 1, 'DataAnalysis', '/dashboard', 'home/index', NULL, 1, 1, 1, 'N', NOW(), 0),
+(1100, 0, '系统管理', 0, 'Setting', '/sys', 'Layout', NULL, 10, 1, 1, 'N', NOW(), 0),
+(1110, 1100, '用户管理', 1, 'User', '/sys/user', 'sys/user/index', 'sys:user:list', 11, 1, 1, 'N', NOW(), 0),
+(1120, 1100, '角色管理', 1, 'Avatar', '/sys/role', 'sys/role/index', 'sys:role:list', 12, 1, 1, 'N', NOW(), 0),
+(1130, 1100, '菜单管理', 1, 'Menu', '/sys/menu', 'sys/menu/index', 'sys:menu:list', 13, 1, 1, 'N', NOW(), 0),
+(1140, 1100, '文件管理', 1, 'FolderOpened', '/sys/file', 'sys/file/index', 'sys:file:list', 14, 1, 1, 'N', NOW(), 0),
+(1200, 0, '基础设置', 0, 'Tools', '/system', 'Layout', NULL, 20, 1, 1, 'N', NOW(), 0),
+(1210, 1200, '部门管理', 1, 'OfficeBuilding', '/system/dept', 'system/dept/index', 'system:dept:list', 21, 1, 1, 'N', NOW(), 0),
+(1220, 1200, '岗位管理', 1, 'Postcard', '/system/post', 'system/post/index', 'system:post:list', 22, 1, 1, 'N', NOW(), 0),
+(1230, 1200, '字典管理', 1, 'Collection', '/system/dict', 'system/dict/index', 'system:dict:list', 23, 1, 1, 'N', NOW(), 0),
+(1240, 1200, '参数配置', 1, 'Operation', '/system/config', 'system/config/index', 'system:config:list', 24, 1, 1, 'N', NOW(), 0),
+(1250, 1200, '通知公告', 1, 'Bell', '/system/notice', 'system/notice/index', 'system:notice:list', 25, 1, 1, 'N', NOW(), 0),
+(1260, 1200, '职员管理', 1, 'UserFilled', '/system/staff', 'system/staff/index', 'system:staff:list', 26, 1, 1, 'N', NOW(), 0),
+(1300, 0, '日志管理', 0, 'Document', '/sys/log', 'ParentView', NULL, 30, 1, 1, 'N', NOW(), 0),
+(1310, 1300, '操作日志', 1, 'Tickets', '/sys/log/oper', 'sys/log/oper/index', 'sys:log:oper', 31, 1, 1, 'N', NOW(), 0),
+(1320, 1300, '登录日志', 1, 'Key', '/sys/log/login', 'sys/log/login/index', 'sys:log:login', 32, 1, 1, 'N', NOW(), 0),
+(1330, 1300, '错误日志', 1, 'Warning', '/sys/log/error', 'sys/log/error/index', 'sys:log:error', 33, 1, 1, 'N', NOW(), 0),
+(1340, 1300, '慢SQL日志', 1, 'Timer', '/sys/log/slow-sql', 'sys/log/slowSql/index', 'sys:log:slowSql', 34, 1, 1, 'N', NOW(), 0),
+(1400, 0, '系统监控', 0, 'Monitor', '/monitor', 'Layout', NULL, 40, 1, 1, 'N', NOW(), 0),
+(1410, 1400, '服务监控', 1, 'DataAnalysis', '/monitor/admin', 'monitor/admin/index', 'monitor:admin:view', 41, 1, 1, 'N', NOW(), 0),
+(1420, 1400, '缓存监控', 1, 'Cpu', '/monitor/cache', 'monitor/cache/index', 'monitor:cache:view', 42, 1, 1, 'N', NOW(), 0),
+(1430, 1400, '在线用户', 1, 'Connection', '/monitor/online', 'monitor/online/index', 'monitor:online:view', 43, 1, 1, 'N', NOW(), 0),
+(1440, 1400, '实时日志', 1, 'Document', '/monitor/log', 'monitor/log/index', 'monitor:log:view', 44, 1, 1, 'N', NOW(), 0),
+(1450, 1400, '任务监控', 1, 'Timer', '/monitor/job', 'monitor/job/index', 'monitor:job:list', 45, 1, 1, 'N', NOW(), 0);
+
+-- Default Button Permissions
+INSERT IGNORE INTO `sys_menu`
+(`menu_id`, `parent_id`, `menu_name`, `menu_type`, `icon`, `path`, `component`, `permission`, `sort_order`, `visible`, `status`, `is_cache`, `create_time`, `del_flag`)
+VALUES
+(1111, 1110, '用户新增', 2, NULL, NULL, NULL, 'sys:user:add', 1, 1, 1, 'N', NOW(), 0),
+(1112, 1110, '用户编辑', 2, NULL, NULL, NULL, 'sys:user:edit', 2, 1, 1, 'N', NOW(), 0),
+(1113, 1110, '用户删除', 2, NULL, NULL, NULL, 'sys:user:remove', 3, 1, 1, 'N', NOW(), 0),
+(1114, 1110, '用户重置密码', 2, NULL, NULL, NULL, 'sys:user:resetPwd', 4, 1, 1, 'N', NOW(), 0),
+(1115, 1110, '用户分配角色', 2, NULL, NULL, NULL, 'sys:user:authRole', 5, 1, 1, 'N', NOW(), 0),
+(1121, 1120, '角色新增', 2, NULL, NULL, NULL, 'sys:role:add', 1, 1, 1, 'N', NOW(), 0),
+(1122, 1120, '角色编辑', 2, NULL, NULL, NULL, 'sys:role:edit', 2, 1, 1, 'N', NOW(), 0),
+(1123, 1120, '角色删除', 2, NULL, NULL, NULL, 'sys:role:remove', 3, 1, 1, 'N', NOW(), 0),
+(1124, 1120, '角色分配用户', 2, NULL, NULL, NULL, 'sys:role:authUser', 4, 1, 1, 'N', NOW(), 0),
+(1125, 1120, '角色查询', 2, NULL, NULL, NULL, 'sys:role:query', 5, 1, 1, 'N', NOW(), 0),
+(1131, 1130, '菜单新增', 2, NULL, NULL, NULL, 'sys:menu:add', 1, 1, 1, 'N', NOW(), 0),
+(1132, 1130, '菜单编辑', 2, NULL, NULL, NULL, 'sys:menu:edit', 2, 1, 1, 'N', NOW(), 0),
+(1133, 1130, '菜单删除', 2, NULL, NULL, NULL, 'sys:menu:remove', 3, 1, 1, 'N', NOW(), 0),
+(1141, 1140, '文件上传', 2, NULL, NULL, NULL, 'sys:file:upload', 1, 1, 1, 'N', NOW(), 0),
+(1142, 1140, '文件删除', 2, NULL, NULL, NULL, 'sys:file:remove', 2, 1, 1, 'N', NOW(), 0),
+(1143, 1140, '文件配置', 2, NULL, NULL, NULL, 'sys:file:config', 3, 1, 1, 'N', NOW(), 0),
+(1211, 1210, '部门新增', 2, NULL, NULL, NULL, 'system:dept:add', 1, 1, 1, 'N', NOW(), 0),
+(1212, 1210, '部门编辑', 2, NULL, NULL, NULL, 'system:dept:edit', 2, 1, 1, 'N', NOW(), 0),
+(1213, 1210, '部门删除', 2, NULL, NULL, NULL, 'system:dept:remove', 3, 1, 1, 'N', NOW(), 0),
+(1221, 1220, '岗位新增', 2, NULL, NULL, NULL, 'system:post:add', 1, 1, 1, 'N', NOW(), 0),
+(1222, 1220, '岗位编辑', 2, NULL, NULL, NULL, 'system:post:edit', 2, 1, 1, 'N', NOW(), 0),
+(1223, 1220, '岗位删除', 2, NULL, NULL, NULL, 'system:post:remove', 3, 1, 1, 'N', NOW(), 0),
+(1231, 1230, '字典新增', 2, NULL, NULL, NULL, 'system:dict:add', 1, 1, 1, 'N', NOW(), 0),
+(1232, 1230, '字典编辑', 2, NULL, NULL, NULL, 'system:dict:edit', 2, 1, 1, 'N', NOW(), 0),
+(1233, 1230, '字典删除', 2, NULL, NULL, NULL, 'system:dict:remove', 3, 1, 1, 'N', NOW(), 0),
+(1241, 1240, '参数新增', 2, NULL, NULL, NULL, 'system:config:add', 1, 1, 1, 'N', NOW(), 0),
+(1242, 1240, '参数编辑', 2, NULL, NULL, NULL, 'system:config:edit', 2, 1, 1, 'N', NOW(), 0),
+(1243, 1240, '参数删除', 2, NULL, NULL, NULL, 'system:config:remove', 3, 1, 1, 'N', NOW(), 0),
+(1251, 1250, '公告新增', 2, NULL, NULL, NULL, 'system:notice:add', 1, 1, 1, 'N', NOW(), 0),
+(1252, 1250, '公告编辑', 2, NULL, NULL, NULL, 'system:notice:edit', 2, 1, 1, 'N', NOW(), 0),
+(1253, 1250, '公告删除', 2, NULL, NULL, NULL, 'system:notice:remove', 3, 1, 1, 'N', NOW(), 0),
+(1261, 1260, '职员新增', 2, NULL, NULL, NULL, 'system:staff:add', 1, 1, 1, 'N', NOW(), 0),
+(1262, 1260, '职员编辑', 2, NULL, NULL, NULL, 'system:staff:edit', 2, 1, 1, 'N', NOW(), 0),
+(1263, 1260, '职员删除', 2, NULL, NULL, NULL, 'system:staff:remove', 3, 1, 1, 'N', NOW(), 0),
+(1451, 1450, '任务新增', 2, NULL, NULL, NULL, 'monitor:job:add', 1, 1, 1, 'N', NOW(), 0),
+(1452, 1450, '任务编辑', 2, NULL, NULL, NULL, 'monitor:job:edit', 2, 1, 1, 'N', NOW(), 0),
+(1453, 1450, '任务删除', 2, NULL, NULL, NULL, 'monitor:job:remove', 3, 1, 1, 'N', NOW(), 0),
+(1454, 1450, '任务启停', 2, NULL, NULL, NULL, 'monitor:job:changeStatus', 4, 1, 1, 'N', NOW(), 0),
+(1455, 1450, '任务执行一次', 2, NULL, NULL, NULL, 'monitor:job:run', 5, 1, 1, 'N', NOW(), 0),
+(1456, 1450, '任务日志查询', 2, NULL, NULL, NULL, 'monitor:job:log', 6, 1, 1, 'N', NOW(), 0),
+(1457, 1450, '任务日志删除', 2, NULL, NULL, NULL, 'monitor:job:logRemove', 7, 1, 1, 'N', NOW(), 0),
+(1458, 1450, '任务日志清空', 2, NULL, NULL, NULL, 'monitor:job:logClean', 8, 1, 1, 'N', NOW(), 0);
+
+-- Assign Super Admin Role to All Menus
+INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
+SELECT 1, menu_id FROM `sys_menu`;
+
+-- Default Dictionaries
+INSERT IGNORE INTO `sys_dict_type`
+(`dict_id`, `dict_name`, `dict_type`, `status`, `create_time`, `del_flag`)
+VALUES
+(1, '正常禁用状态', 'sys_normal_disable', 1, NOW(), 0),
+(2, '系统是否', 'sys_yes_no', 1, NOW(), 0),
+(3, '菜单类型', 'sys_menu_type', 1, NOW(), 0),
+(4, '用户性别', 'sys_user_sex', 1, NOW(), 0),
+(5, '通用状态', 'sys_common_status', 1, NOW(), 0),
+(6, '操作类型', 'sys_oper_type', 1, NOW(), 0),
+(7, '文件存储类型', 'sys_file_storage_type', 1, NOW(), 0),
+(8, '通知类型', 'sys_notice_type', 1, NOW(), 0),
+(9, '通知状态', 'sys_notice_status', 1, NOW(), 0),
+(10, '数据权限范围', 'sys_data_scope', 1, NOW(), 0),
+(11, '定时任务状态', 'sys_job_status', 1, NOW(), 0),
+(12, '定时任务并发策略', 'sys_job_concurrent', 1, NOW(), 0),
+(13, '定时任务错过策略', 'sys_job_misfire_policy', 1, NOW(), 0);
+
+INSERT IGNORE INTO `sys_dict_data`
+(`dict_code`, `dict_sort`, `dict_label`, `dict_value`, `dict_type`, `list_class`, `is_default`, `status`, `create_time`, `del_flag`)
+VALUES
+(101, 1, '正常', '1', 'sys_normal_disable', 'success', 'Y', 1, NOW(), 0),
+(102, 2, '禁用', '0', 'sys_normal_disable', 'danger', 'N', 1, NOW(), 0),
+(201, 1, '是', 'Y', 'sys_yes_no', 'success', 'N', 1, NOW(), 0),
+(202, 2, '否', 'N', 'sys_yes_no', 'info', 'Y', 1, NOW(), 0),
+(301, 1, '目录', '0', 'sys_menu_type', 'primary', 'N', 1, NOW(), 0),
+(302, 2, '菜单', '1', 'sys_menu_type', 'success', 'Y', 1, NOW(), 0),
+(303, 3, '按钮', '2', 'sys_menu_type', 'warning', 'N', 1, NOW(), 0),
+(401, 1, '女', '0', 'sys_user_sex', 'info', 'N', 1, NOW(), 0),
+(402, 2, '男', '1', 'sys_user_sex', 'info', 'N', 1, NOW(), 0),
+(403, 3, '其他', '2', 'sys_user_sex', 'info', 'Y', 1, NOW(), 0),
+(501, 1, '成功', '1', 'sys_common_status', 'success', 'Y', 1, NOW(), 0),
+(502, 2, '失败', '0', 'sys_common_status', 'danger', 'N', 1, NOW(), 0),
+(601, 1, '其他', '0', 'sys_oper_type', 'info', 'Y', 1, NOW(), 0),
+(602, 2, '新增', '1', 'sys_oper_type', 'success', 'N', 1, NOW(), 0),
+(603, 3, '修改', '2', 'sys_oper_type', 'warning', 'N', 1, NOW(), 0),
+(604, 4, '删除', '3', 'sys_oper_type', 'danger', 'N', 1, NOW(), 0),
+(701, 1, '本地', 'LOCAL', 'sys_file_storage_type', 'success', 'Y', 1, NOW(), 0),
+(702, 2, 'MinIO', 'MINIO', 'sys_file_storage_type', 'primary', 'N', 1, NOW(), 0),
+(703, 3, '阿里云', 'ALIYUN', 'sys_file_storage_type', 'warning', 'N', 1, NOW(), 0),
+(704, 4, '腾讯云', 'TENCENT', 'sys_file_storage_type', 'warning', 'N', 1, NOW(), 0),
+(705, 5, '七牛云', 'QINIU', 'sys_file_storage_type', 'warning', 'N', 1, NOW(), 0),
+(801, 1, '通知', '1', 'sys_notice_type', 'primary', 'Y', 1, NOW(), 0),
+(802, 2, '公告', '2', 'sys_notice_type', 'success', 'N', 1, NOW(), 0),
+(901, 1, '正常', '1', 'sys_notice_status', 'success', 'Y', 1, NOW(), 0),
+(902, 2, '关闭', '0', 'sys_notice_status', 'danger', 'N', 1, NOW(), 0),
+(1001, 1, '全部数据权限', '1', 'sys_data_scope', 'primary', 'Y', 1, NOW(), 0),
+(1002, 2, '自定数据权限', '2', 'sys_data_scope', 'warning', 'N', 1, NOW(), 0),
+(1003, 3, '本部门数据权限', '3', 'sys_data_scope', 'success', 'N', 1, NOW(), 0),
+(1004, 4, '本部门及以下数据权限', '4', 'sys_data_scope', 'success', 'N', 1, NOW(), 0),
+(1005, 5, '仅本人数据权限', '5', 'sys_data_scope', 'info', 'N', 1, NOW(), 0),
+(1101, 1, '运行中', '1', 'sys_job_status', 'success', 'Y', 1, NOW(), 0),
+(1102, 2, '已暂停', '0', 'sys_job_status', 'info', 'N', 1, NOW(), 0),
+(1201, 1, '允许并发', 'Y', 'sys_job_concurrent', 'success', 'N', 1, NOW(), 0),
+(1202, 2, '禁止并发', 'N', 'sys_job_concurrent', 'warning', 'Y', 1, NOW(), 0),
+(1301, 1, '忽略错过执行', 'IGNORE', 'sys_job_misfire_policy', 'info', 'N', 1, NOW(), 0),
+(1302, 2, '立即执行一次', 'FIRE_ONCE', 'sys_job_misfire_policy', 'warning', 'N', 1, NOW(), 0),
+(1303, 3, '错过不补偿', 'DO_NOTHING', 'sys_job_misfire_policy', 'success', 'Y', 1, NOW(), 0);
+
+-- Default Config
+INSERT IGNORE INTO `sys_config`
+(`config_id`, `config_name`, `config_key`, `config_value`, `config_type`, `remark`, `create_time`, `del_flag`)
+VALUES
+(1, '系统名称', 'sys.name', 'LingNow Base', 'Y', '系统显示名称', NOW(), 0);
