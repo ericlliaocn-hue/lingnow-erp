@@ -78,7 +78,7 @@ lingnow/backend/
 
 1. 创建数据库并导入完整表结构及核心数据：
 ```bash
-mysql -u root -p lingnow_base < sql/init.sql
+mysql -u root -p lingnow_erp < sql/init.sql
 ```
 
 初始化脚本会创建基座管理员账号，用于首次登录后继续配置系统资料。
@@ -122,7 +122,7 @@ mvn spring-boot:run
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/lingnow_base
+    url: jdbc:mysql://localhost:3306/lingnow_erp
     username: root
     password: your_password
     

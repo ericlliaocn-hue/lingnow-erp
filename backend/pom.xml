@@ -11,7 +11,7 @@
     <packaging>pom</packaging>
 
     <name>LingNow Parent</name>
-    <description>LingNow Base - 基础权限与业务开发底座</description>
+    <description>LingNow ERP - 基于 LingNow Admin 的 ERP 项目</description>
 
     <modules>
         <!-- 基础模块 -->

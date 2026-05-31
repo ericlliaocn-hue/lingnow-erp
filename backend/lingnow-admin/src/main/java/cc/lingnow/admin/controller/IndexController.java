@@ -13,12 +13,12 @@ public class IndexController {
 
     @GetMapping("/")
     public String index() {
-        return "Welcome to LingNow Admin API! Service is running.";
+        return "Welcome to LingNow ERP API! Service is running.";
     }
 
     @GetMapping("/welcome")
     public String welcome() {
-        return "Welcome to LingNow Admin API! Service is running.";
+        return "Welcome to LingNow ERP API! Service is running.";
     }
 
     @GetMapping("/favicon.ico")

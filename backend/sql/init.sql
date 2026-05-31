@@ -3,8 +3,8 @@
 
 -- 0. Database Creation
 -- ---------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS `lingnow_base` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE `lingnow_base`;
+CREATE DATABASE IF NOT EXISTS `lingnow_erp` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `lingnow_erp`;
 
 -- ---------------------------------------------------------
 -- 1. Core System Tables (Foundational Infrastructure)
@@ -444,6 +444,246 @@ CREATE TABLE IF NOT EXISTS `sys_job_log`
   DEFAULT CHARSET = utf8mb4 COMMENT ='定时任务调度日志表';
 
 -- ---------------------------------------------------------
+-- 1. ERP Master Data Tables
+-- ---------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `erp_product_category`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '分类ID',
+    `code`        varchar(64)  NOT NULL COMMENT '分类编码',
+    `name`        varchar(128) NOT NULL COMMENT '分类名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父分类ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_category_code` (`code`, `del_flag`),
+    KEY `idx_category_parent` (`parent_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP商品分类';
+
+CREATE TABLE IF NOT EXISTS `erp_unit`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '单位ID',
+    `code`        varchar(64)  NOT NULL COMMENT '单位编码',
+    `name`        varchar(128) NOT NULL COMMENT '单位名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_unit_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP单位';
+
+CREATE TABLE IF NOT EXISTS `erp_product_brand`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '品牌ID',
+    `code`        varchar(64)  NOT NULL COMMENT '品牌编码',
+    `name`        varchar(128) NOT NULL COMMENT '品牌名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_brand_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP商品品牌';
+
+CREATE TABLE IF NOT EXISTS `erp_product_attribute`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '属性ID',
+    `code`        varchar(64)  NOT NULL COMMENT '属性编码',
+    `name`        varchar(128) NOT NULL COMMENT '属性名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_attribute_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP商品属性';
+
+CREATE TABLE IF NOT EXISTS `erp_customer`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '客户ID',
+    `code`        varchar(64)  NOT NULL COMMENT '客户编码',
+    `name`        varchar(128) NOT NULL COMMENT '客户名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_customer_code` (`code`, `del_flag`),
+    KEY `idx_customer_level` (`level_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户';
+
+CREATE TABLE IF NOT EXISTS `erp_supplier`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '供应商ID',
+    `code`        varchar(64)  NOT NULL COMMENT '供应商编码',
+    `name`        varchar(128) NOT NULL COMMENT '供应商名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_supplier_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP供应商';
+
+CREATE TABLE IF NOT EXISTS `erp_warehouse`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '仓库ID',
+    `code`        varchar(64)  NOT NULL COMMENT '仓库编码',
+    `name`        varchar(128) NOT NULL COMMENT '仓库名称',
+    `parent_id`   bigint(20)            DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)           DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)           DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)          DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)            DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time` datetime              DEFAULT NULL,
+    `update_time` datetime              DEFAULT NULL,
+    `create_by`   varchar(64)           DEFAULT NULL,
+    `update_by`   varchar(64)           DEFAULT NULL,
+    `del_flag`    tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_warehouse_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP仓库';
+
+CREATE TABLE IF NOT EXISTS `erp_account`
+(
+    `id`          bigint(20)    NOT NULL COMMENT '账户ID',
+    `code`        varchar(64)    NOT NULL COMMENT '账户编码',
+    `name`        varchar(128)   NOT NULL COMMENT '账户名称',
+    `parent_id`   bigint(20)              DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)             DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)             DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)            DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)              DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)            DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4)        DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)                 DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)     NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)            DEFAULT NULL COMMENT '备注',
+    `create_time` datetime                DEFAULT NULL,
+    `update_time` datetime                DEFAULT NULL,
+    `create_by`   varchar(64)             DEFAULT NULL,
+    `update_by`   varchar(64)             DEFAULT NULL,
+    `del_flag`    tinyint(1)     NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_account_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP资金账户';
+
+CREATE TABLE IF NOT EXISTS `erp_agent_level`
+(
+    `id`          bigint(20)    NOT NULL COMMENT '代理等级ID',
+    `code`        varchar(64)    NOT NULL COMMENT '等级编码',
+    `name`        varchar(128)   NOT NULL COMMENT '等级名称',
+    `parent_id`   bigint(20)              DEFAULT '0' COMMENT '父级ID',
+    `contact`     varchar(64)             DEFAULT NULL COMMENT '联系人',
+    `phone`       varchar(32)             DEFAULT NULL COMMENT '联系电话',
+    `address`     varchar(255)            DEFAULT NULL COMMENT '地址',
+    `level_id`    bigint(20)              DEFAULT NULL COMMENT '代理等级ID',
+    `account_type` varchar(32)            DEFAULT NULL COMMENT '账户类型',
+    `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
+    `discount_rate` decimal(10, 4) DEFAULT NULL COMMENT '折扣率',
+    `sort_order`  int(11)                 DEFAULT '0' COMMENT '显示顺序',
+    `status`      tinyint(1)     NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`      varchar(500)            DEFAULT NULL COMMENT '备注',
+    `create_time` datetime                DEFAULT NULL,
+    `update_time` datetime                DEFAULT NULL,
+    `create_by`   varchar(64)             DEFAULT NULL,
+    `update_by`   varchar(64)             DEFAULT NULL,
+    `del_flag`    tinyint(1)     NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_agent_level_code` (`code`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP代理等级';
+
+-- ---------------------------------------------------------
 -- 2. Initial Seed Data (Admin Account & Roles)
 -- ---------------------------------------------------------
 
@@ -503,7 +743,18 @@ VALUES
 (1420, 1400, '缓存监控', 1, 'Cpu', '/monitor/cache', 'monitor/cache/index', 'monitor:cache:view', 42, 1, 1, 'N', NOW(), 0),
 (1430, 1400, '在线用户', 1, 'Connection', '/monitor/online', 'monitor/online/index', 'monitor:online:view', 43, 1, 1, 'N', NOW(), 0),
 (1440, 1400, '实时日志', 1, 'Document', '/monitor/log', 'monitor/log/index', 'monitor:log:view', 44, 1, 1, 'N', NOW(), 0),
-(1450, 1400, '任务监控', 1, 'Timer', '/monitor/job', 'monitor/job/index', 'monitor:job:list', 45, 1, 1, 'N', NOW(), 0);
+(1450, 1400, '任务监控', 1, 'Timer', '/monitor/job', 'monitor/job/index', 'monitor:job:list', 45, 1, 1, 'N', NOW(), 0),
+(2000, 0, '商品', 0, 'Goods', '/erp/product', 'Layout', NULL, 100, 1, 1, 'N', NOW(), 0),
+(2010, 2000, '商品分类', 1, 'FolderOpened', '/erp/product/category', 'erp/master/index', 'erp:product-category:list', 101, 1, 1, 'N', NOW(), 0),
+(2020, 2000, '单位管理', 1, 'CollectionTag', '/erp/product/unit', 'erp/master/index', 'erp:unit:list', 102, 1, 1, 'N', NOW(), 0),
+(2030, 2000, '商品品牌', 1, 'PriceTag', '/erp/product/brand', 'erp/master/index', 'erp:product-brand:list', 103, 1, 1, 'N', NOW(), 0),
+(2040, 2000, '属性设置', 1, 'Operation', '/erp/product/attribute', 'erp/master/index', 'erp:product-attribute:list', 104, 1, 1, 'N', NOW(), 0),
+(2100, 0, 'ERP设置', 0, 'Tools', '/erp/setting', 'Layout', NULL, 110, 1, 1, 'N', NOW(), 0),
+(2110, 2100, '客户管理', 1, 'User', '/erp/setting/customer', 'erp/master/index', 'erp:customer:list', 111, 1, 1, 'N', NOW(), 0),
+(2120, 2100, '供应商管理', 1, 'Van', '/erp/setting/supplier', 'erp/master/index', 'erp:supplier:list', 112, 1, 1, 'N', NOW(), 0),
+(2130, 2100, '仓库管理', 1, 'House', '/erp/setting/warehouse', 'erp/master/index', 'erp:warehouse:list', 113, 1, 1, 'N', NOW(), 0),
+(2140, 2100, '账户管理', 1, 'Wallet', '/erp/setting/account', 'erp/master/index', 'erp:account:list', 114, 1, 1, 'N', NOW(), 0),
+(2150, 2100, '代理等级', 1, 'Medal', '/erp/setting/agent-level', 'erp/master/index', 'erp:agent-level:list', 115, 1, 1, 'N', NOW(), 0);
 
 -- Default Button Permissions
 INSERT IGNORE INTO `sys_menu`
@@ -550,7 +801,34 @@ VALUES
 (1455, 1450, '任务执行一次', 2, NULL, NULL, NULL, 'monitor:job:run', 5, 1, 1, 'N', NOW(), 0),
 (1456, 1450, '任务日志查询', 2, NULL, NULL, NULL, 'monitor:job:log', 6, 1, 1, 'N', NOW(), 0),
 (1457, 1450, '任务日志删除', 2, NULL, NULL, NULL, 'monitor:job:logRemove', 7, 1, 1, 'N', NOW(), 0),
-(1458, 1450, '任务日志清空', 2, NULL, NULL, NULL, 'monitor:job:logClean', 8, 1, 1, 'N', NOW(), 0);
+(1458, 1450, '任务日志清空', 2, NULL, NULL, NULL, 'monitor:job:logClean', 8, 1, 1, 'N', NOW(), 0),
+(2011, 2010, '商品分类新增', 2, NULL, NULL, NULL, 'erp:product-category:add', 1, 1, 1, 'N', NOW(), 0),
+(2012, 2010, '商品分类编辑', 2, NULL, NULL, NULL, 'erp:product-category:edit', 2, 1, 1, 'N', NOW(), 0),
+(2013, 2010, '商品分类删除', 2, NULL, NULL, NULL, 'erp:product-category:remove', 3, 1, 1, 'N', NOW(), 0),
+(2021, 2020, '单位新增', 2, NULL, NULL, NULL, 'erp:unit:add', 1, 1, 1, 'N', NOW(), 0),
+(2022, 2020, '单位编辑', 2, NULL, NULL, NULL, 'erp:unit:edit', 2, 1, 1, 'N', NOW(), 0),
+(2023, 2020, '单位删除', 2, NULL, NULL, NULL, 'erp:unit:remove', 3, 1, 1, 'N', NOW(), 0),
+(2031, 2030, '品牌新增', 2, NULL, NULL, NULL, 'erp:product-brand:add', 1, 1, 1, 'N', NOW(), 0),
+(2032, 2030, '品牌编辑', 2, NULL, NULL, NULL, 'erp:product-brand:edit', 2, 1, 1, 'N', NOW(), 0),
+(2033, 2030, '品牌删除', 2, NULL, NULL, NULL, 'erp:product-brand:remove', 3, 1, 1, 'N', NOW(), 0),
+(2041, 2040, '属性新增', 2, NULL, NULL, NULL, 'erp:product-attribute:add', 1, 1, 1, 'N', NOW(), 0),
+(2042, 2040, '属性编辑', 2, NULL, NULL, NULL, 'erp:product-attribute:edit', 2, 1, 1, 'N', NOW(), 0),
+(2043, 2040, '属性删除', 2, NULL, NULL, NULL, 'erp:product-attribute:remove', 3, 1, 1, 'N', NOW(), 0),
+(2111, 2110, '客户新增', 2, NULL, NULL, NULL, 'erp:customer:add', 1, 1, 1, 'N', NOW(), 0),
+(2112, 2110, '客户编辑', 2, NULL, NULL, NULL, 'erp:customer:edit', 2, 1, 1, 'N', NOW(), 0),
+(2113, 2110, '客户删除', 2, NULL, NULL, NULL, 'erp:customer:remove', 3, 1, 1, 'N', NOW(), 0),
+(2121, 2120, '供应商新增', 2, NULL, NULL, NULL, 'erp:supplier:add', 1, 1, 1, 'N', NOW(), 0),
+(2122, 2120, '供应商编辑', 2, NULL, NULL, NULL, 'erp:supplier:edit', 2, 1, 1, 'N', NOW(), 0),
+(2123, 2120, '供应商删除', 2, NULL, NULL, NULL, 'erp:supplier:remove', 3, 1, 1, 'N', NOW(), 0),
+(2131, 2130, '仓库新增', 2, NULL, NULL, NULL, 'erp:warehouse:add', 1, 1, 1, 'N', NOW(), 0),
+(2132, 2130, '仓库编辑', 2, NULL, NULL, NULL, 'erp:warehouse:edit', 2, 1, 1, 'N', NOW(), 0),
+(2133, 2130, '仓库删除', 2, NULL, NULL, NULL, 'erp:warehouse:remove', 3, 1, 1, 'N', NOW(), 0),
+(2141, 2140, '账户新增', 2, NULL, NULL, NULL, 'erp:account:add', 1, 1, 1, 'N', NOW(), 0),
+(2142, 2140, '账户编辑', 2, NULL, NULL, NULL, 'erp:account:edit', 2, 1, 1, 'N', NOW(), 0),
+(2143, 2140, '账户删除', 2, NULL, NULL, NULL, 'erp:account:remove', 3, 1, 1, 'N', NOW(), 0),
+(2151, 2150, '代理等级新增', 2, NULL, NULL, NULL, 'erp:agent-level:add', 1, 1, 1, 'N', NOW(), 0),
+(2152, 2150, '代理等级编辑', 2, NULL, NULL, NULL, 'erp:agent-level:edit', 2, 1, 1, 'N', NOW(), 0),
+(2153, 2150, '代理等级删除', 2, NULL, NULL, NULL, 'erp:agent-level:remove', 3, 1, 1, 'N', NOW(), 0);
 
 -- Assign Super Admin Role to All Menus
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
@@ -619,4 +897,4 @@ VALUES
 INSERT IGNORE INTO `sys_config`
 (`config_id`, `config_name`, `config_key`, `config_value`, `config_type`, `remark`, `create_time`, `del_flag`)
 VALUES
-(1, '系统名称', 'sys.name', 'LingNow Base', 'Y', '系统显示名称', NOW(), 0);
+(1, '系统名称', 'sys.name', 'LingNow ERP', 'Y', '系统显示名称', NOW(), 0);

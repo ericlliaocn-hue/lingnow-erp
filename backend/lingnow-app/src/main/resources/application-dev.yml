@@ -3,7 +3,7 @@ spring:
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${LINGNOW_DB_URL:jdbc:mysql://localhost:3306/lingnow_base?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    url: ${LINGNOW_DB_URL:jdbc:mysql://localhost:3306/lingnow_erp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
     username: ${LINGNOW_DB_USERNAME:root}
     password: ${LINGNOW_DB_PASSWORD:}
     type: com.alibaba.druid.pool.DruidDataSource

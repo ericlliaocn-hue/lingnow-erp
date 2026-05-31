@@ -14,7 +14,7 @@
     <artifactId>lingnow-admin</artifactId>
     <packaging>jar</packaging>
 
-    <name>LingNow Admin</name>
+    <name>LingNow ERP Admin</name>
     <description>管理端应用模块</description>
 
     <dependencies>

@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SysDictManager {
 
-    private static final String DICT_CACHE_PREFIX = "lingnow_base:sys_dict:";
+    private static final String DICT_CACHE_PREFIX = "lingnow_erp:sys_dict:";
 
     private final SysDictTypeService dictTypeService;
     private final SysDictDataService dictDataService;

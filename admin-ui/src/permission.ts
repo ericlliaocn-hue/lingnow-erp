@@ -7,9 +7,9 @@ const whiteList = ['/login', '/404', '/register'] // 白名单
 router.beforeEach(async (to, from, next) => {
   // 设置页面标题
   if (to.meta.title) {
-    document.title = `${to.meta.title} - LingNow Admin`
+    document.title = `${to.meta.title} - LingNow ERP`
   } else {
-    document.title = 'LingNow Admin'
+    document.title = 'LingNow ERP'
   }
 
   const userStore = useUserStore()

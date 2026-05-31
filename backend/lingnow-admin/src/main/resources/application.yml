@@ -1,7 +1,7 @@
 # Spring Boot 配置
 spring:
   application:
-    name: lingnow-admin
+    name: lingnow-erp-admin
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   main:

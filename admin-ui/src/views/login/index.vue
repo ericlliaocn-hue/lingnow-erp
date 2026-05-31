@@ -3,48 +3,13 @@
     <Loading v-if="loading" />
 
     <div class="login-header">
-      <h4 class="title">Sign in to LingNow Admin</h4>
-      <div class="subtitle">
-        New user?
-        <el-link type="primary" :underline="false" @click="$router.push('/register')" class="register-link">
-          Create an account
-        </el-link>
-      </div>
+      <h4 class="title">登录 LingNow ERP</h4>
+      <div class="subtitle">请输入账号密码进入管理后台</div>
     </div>
 
-    <!-- Social Login Buttons -->
-    <div class="social-login">
-      <button class="social-btn" @click="handleSocialLogin('google')">
-        <svg width="24" height="24" viewBox="0 0 24 24">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-        </svg>
-      </button>
-
-      <button class="social-btn" @click="handleSocialLogin('github')">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.137 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
-        </svg>
-      </button>
-
-      <button class="social-btn" @click="handleSocialLogin('twitter')">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="#1DA1F2">
-          <path d="M23.643 4.937c-.835.37-1.732.62-2.675.733.962-.576 1.7-1.49 2.048-2.578-.9.534-1.897.922-2.958 1.13-.85-.904-2.06-1.47-3.4-1.47-2.572 0-4.658 2.086-4.658 4.66 0 .364.042.718.12 1.06-3.873-.195-7.304-2.05-9.602-4.868-.4.69-.63 1.49-.63 2.342 0 1.616.823 3.043 2.072 3.878-.764-.025-1.482-.234-2.11-.583v.06c0 2.257 1.605 4.14 3.737 4.568-.392.106-.803.162-1.227.162-.3 0-.593-.028-.877-.082.593 1.85 2.313 3.198 4.352 3.234-1.595 1.25-3.604 1.995-5.786 1.995-.376 0-.747-.022-1.112-.065 2.062 1.323 4.51 2.093 7.14 2.093 8.57 0 13.255-7.098 13.255-13.254 0-.2-.005-.402-.014-.602.91-.658 1.7-1.477 2.323-2.41z"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Divider -->
-    <div class="divider">
-      <span class="divider-text">OR</span>
-    </div>
-
-    <!-- Login Form -->
     <el-form :model="form" class="login-form" @keyup.enter="handleLogin">
       <el-form-item>
-        <div class="form-label">Email address</div>
+        <div class="form-label">账号</div>
         <el-input
             v-model="form.username"
             placeholder="请输入账号"
@@ -55,13 +20,12 @@
 
       <el-form-item>
         <div class="form-label">
-           <span>Password</span>
-           <el-link class="forgot-link" :underline="false">Forgot password?</el-link>
+           <span>密码</span>
         </div>
         <el-input
             v-model="form.password"
             type="password"
-            placeholder="6+ characters"
+            placeholder="请输入密码"
             size="large"
             show-password
             autocomplete="current-password"
@@ -74,7 +38,7 @@
         class="login-btn"
         @click="handleLogin"
       >
-        Sign in
+        登录
       </el-button>
     </el-form>
   </div>
@@ -123,9 +87,6 @@ const handleLogin = async () => {
   }
 }
 
-const handleSocialLogin = (provider: string) => {
-  ElMessage.info(`${provider} 登录暂未接入`)
-}
 </script>
 
 <style scoped>
@@ -156,73 +117,6 @@ const handleSocialLogin = (provider: string) => {
   gap: 4px;
 }
 
-.register-link {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* Social Login */
-.social-login {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.social-btn {
-  flex: 1;
-  height: 48px;
-  border-radius: 8px;
-  border: 1px solid rgba(145, 158, 171, 0.2);
-  background-color: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  color: #637381;
-}
-
-.social-btn:hover {
-  background-color: rgba(145, 158, 171, 0.08);
-  border-color: rgba(145, 158, 171, 0.32);
-}
-
-.social-btn:active {
-  transform: scale(0.98);
-}
-
-.social-btn svg {
-  width: 24px;
-  height: 24px;
-}
-
-/* Divider */
-.divider {
-  position: relative;
-  text-align: center;
-  margin: 32px 0;
-}
-
-.divider::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-color: rgba(145, 158, 171, 0.2);
-}
-
-.divider-text {
-  position: relative;
-  display: inline-block;
-  padding: 0 16px;
-  background-color: #fff;
-  color: #919eab;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 /* Form */
 .login-form {
   margin-bottom: 24px;
@@ -237,18 +131,6 @@ const handleSocialLogin = (provider: string) => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-}
-
-.forgot-link {
-  font-size: 13px;
-  color: #637381;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.forgot-link:hover {
-  text-decoration: underline;
-  color: #212b36;
 }
 
 .login-btn {
@@ -381,35 +263,7 @@ const handleSocialLogin = (provider: string) => {
   color: #919eab;
 }
 
-:global(.dark) .divider::before {
-  background-color: rgba(145, 158, 171, 0.2);
-}
-
-:global(.dark) .divider-text {
-  background-color: #141a21;
-  color: #637381;
-}
-
-:global(.dark) .social-btn {
-  border-color: rgba(145, 158, 171, 0.16);
-  color: #919eab;
-  background-color: rgba(145, 158, 171, 0.08);
-}
-
-:global(.dark) .social-btn:hover {
-  background-color: rgba(145, 158, 171, 0.16);
-  border-color: rgba(145, 158, 171, 0.24);
-}
-
 :global(.dark) .form-label {
-  color: #fff;
-}
-
-:global(.dark) .forgot-link {
-  color: #919eab;
-}
-
-:global(.dark) .forgot-link:hover {
   color: #fff;
 }
 

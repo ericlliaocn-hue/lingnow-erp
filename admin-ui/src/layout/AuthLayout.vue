@@ -6,7 +6,7 @@
         <Logo width="40px" height="40px" />
       </div>
       <div class="header-actions">
-        <a href="#" class="help-link">Need help?</a>
+        <a href="#" class="help-link">LingNow ERP</a>
         <div class="settings-btn" @click="settingsStore.setDrawerOpen(true)">
           <el-icon class="settings-icon is-loading"><Setting /></el-icon>
         </div>
@@ -18,8 +18,8 @@
     <!-- Left Section -->
     <div class="auth-side">
       <div class="auth-side-content">
-        <h3 class="auth-title">Hi, Welcome back</h3>
-        <p class="auth-subtitle">The starting point for your next project with LingNow is built on Minimals UI Kit, made to help you work smarter.</p>
+        <h3 class="auth-title">欢迎使用 LingNow ERP</h3>
+        <p class="auth-subtitle">通用后台基座已接入权限、菜单、日志、文件与 ERP 基础资料能力，后续业务模块可按行业独立扩展。</p>
         <img src="/assets/illustrations/illustration-dashboard.webp" alt="Dashboard" class="auth-illustration" />
       </div>
     </div>
