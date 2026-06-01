@@ -24,6 +24,21 @@
     </el-row>
 
     <el-row :gutter="16">
+      <el-col v-for="item in erpSummaryItems" :key="item.key" :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-icon" :class="item.tone">
+            <el-icon><component :is="item.icon" /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">{{ item.label }}</div>
+            <div class="stat-value">{{ item.money ? formatMoney(erpStats[item.key]) : formatValue(erpStats[item.key]) }}</div>
+            <div class="stat-desc">{{ item.desc }}</div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16">
       <el-col :xs="24" :lg="12">
         <el-card shadow="never" class="chart-card">
           <template #header>
@@ -100,7 +115,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Calendar, CircleCheck, CircleClose, Connection, Refresh, TrendCharts, User } from '@element-plus/icons-vue'
+import { Calendar, CircleCheck, CircleClose, Connection, Goods, Money, Refresh, TrendCharts, User, Wallet } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getUserDashboardData } from '@/api/monitor/admin'
 
@@ -130,6 +145,19 @@ interface DashboardData {
   genderStats?: StatItem[]
   growthTrend?: Array<{ date: string; value: number }>
   onlineUsers?: OnlineUser[]
+  erpStats?: ErpStats
+}
+
+interface ErpStats {
+  productCount?: number
+  customerCount?: number
+  supplierCount?: number
+  todaySaleAmount?: number
+  todayPurchaseAmount?: number
+  stockAmount?: number
+  receivable?: number
+  payable?: number
+  accountBalance?: number
 }
 
 type MetricKey = keyof Pick<DashboardData,
@@ -155,6 +183,19 @@ const userStatusStats = computed(() => metrics.value.userStatusStats || [])
 const genderStats = computed(() => metrics.value.genderStats || [])
 const growthTrend = computed(() => metrics.value.growthTrend || [])
 const onlineUsers = computed(() => metrics.value.onlineUsers || [])
+const erpStats = computed(() => metrics.value.erpStats || {})
+
+const erpSummaryItems: Array<{ key: keyof ErpStats; label: string; desc: string; icon: any; tone: string; money?: boolean }> = [
+  { key: 'productCount', label: '商品数', desc: 'ERP 商品资料', icon: Goods, tone: 'blue' },
+  { key: 'customerCount', label: '客户数', desc: '客户基础资料', icon: User, tone: 'cyan' },
+  { key: 'supplierCount', label: '供应商数', desc: '供应商基础资料', icon: Connection, tone: 'purple' },
+  { key: 'todaySaleAmount', label: '今日销售额', desc: '已审核销售单', icon: TrendCharts, tone: 'green', money: true },
+  { key: 'todayPurchaseAmount', label: '今日进货额', desc: '已审核进货单', icon: Money, tone: 'orange', money: true },
+  { key: 'stockAmount', label: '库存金额', desc: '当前库存成本', icon: Goods, tone: 'cyan', money: true },
+  { key: 'receivable', label: '应收余额', desc: '客户待收金额', icon: Wallet, tone: 'red', money: true },
+  { key: 'payable', label: '应付余额', desc: '供应商待付金额', icon: Wallet, tone: 'purple', money: true },
+  { key: 'accountBalance', label: '账户余额', desc: '账户当前余额', icon: Money, tone: 'green', money: true }
+]
 
 let growthChart: echarts.ECharts | null = null
 let genderChart: echarts.ECharts | null = null
@@ -162,6 +203,11 @@ let genderChart: echarts.ECharts | null = null
 const formatValue = (value: number | null | undefined) => {
   if (value === null || value === undefined) return '0'
   return Number(value).toLocaleString()
+}
+
+const formatMoney = (value: number | null | undefined) => {
+  if (value === null || value === undefined) return '0.00'
+  return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 const formatPercent = (value: number | null | undefined) => {

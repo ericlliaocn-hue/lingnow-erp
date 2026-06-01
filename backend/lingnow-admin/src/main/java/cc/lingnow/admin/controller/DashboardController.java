@@ -3,6 +3,8 @@ package cc.lingnow.admin.controller;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.user.entity.SysUser;
 import cc.lingnow.biz.user.service.SysUserService;
+import cc.lingnow.biz.erp.entity.*;
+import cc.lingnow.biz.erp.service.*;
 import cc.lingnow.common.constant.CommonConstants;
 import cc.lingnow.common.vo.Result;
 import cn.hutool.core.util.StrUtil;
@@ -28,6 +30,22 @@ public class DashboardController {
 
     @Resource
     private SysUserService sysUserService;
+    @Resource
+    private ErpProductService productService;
+    @Resource
+    private ErpCustomerService customerService;
+    @Resource
+    private ErpSupplierService supplierService;
+    @Resource
+    private ErpBillService billService;
+    @Resource
+    private ErpStockBalanceService stockBalanceService;
+    @Resource
+    private ErpPartnerFlowService partnerFlowService;
+    @Resource
+    private ErpFundFlowService fundFlowService;
+    @Resource
+    private ErpAccountService accountService;
 
     @Operation(summary = "获取用户维度数据看板")
     @GetMapping("/user")
@@ -65,7 +83,46 @@ public class DashboardController {
         ));
         data.put("genderStats", buildGenderStats());
         data.put("growthTrend", buildGrowthTrend());
+        data.put("erpStats", buildErpStats());
         return Result.success(data);
+    }
+
+    private Map<String, Object> buildErpStats() {
+        LocalDate today = LocalDate.now();
+        Map<String, Object> data = new HashMap<>();
+        data.put("productCount", productService.count());
+        data.put("customerCount", customerService.count());
+        data.put("supplierCount", supplierService.count());
+        data.put("todaySaleAmount", billAmount("SALE", today));
+        data.put("todayPurchaseAmount", billAmount("PURCHASE", today));
+        data.put("stockAmount", stockBalanceService.list().stream().map(ErpStockBalance::getCostAmount).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+        data.put("receivable", partnerTotal("RECEIVABLE").subtract(partnerTotal("RECEIVE")));
+        data.put("payable", partnerTotal("PAYABLE").subtract(partnerTotal("PAY")));
+        data.put("accountBalance", accountTotal());
+        return data;
+    }
+
+    private java.math.BigDecimal billAmount(String billType, LocalDate date) {
+        return billService.list(Wrappers.<ErpBill>lambdaQuery()
+                .eq(ErpBill::getBillType, billType)
+                .eq(ErpBill::getBillDate, date)
+                .eq(ErpBill::getAuditStatus, 1))
+                .stream().map(ErpBill::getPayableAmount).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+    }
+
+    private java.math.BigDecimal partnerTotal(String direction) {
+        return partnerFlowService.list(Wrappers.<ErpPartnerFlow>lambdaQuery().eq(ErpPartnerFlow::getDirection, direction))
+                .stream().map(ErpPartnerFlow::getAmount).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+    }
+
+    private java.math.BigDecimal accountTotal() {
+        java.math.BigDecimal balance = accountService.list().stream()
+                .map(ErpAccount::getOpeningBalance)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        for (ErpFundFlow flow : fundFlowService.list()) {
+            balance = "IN".equals(flow.getDirection()) ? balance.add(flow.getAmount()) : balance.subtract(flow.getAmount());
+        }
+        return balance;
     }
 
     private List<Map<String, Object>> buildGrowthTrend() {

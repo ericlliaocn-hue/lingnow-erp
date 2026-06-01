@@ -683,6 +683,228 @@ CREATE TABLE IF NOT EXISTS `erp_agent_level`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP代理等级';
 
+CREATE TABLE IF NOT EXISTS `erp_product`
+(
+    `id`             bigint(20)    NOT NULL COMMENT '商品ID',
+    `code`           varchar(64)    NOT NULL COMMENT '商品编号',
+    `name`           varchar(128)   NOT NULL COMMENT '商品名称',
+    `spec`           varchar(128)            DEFAULT NULL COMMENT '规格型号',
+    `category_id`    bigint(20)              DEFAULT NULL COMMENT '商品分类ID',
+    `brand_id`       bigint(20)              DEFAULT NULL COMMENT '品牌ID',
+    `unit_id`        bigint(20)              DEFAULT NULL COMMENT '单位ID',
+    `attribute_text` varchar(255)            DEFAULT NULL COMMENT '辅助属性',
+    `barcode`        varchar(128)            DEFAULT NULL COMMENT '条码',
+    `location`       varchar(128)            DEFAULT NULL COMMENT '货位',
+    `purchase_price` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '采购价',
+    `sale_price`     decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '销售价',
+    `retail_price`   decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '零售价',
+    `min_stock`      decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '最低库存',
+    `max_stock`      decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '最高库存',
+    `image_url`      varchar(500)            DEFAULT NULL COMMENT '商品图片',
+    `sort_order`     int(11)                 DEFAULT '0' COMMENT '显示顺序',
+    `status`         tinyint(1)     NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
+    `remark`         varchar(500)            DEFAULT NULL COMMENT '备注',
+    `create_time`    datetime                DEFAULT NULL,
+    `update_time`    datetime                DEFAULT NULL,
+    `create_by`      varchar(64)             DEFAULT NULL,
+    `update_by`      varchar(64)             DEFAULT NULL,
+    `del_flag`       tinyint(1)     NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_product_code` (`code`, `del_flag`),
+    KEY `idx_product_category` (`category_id`),
+    KEY `idx_product_brand` (`brand_id`),
+    KEY `idx_product_unit` (`unit_id`),
+    KEY `idx_product_barcode` (`barcode`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP商品';
+
+CREATE TABLE IF NOT EXISTS `erp_bill`
+(
+    `id`             bigint(20)     NOT NULL COMMENT '单据ID',
+    `bill_no`        varchar(64)     NOT NULL COMMENT '单据编号',
+    `bill_type`      varchar(32)     NOT NULL COMMENT '单据类型 SALE/PURCHASE',
+    `bill_date`      date            NOT NULL COMMENT '单据日期',
+    `partner_id`     bigint(20)      NOT NULL COMMENT '往来单位ID',
+    `partner_type`   varchar(32)     NOT NULL COMMENT '往来单位类型 CUSTOMER/SUPPLIER',
+    `warehouse_id`   bigint(20)      NOT NULL COMMENT '仓库ID',
+    `account_id`     bigint(20)               DEFAULT NULL COMMENT '结算账户ID',
+    `employee_id`    bigint(20)               DEFAULT NULL COMMENT '业务员ID',
+    `total_qty`      decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '总数量',
+    `total_amount`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '单据金额',
+    `discount_amount` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '优惠金额',
+    `other_amount`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '其他费用',
+    `payable_amount` decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '应收/应付金额',
+    `paid_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '实收/实付金额',
+    `debt_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '欠款金额',
+    `audit_status`   tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态 0未审核 1已审核',
+    `payment_status` varchar(32)     NOT NULL DEFAULT 'UNPAID' COMMENT '收付款状态',
+    `audit_time`     datetime                 DEFAULT NULL COMMENT '审核时间',
+    `audit_by`       varchar(64)              DEFAULT NULL COMMENT '审核人',
+    `remark`         varchar(500)             DEFAULT NULL COMMENT '备注',
+    `attachment_url` varchar(500)             DEFAULT NULL COMMENT '附件',
+    `create_time`    datetime                 DEFAULT NULL,
+    `update_time`    datetime                 DEFAULT NULL,
+    `create_by`      varchar(64)              DEFAULT NULL,
+    `update_by`      varchar(64)              DEFAULT NULL,
+    `del_flag`       tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_bill_no` (`bill_no`, `del_flag`),
+    KEY `idx_bill_type_date` (`bill_type`, `bill_date`),
+    KEY `idx_bill_partner` (`partner_type`, `partner_id`),
+    KEY `idx_bill_audit` (`audit_status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP业务单据';
+
+CREATE TABLE IF NOT EXISTS `erp_bill_item`
+(
+    `id`              bigint(20)     NOT NULL COMMENT '明细ID',
+    `bill_id`         bigint(20)      NOT NULL COMMENT '单据ID',
+    `product_id`      bigint(20)      NOT NULL COMMENT '商品ID',
+    `product_code`    varchar(64)     NOT NULL COMMENT '商品编号',
+    `product_name`    varchar(128)    NOT NULL COMMENT '商品名称',
+    `spec`            varchar(128)             DEFAULT NULL COMMENT '规格型号',
+    `unit_id`         bigint(20)               DEFAULT NULL COMMENT '单位ID',
+    `warehouse_id`    bigint(20)      NOT NULL COMMENT '仓库ID',
+    `qty`             decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '数量',
+    `price`           decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '单价',
+    `amount`          decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '金额',
+    `discount_rate`   decimal(10, 4)  NOT NULL DEFAULT '100.0000' COMMENT '折扣率',
+    `discount_amount` decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '优惠金额',
+    `final_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '折后金额',
+    `remark`          varchar(500)             DEFAULT NULL COMMENT '备注',
+    `create_time`     datetime                 DEFAULT NULL,
+    `update_time`     datetime                 DEFAULT NULL,
+    `create_by`       varchar(64)              DEFAULT NULL,
+    `update_by`       varchar(64)              DEFAULT NULL,
+    `del_flag`        tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_bill_item_bill` (`bill_id`),
+    KEY `idx_bill_item_product` (`product_id`),
+    KEY `idx_bill_item_warehouse` (`warehouse_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP业务单据明细';
+
+CREATE TABLE IF NOT EXISTS `erp_stock_balance`
+(
+    `id`           bigint(20)     NOT NULL COMMENT '库存余额ID',
+    `product_id`   bigint(20)     NOT NULL COMMENT '商品ID',
+    `warehouse_id` bigint(20)     NOT NULL COMMENT '仓库ID',
+    `qty`          decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '库存数量',
+    `cost_amount`  decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '库存成本',
+    `avg_cost`     decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '平均成本',
+    `create_time`  datetime               DEFAULT NULL,
+    `update_time`  datetime               DEFAULT NULL,
+    `create_by`    varchar(64)            DEFAULT NULL,
+    `update_by`    varchar(64)            DEFAULT NULL,
+    `del_flag`     tinyint(1)    NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_stock_balance` (`product_id`, `warehouse_id`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP库存余额';
+
+CREATE TABLE IF NOT EXISTS `erp_stock_flow`
+(
+    `id`               bigint(20)     NOT NULL COMMENT '库存流水ID',
+    `flow_no`          varchar(64)     NOT NULL COMMENT '流水编号',
+    `source_bill_id`   bigint(20)      NOT NULL COMMENT '来源单据ID',
+    `source_bill_no`   varchar(64)     NOT NULL COMMENT '来源单号',
+    `source_bill_type` varchar(32)     NOT NULL COMMENT '来源类型',
+    `product_id`       bigint(20)      NOT NULL COMMENT '商品ID',
+    `warehouse_id`     bigint(20)      NOT NULL COMMENT '仓库ID',
+    `direction`        varchar(16)     NOT NULL COMMENT '方向 IN/OUT',
+    `qty`              decimal(18, 4)  NOT NULL COMMENT '数量',
+    `price`            decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '单价',
+    `amount`           decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '金额',
+    `before_qty`       decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '变动前数量',
+    `after_qty`        decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '变动后数量',
+    `operate_time`     datetime        NOT NULL COMMENT '操作时间',
+    `create_time`      datetime                 DEFAULT NULL,
+    `update_time`      datetime                 DEFAULT NULL,
+    `create_by`        varchar(64)              DEFAULT NULL,
+    `update_by`        varchar(64)              DEFAULT NULL,
+    `del_flag`         tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_stock_flow_no` (`flow_no`),
+    KEY `idx_stock_flow_source` (`source_bill_id`, `source_bill_type`),
+    KEY `idx_stock_flow_product` (`product_id`, `warehouse_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP库存流水';
+
+CREATE TABLE IF NOT EXISTS `erp_fund_flow`
+(
+    `id`               bigint(20)     NOT NULL COMMENT '资金流水ID',
+    `flow_no`          varchar(64)     NOT NULL COMMENT '流水编号',
+    `source_bill_id`   bigint(20)      NOT NULL COMMENT '来源单据ID',
+    `source_bill_no`   varchar(64)     NOT NULL COMMENT '来源单号',
+    `source_bill_type` varchar(32)     NOT NULL COMMENT '来源类型',
+    `account_id`       bigint(20)      NOT NULL COMMENT '账户ID',
+    `direction`        varchar(16)     NOT NULL COMMENT '方向 IN/OUT',
+    `amount`           decimal(18, 4)  NOT NULL COMMENT '金额',
+    `before_balance`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '变动前余额',
+    `after_balance`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '变动后余额',
+    `remark`           varchar(500)             DEFAULT NULL COMMENT '备注',
+    `operate_time`     datetime        NOT NULL COMMENT '操作时间',
+    `create_time`      datetime                 DEFAULT NULL,
+    `update_time`      datetime                 DEFAULT NULL,
+    `create_by`        varchar(64)              DEFAULT NULL,
+    `update_by`        varchar(64)              DEFAULT NULL,
+    `del_flag`         tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_fund_flow_no` (`flow_no`),
+    KEY `idx_fund_flow_source` (`source_bill_id`, `source_bill_type`),
+    KEY `idx_fund_flow_account` (`account_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP资金流水';
+
+CREATE TABLE IF NOT EXISTS `erp_partner_flow`
+(
+    `id`               bigint(20)     NOT NULL COMMENT '往来流水ID',
+    `source_bill_id`   bigint(20)      NOT NULL COMMENT '来源单据ID',
+    `source_bill_no`   varchar(64)     NOT NULL COMMENT '来源单号',
+    `source_bill_type` varchar(32)     NOT NULL COMMENT '来源类型',
+    `partner_id`       bigint(20)      NOT NULL COMMENT '往来单位ID',
+    `partner_type`     varchar(32)     NOT NULL COMMENT '往来单位类型',
+    `direction`        varchar(32)     NOT NULL COMMENT '方向 RECEIVABLE/PAYABLE/RECEIVE/PAY',
+    `amount`           decimal(18, 4)  NOT NULL COMMENT '金额',
+    `remark`           varchar(500)             DEFAULT NULL COMMENT '备注',
+    `operate_time`     datetime        NOT NULL COMMENT '操作时间',
+    `create_time`      datetime                 DEFAULT NULL,
+    `update_time`      datetime                 DEFAULT NULL,
+    `create_by`        varchar(64)              DEFAULT NULL,
+    `update_by`        varchar(64)              DEFAULT NULL,
+    `del_flag`         tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_partner_flow_source` (`source_bill_id`, `source_bill_type`),
+    KEY `idx_partner_flow_partner` (`partner_type`, `partner_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP往来流水';
+
+CREATE TABLE IF NOT EXISTS `erp_finance_bill`
+(
+    `id`             bigint(20)     NOT NULL COMMENT '财务单据ID',
+    `bill_no`        varchar(64)     NOT NULL COMMENT '单据编号',
+    `bill_type`      varchar(32)     NOT NULL COMMENT 'RECEIPT/PAYMENT',
+    `bill_date`      date            NOT NULL COMMENT '单据日期',
+    `partner_id`     bigint(20)      NOT NULL COMMENT '往来单位ID',
+    `partner_type`   varchar(32)     NOT NULL COMMENT '往来单位类型',
+    `account_id`     bigint(20)      NOT NULL COMMENT '账户ID',
+    `amount`         decimal(18, 4)  NOT NULL COMMENT '金额',
+    `audit_status`   tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态',
+    `audit_time`     datetime                 DEFAULT NULL COMMENT '审核时间',
+    `audit_by`       varchar(64)              DEFAULT NULL COMMENT '审核人',
+    `remark`         varchar(500)             DEFAULT NULL COMMENT '备注',
+    `create_time`    datetime                 DEFAULT NULL,
+    `update_time`    datetime                 DEFAULT NULL,
+    `create_by`      varchar(64)              DEFAULT NULL,
+    `update_by`      varchar(64)              DEFAULT NULL,
+    `del_flag`       tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_finance_bill_no` (`bill_no`, `del_flag`),
+    KEY `idx_finance_bill_type_date` (`bill_type`, `bill_date`),
+    KEY `idx_finance_bill_partner` (`partner_type`, `partner_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP财务单据';
+
 -- ---------------------------------------------------------
 -- 2. Initial Seed Data (Admin Account & Roles)
 -- ---------------------------------------------------------
@@ -749,12 +971,34 @@ VALUES
 (2020, 2000, '单位管理', 1, 'CollectionTag', '/erp/product/unit', 'erp/master/index', 'erp:unit:list', 102, 1, 1, 'N', NOW(), 0),
 (2030, 2000, '商品品牌', 1, 'PriceTag', '/erp/product/brand', 'erp/master/index', 'erp:product-brand:list', 103, 1, 1, 'N', NOW(), 0),
 (2040, 2000, '属性设置', 1, 'Operation', '/erp/product/attribute', 'erp/master/index', 'erp:product-attribute:list', 104, 1, 1, 'N', NOW(), 0),
+(2050, 2000, '商品管理', 1, 'Goods', '/erp/product/list', 'erp/product/index', 'erp:product:list', 100, 1, 1, 'N', NOW(), 0),
 (2100, 0, 'ERP设置', 0, 'Tools', '/erp/setting', 'Layout', NULL, 110, 1, 1, 'N', NOW(), 0),
 (2110, 2100, '客户管理', 1, 'User', '/erp/setting/customer', 'erp/master/index', 'erp:customer:list', 111, 1, 1, 'N', NOW(), 0),
 (2120, 2100, '供应商管理', 1, 'Van', '/erp/setting/supplier', 'erp/master/index', 'erp:supplier:list', 112, 1, 1, 'N', NOW(), 0),
 (2130, 2100, '仓库管理', 1, 'House', '/erp/setting/warehouse', 'erp/master/index', 'erp:warehouse:list', 113, 1, 1, 'N', NOW(), 0),
 (2140, 2100, '账户管理', 1, 'Wallet', '/erp/setting/account', 'erp/master/index', 'erp:account:list', 114, 1, 1, 'N', NOW(), 0),
-(2150, 2100, '代理等级', 1, 'Medal', '/erp/setting/agent-level', 'erp/master/index', 'erp:agent-level:list', 115, 1, 1, 'N', NOW(), 0);
+(2150, 2100, '代理等级', 1, 'Medal', '/erp/setting/agent-level', 'erp/master/index', 'erp:agent-level:list', 115, 1, 1, 'N', NOW(), 0),
+(2200, 0, '销售', 0, 'Sell', '/erp/sale', 'Layout', NULL, 120, 1, 1, 'N', NOW(), 0),
+(2210, 2200, '销售单', 1, 'Document', '/erp/sale/list', 'erp/bill/index', 'erp:sale:list', 121, 1, 1, 'N', NOW(), 0),
+(2220, 2200, '新增销售单', 1, 'Plus', '/erp/sale/add', 'erp/bill/form', 'erp:sale:add', 122, 1, 1, 'N', NOW(), 0),
+(2300, 0, '进货', 0, 'ShoppingCart', '/erp/purchase', 'Layout', NULL, 130, 1, 1, 'N', NOW(), 0),
+(2310, 2300, '进货单', 1, 'Document', '/erp/purchase/list', 'erp/bill/index', 'erp:purchase:list', 131, 1, 1, 'N', NOW(), 0),
+(2320, 2300, '新增进货单', 1, 'Plus', '/erp/purchase/add', 'erp/bill/form', 'erp:purchase:add', 132, 1, 1, 'N', NOW(), 0),
+(2400, 0, '库存', 0, 'Box', '/erp/stock', 'Layout', NULL, 140, 1, 1, 'N', NOW(), 0),
+(2410, 2400, '库存查询', 1, 'Search', '/erp/stock/balance', 'erp/stock/balance', 'erp:stock:balance', 141, 1, 1, 'N', NOW(), 0),
+(2420, 2400, '商品收发明细', 1, 'Tickets', '/erp/stock/flow', 'erp/stock/flow', 'erp:stock:flow', 142, 1, 1, 'N', NOW(), 0),
+(2500, 0, '财务', 0, 'Money', '/erp/finance', 'Layout', NULL, 150, 1, 1, 'N', NOW(), 0),
+(2510, 2500, '收款单', 1, 'Wallet', '/erp/finance/receipt', 'erp/finance/form', 'erp:finance:receipt:list', 151, 1, 1, 'N', NOW(), 0),
+(2520, 2500, '付款单', 1, 'WalletFilled', '/erp/finance/payment', 'erp/finance/form', 'erp:finance:payment:list', 152, 1, 1, 'N', NOW(), 0),
+(2530, 2500, '资金流水', 1, 'List', '/erp/finance/fund-flow', 'erp/finance/fundFlow', 'erp:finance:fund-flow', 153, 1, 1, 'N', NOW(), 0),
+(2540, 2500, '往来流水', 1, 'List', '/erp/finance/partner-flow', 'erp/finance/partnerFlow', 'erp:finance:partner-flow', 154, 1, 1, 'N', NOW(), 0),
+(2600, 0, '报表', 0, 'TrendCharts', '/erp/report', 'Layout', NULL, 160, 1, 1, 'N', NOW(), 0),
+(2610, 2600, '销售明细', 1, 'DataLine', '/erp/report/sale-detail', 'erp/report/billDetail', 'erp:report:sale-detail', 161, 1, 1, 'N', NOW(), 0),
+(2620, 2600, '进货明细', 1, 'DataLine', '/erp/report/purchase-detail', 'erp/report/billDetail', 'erp:report:purchase-detail', 162, 1, 1, 'N', NOW(), 0),
+(2630, 2600, '库存余额', 1, 'DataAnalysis', '/erp/report/stock-balance', 'erp/report/stockBalance', 'erp:report:stock-balance', 163, 1, 1, 'N', NOW(), 0),
+(2640, 2600, '应收应付', 1, 'DataBoard', '/erp/report/partner-balance', 'erp/report/partnerBalance', 'erp:report:partner-balance', 164, 1, 1, 'N', NOW(), 0),
+(2650, 2600, '账户余额', 1, 'CreditCard', '/erp/report/account-balance', 'erp/report/accountBalance', 'erp:report:account-balance', 165, 1, 1, 'N', NOW(), 0),
+(2660, 2600, '经营汇总', 1, 'Histogram', '/erp/report/summary', 'erp/report/summary', 'erp:report:summary', 166, 1, 1, 'N', NOW(), 0);
 
 -- Default Button Permissions
 INSERT IGNORE INTO `sys_menu`
@@ -814,6 +1058,10 @@ VALUES
 (2041, 2040, '属性新增', 2, NULL, NULL, NULL, 'erp:product-attribute:add', 1, 1, 1, 'N', NOW(), 0),
 (2042, 2040, '属性编辑', 2, NULL, NULL, NULL, 'erp:product-attribute:edit', 2, 1, 1, 'N', NOW(), 0),
 (2043, 2040, '属性删除', 2, NULL, NULL, NULL, 'erp:product-attribute:remove', 3, 1, 1, 'N', NOW(), 0),
+(2051, 2050, '商品新增', 2, NULL, NULL, NULL, 'erp:product:add', 1, 1, 1, 'N', NOW(), 0),
+(2052, 2050, '商品编辑', 2, NULL, NULL, NULL, 'erp:product:edit', 2, 1, 1, 'N', NOW(), 0),
+(2053, 2050, '商品删除', 2, NULL, NULL, NULL, 'erp:product:remove', 3, 1, 1, 'N', NOW(), 0),
+(2054, 2050, '商品选项', 2, NULL, NULL, NULL, 'erp:product:options', 4, 1, 1, 'N', NOW(), 0),
 (2111, 2110, '客户新增', 2, NULL, NULL, NULL, 'erp:customer:add', 1, 1, 1, 'N', NOW(), 0),
 (2112, 2110, '客户编辑', 2, NULL, NULL, NULL, 'erp:customer:edit', 2, 1, 1, 'N', NOW(), 0),
 (2113, 2110, '客户删除', 2, NULL, NULL, NULL, 'erp:customer:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -828,7 +1076,27 @@ VALUES
 (2143, 2140, '账户删除', 2, NULL, NULL, NULL, 'erp:account:remove', 3, 1, 1, 'N', NOW(), 0),
 (2151, 2150, '代理等级新增', 2, NULL, NULL, NULL, 'erp:agent-level:add', 1, 1, 1, 'N', NOW(), 0),
 (2152, 2150, '代理等级编辑', 2, NULL, NULL, NULL, 'erp:agent-level:edit', 2, 1, 1, 'N', NOW(), 0),
-(2153, 2150, '代理等级删除', 2, NULL, NULL, NULL, 'erp:agent-level:remove', 3, 1, 1, 'N', NOW(), 0);
+(2153, 2150, '代理等级删除', 2, NULL, NULL, NULL, 'erp:agent-level:remove', 3, 1, 1, 'N', NOW(), 0),
+(2211, 2210, '销售新增', 2, NULL, NULL, NULL, 'erp:sale:add', 1, 1, 1, 'N', NOW(), 0),
+(2212, 2210, '销售编辑', 2, NULL, NULL, NULL, 'erp:sale:edit', 2, 1, 1, 'N', NOW(), 0),
+(2213, 2210, '销售删除', 2, NULL, NULL, NULL, 'erp:sale:remove', 3, 1, 1, 'N', NOW(), 0),
+(2214, 2210, '销售审核', 2, NULL, NULL, NULL, 'erp:sale:audit', 4, 1, 1, 'N', NOW(), 0),
+(2215, 2210, '销售反审核', 2, NULL, NULL, NULL, 'erp:sale:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2311, 2310, '进货新增', 2, NULL, NULL, NULL, 'erp:purchase:add', 1, 1, 1, 'N', NOW(), 0),
+(2312, 2310, '进货编辑', 2, NULL, NULL, NULL, 'erp:purchase:edit', 2, 1, 1, 'N', NOW(), 0),
+(2313, 2310, '进货删除', 2, NULL, NULL, NULL, 'erp:purchase:remove', 3, 1, 1, 'N', NOW(), 0),
+(2314, 2310, '进货审核', 2, NULL, NULL, NULL, 'erp:purchase:audit', 4, 1, 1, 'N', NOW(), 0),
+(2315, 2310, '进货反审核', 2, NULL, NULL, NULL, 'erp:purchase:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2511, 2510, '收款新增', 2, NULL, NULL, NULL, 'erp:finance:receipt:add', 1, 1, 1, 'N', NOW(), 0),
+(2512, 2510, '收款编辑', 2, NULL, NULL, NULL, 'erp:finance:receipt:edit', 2, 1, 1, 'N', NOW(), 0),
+(2513, 2510, '收款删除', 2, NULL, NULL, NULL, 'erp:finance:receipt:remove', 3, 1, 1, 'N', NOW(), 0),
+(2514, 2510, '收款审核', 2, NULL, NULL, NULL, 'erp:finance:receipt:audit', 4, 1, 1, 'N', NOW(), 0),
+(2515, 2510, '收款反审核', 2, NULL, NULL, NULL, 'erp:finance:receipt:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2521, 2520, '付款新增', 2, NULL, NULL, NULL, 'erp:finance:payment:add', 1, 1, 1, 'N', NOW(), 0),
+(2522, 2520, '付款编辑', 2, NULL, NULL, NULL, 'erp:finance:payment:edit', 2, 1, 1, 'N', NOW(), 0),
+(2523, 2520, '付款删除', 2, NULL, NULL, NULL, 'erp:finance:payment:remove', 3, 1, 1, 'N', NOW(), 0),
+(2524, 2520, '付款审核', 2, NULL, NULL, NULL, 'erp:finance:payment:audit', 4, 1, 1, 'N', NOW(), 0),
+(2525, 2520, '付款反审核', 2, NULL, NULL, NULL, 'erp:finance:payment:unaudit', 5, 1, 1, 'N', NOW(), 0);
 
 -- Assign Super Admin Role to All Menus
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
