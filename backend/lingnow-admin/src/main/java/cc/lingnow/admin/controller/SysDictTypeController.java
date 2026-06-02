@@ -35,6 +35,12 @@ public class SysDictTypeController {
         return Result.success(dictManager.listDictTypes(query));
     }
 
+    @Operation(summary = "获取字典类型选项")
+    @GetMapping("/optionselect")
+    public Result<List<DictTypeVO>> optionselect() {
+        return Result.success(dictManager.optionSelect());
+    }
+
     @Operation(summary = "获取字典类型详细信息")
     @GetMapping("/{dictId}")
     public Result<DictTypeVO> getInfo(@PathVariable Long dictId) {

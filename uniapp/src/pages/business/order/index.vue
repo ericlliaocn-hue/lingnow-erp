@@ -1,109 +1,60 @@
 <template>
   <view class="page">
     <view class="nav">
-      <text class="title">订单</text>
+      <text class="title">单据</text>
+      <button class="new-btn" @click="goCreate">新建</button>
     </view>
     <scroll-view class="content" scroll-y>
-      <view v-for="item in orders" :key="item.id" class="card">
+      <view v-for="item in bills" :key="item.id" class="card">
         <view class="row">
-          <text class="order-no">订单号 {{ item.orderNo || item.id }}</text>
-          <text class="status">{{ item.status || '-' }}</text>
+          <text class="bill-no">{{ item.billNo || item.id }}</text>
+          <text class="status">{{ item.auditStatus === 1 ? '已审核' : '未审核' }}</text>
         </view>
-        <view class="row">
-          <text class="amount">¥ {{ item.totalAmount ?? '-' }}</text>
-          <button class="btn" @click="goDetail(item)">查看</button>
-        </view>
+        <text class="line">类型：{{ item.billType || '-' }}</text>
+        <text class="line">客户/供应商：{{ item.partnerName || '-' }}</text>
+        <text class="amount">金额：{{ item.payableAmount ?? item.amount ?? '-' }}</text>
       </view>
-      <view v-if="orders.length === 0" class="empty">暂无订单</view>
+      <view v-if="loadError" class="empty error">{{ loadError }}</view>
+      <view v-else-if="bills.length === 0" class="empty">暂无业务单据</view>
+      <view class="safe-area"></view>
     </scroll-view>
-    <TabBar :current="3"/>
   </view>
 </template>
 
 <script lang="ts" setup>
 import {onMounted, ref} from 'vue'
-import TabBar from '@/components/TabBar.vue'
-import {getOrders} from '@/api/business'
+import {getMobileBills} from '@/api/business'
 
-const orders = ref<any[]>([])
-const currentUser = uni.getStorageSync('userInfo') || null
+const bills = ref<any[]>([])
+const loadError = ref('')
 
 const loadData = async () => {
-  if (!currentUser?.userId) {
-    orders.value = []
-    return
-  }
+  loadError.value = ''
   try {
-    const res = await getOrders(currentUser.userId)
-    orders.value = res?.data || []
+    const res = await getMobileBills()
+    bills.value = res?.data || []
   } catch (e) {
-    console.error(e)
+    loadError.value = '业务单据加载失败，请登录后重试'
   }
 }
 
-const goDetail = (item: any) => {
-  uni.showToast({title: '订单详情暂未接入', icon: 'none'})
-}
+const goCreate = () => uni.navigateTo({url: '/pages/business/checkout/index'})
 
-onMounted(() => {
-  loadData()
-})
+onMounted(loadData)
 </script>
 
 <style lang="scss" scoped>
-.page {
-  height: 100vh;
-  background: #f7f7f8;
-}
-
-.nav {
-  padding: 24rpx;
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.content {
-  height: calc(100vh - 180rpx);
-  padding: 0 24rpx;
-}
-
-.card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 16rpx;
-  margin-bottom: 16rpx;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10rpx;
-}
-
-.order-no {
-  color: #666;
-  font-size: 24rpx;
-}
-
-.status {
-  color: #ff6f61;
-}
-
-.amount {
-  font-size: 28rpx;
-  font-weight: 600;
-}
-
-.btn {
-  background: #ff6f61;
-  color: #fff;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-}
-
-.empty {
-  text-align: center;
-  color: #999;
-  margin-top: 80rpx;
-}
+.page { height: 100vh; background: #f5f7f6; }
+.nav { padding: 24rpx; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1rpx solid #e5ebe7; }
+.title { font-size: 32rpx; font-weight: 700; color: #1f2d2a; }
+.new-btn { background: #2f7d57; color: #fff; border-radius: 999rpx; font-size: 24rpx; padding: 0 28rpx; }
+.content { height: calc(100vh - 180rpx); padding: 24rpx; }
+.card { background: #fff; border-radius: 16rpx; padding: 22rpx; border: 1rpx solid #e5ebe7; margin-bottom: 16rpx; }
+.row { display: flex; justify-content: space-between; margin-bottom: 12rpx; }
+.bill-no { font-size: 28rpx; font-weight: 700; color: #1f2d2a; }
+.status { color: #2f7d57; font-size: 24rpx; }
+.line, .amount { display: block; color: #66736e; font-size: 24rpx; margin-top: 8rpx; }
+.empty { text-align: center; color: #9aa4a0; margin-top: 80rpx; }
+.error { color: #c2410c; }
+.safe-area { height: 140rpx; }
 </style>

@@ -264,7 +264,7 @@ function submitForm() {
 
 function handleDelete(row?: ErpMasterVO) {
   const deleteIds = row?.id ? [row.id] : ids.value
-  ElMessageBox.confirm(`确定删除选中的${config.value.name}吗？`, '提示', { type: 'warning' })
+  ElMessageBox.confirm(`确定删除选中的${config.value.name}吗？已被业务引用的数据不能删除，可改为停用。`, '提示', { type: 'warning' })
     .then(() => deleteMaster(type.value, deleteIds))
     .then(() => {
       ElMessage.success('删除成功')

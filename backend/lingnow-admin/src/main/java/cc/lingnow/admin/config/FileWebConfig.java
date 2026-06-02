@@ -20,6 +20,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @RequiredArgsConstructor
 public class FileWebConfig implements WebMvcConfigurer {
 
+    private static final String DEFAULT_FILE_BASE_PATH = "/data/lingnow/files/";
+
     private final SysFileConfigMapper fileConfigMapper;
 
     @Override
@@ -70,7 +72,7 @@ public class FileWebConfig implements WebMvcConfigurer {
                 }
             } else {
                 // 默认映射
-                String defaultPath = "/Users/eric/Pictures/file/";
+                String defaultPath = defaultBasePath();
                 log.info("未找到本地存储配置，使用默认映射: /files/** -> file:{}", defaultPath);
                 registry.addResourceHandler("/files/**")
                         .addResourceLocations("file:" + defaultPath);
@@ -79,7 +81,12 @@ public class FileWebConfig implements WebMvcConfigurer {
             log.error("加载文件资源映射失败", e);
             // Fallback
             registry.addResourceHandler("/files/**")
-                    .addResourceLocations("file:/Users/eric/Pictures/file/");
+                    .addResourceLocations("file:" + defaultBasePath());
         }
+    }
+
+    private String defaultBasePath() {
+        String path = System.getenv().getOrDefault("LINGNOW_FILE_BASE_PATH", DEFAULT_FILE_BASE_PATH);
+        return path.endsWith("/") ? path : path + "/";
     }
 }

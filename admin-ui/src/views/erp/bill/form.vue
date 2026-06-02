@@ -7,15 +7,16 @@
           <div>
             <el-button @click="back">返回</el-button>
             <el-button type="primary" :disabled="readonly" @click="submit(false)" v-permission="form.id ? `erp:${module}:edit` : `erp:${module}:add`">保存</el-button>
-            <el-button type="warning" :disabled="readonly" @click="submit(true)" v-permission="`erp:${module}:audit`">保存并审核</el-button>
+            <el-button type="warning" :disabled="readonly" @click="submit(true)" v-permission="`erp:${module}:audit`">保存并提交</el-button>
           </div>
         </div>
       </template>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
+        <el-alert v-if="readonly" title="已审核单据只能查看，需反审核后才能修改。" type="warning" :closable="false" show-icon class="readonly-alert" />
+        <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" :disabled="readonly">
         <el-row :gutter="16">
           <el-col :span="6"><el-form-item label="单号"><el-input v-model="form.billNo" placeholder="自动生成" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="日期" prop="billDate"><el-date-picker v-model="form.billDate" value-format="YYYY-MM-DD" style="width: 100%" /></el-form-item></el-col>
-          <el-col :span="6"><el-form-item :label="module === 'sale' ? '客户' : '供应商'" prop="partnerId"><el-select v-model="form.partnerId" filterable style="width: 100%"><el-option v-for="item in partners" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
+          <el-col :span="6"><el-form-item :label="partnerLabel" prop="partnerId"><el-select v-model="form.partnerId" filterable style="width: 100%"><el-option v-for="item in partners" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="仓库" prop="warehouseId"><el-select v-model="form.warehouseId" filterable style="width: 100%"><el-option v-for="item in warehouses" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="账户"><el-select v-model="form.accountId" clearable filterable style="width: 100%"><el-option v-for="item in accounts" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="实收/实付"><el-input-number v-model="form.paidAmount" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
@@ -23,7 +24,7 @@
           <el-col :span="6"><el-form-item label="其他费用"><el-input-number v-model="form.otherAmount" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
         </el-row>
         <el-divider />
-        <div class="toolbar"><el-button type="primary" @click="addRow">添加商品</el-button></div>
+        <div class="toolbar"><el-button type="primary" :disabled="readonly" @click="addRow">添加商品</el-button></div>
         <el-table :data="form.items" border>
           <el-table-column label="商品" min-width="220">
             <template #default="{ row }">
@@ -36,7 +37,7 @@
           <el-table-column label="数量" width="140"><template #default="{ row }"><el-input-number v-model="row.qty" :min="0" :precision="2" @change="calc" /></template></el-table-column>
           <el-table-column label="单价" width="140"><template #default="{ row }"><el-input-number v-model="row.price" :min="0" :precision="2" @change="calc" /></template></el-table-column>
           <el-table-column prop="amount" label="金额" width="120" align="right" />
-          <el-table-column label="操作" width="90"><template #default="{ $index }"><el-button link type="primary" @click="form.items.splice($index, 1); calc()">删除</el-button></template></el-table-column>
+          <el-table-column label="操作" width="90"><template #default="{ $index }"><el-button link type="primary" :disabled="readonly" @click="form.items.splice($index, 1); calc()">删除</el-button></template></el-table-column>
         </el-table>
         <div class="totals">
           <span>总数量：{{ totalQty }}</span>
@@ -54,14 +55,30 @@
 import { computed, onMounted, reactive, ref, toRefs } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { addBill, auditBill, getBill, listBill, nextBillNo, updateBill, type BillItem, type BillModule, type ErpBill } from '@/api/erp/bill'
+import { addBill, getBill, listBill, nextBillNo, updateBill, type BillItem, type BillModule, type ErpBill } from '@/api/erp/bill'
+import { submitApproval, type ApprovalBizType } from '@/api/erp/approval'
 import { productOptions, type ErpProduct } from '@/api/erp/product'
 import { listMaster, type ErpMasterVO } from '@/api/erp/master'
 
 const route = useRoute()
 const router = useRouter()
-const module = computed<BillModule>(() => route.path.includes('/purchase') ? 'purchase' : 'sale')
-const title = computed(() => module.value === 'sale' ? '新增销售单' : '新增进货单')
+const module = computed<BillModule>(() => {
+  if (route.path.includes('/sale-return')) return 'sale-return'
+  if (route.path.includes('/purchase-return')) return 'purchase-return'
+  return route.path.includes('/purchase') ? 'purchase' : 'sale'
+})
+const titleMap: Record<BillModule, string> = { sale: '新增销售单', 'sale-return': '新增销售退货', purchase: '新增进货单', 'purchase-return': '新增进货退货' }
+const title = computed(() => titleMap[module.value])
+const partnerLabel = computed(() => module.value.startsWith('sale') ? '客户' : '供应商')
+const bizType = computed<ApprovalBizType>(() => {
+  const map: Record<BillModule, ApprovalBizType> = {
+    sale: 'SALE',
+    'sale-return': 'SALE_RETURN',
+    purchase: 'PURCHASE',
+    'purchase-return': 'PURCHASE_RETURN'
+  }
+  return map[module.value]
+})
 const formRef = ref()
 const products = ref<ErpProduct[]>([])
 const partners = ref<ErpMasterVO[]>([])
@@ -84,7 +101,7 @@ const debtAmount = computed(() => (Number(payableAmount.value) - Number(form.val
 
 function loadOptions() {
   productOptions().then(res => products.value = res)
-  listMaster(module.value === 'sale' ? 'customer' : 'supplier', { current: 1, size: 200 }).then(res => partners.value = res.records)
+  listMaster(module.value.startsWith('sale') ? 'customer' : 'supplier', { current: 1, size: 200 }).then(res => partners.value = res.records)
   listMaster('warehouse', { current: 1, size: 200 }).then(res => warehouses.value = res.records)
   listMaster('account', { current: 1, size: 200 }).then(res => accounts.value = res.records)
 }
@@ -104,7 +121,7 @@ function productChanged(row: BillItem) {
   row.productName = product.name
   row.spec = product.spec
   row.unitId = product.unitId
-  row.price = module.value === 'sale' ? Number(product.salePrice || 0) : Number(product.purchasePrice || 0)
+  row.price = module.value.startsWith('sale') ? Number(product.salePrice || 0) : Number(product.purchasePrice || 0)
   calc()
 }
 function calc() {
@@ -131,8 +148,8 @@ function submit(needAudit: boolean) {
 function auditSavedBill() {
   const id = form.value.id
   if (id) {
-    auditBill(module.value, id).then(() => {
-      ElMessage.success('审核成功')
+    submitApproval(bizType.value, id).then(() => {
+      ElMessage.success('提交审批成功')
       back()
     })
     return
@@ -143,8 +160,8 @@ function auditSavedBill() {
       back()
       return
     }
-    auditBill(module.value, saved.id).then(() => {
-      ElMessage.success('审核成功')
+    submitApproval(bizType.value, saved.id).then(() => {
+      ElMessage.success('提交审批成功')
       back()
     })
   })
@@ -157,4 +174,5 @@ onMounted(() => { loadOptions(); loadData() })
 .card-header, .toolbar, .totals { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .toolbar { justify-content: flex-start; margin-bottom: 12px; }
 .totals { justify-content: flex-end; padding: 16px 0; font-weight: 600; }
+.readonly-alert { margin-bottom: 16px; }
 </style>

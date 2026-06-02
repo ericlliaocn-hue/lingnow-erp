@@ -30,6 +30,11 @@ public class ErpBillVO {
     private BigDecimal debtAmount;
     private Integer auditStatus;
     private String paymentStatus;
+    private String approvalStatus;
+    private Long approvalInstanceId;
+    private String approvalSubmitBy;
+    private LocalDateTime approvalSubmitTime;
+    private LocalDateTime approvalFinishTime;
     private LocalDateTime auditTime;
     private String auditBy;
     private String remark;

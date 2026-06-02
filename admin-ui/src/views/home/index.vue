@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2>数据看板</h2>
-        <p>通用基座首页聚焦用户维度，后续行业业务数据由业务模块接入。</p>
+        <p>展示系统用户、在线会话与 ERP 经营概览，全部指标来自当前数据库。</p>
       </div>
       <el-button :icon="Refresh" :loading="loading" @click="loadData">刷新</el-button>
     </div>

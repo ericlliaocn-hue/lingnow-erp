@@ -37,5 +37,9 @@ spring:
 # 日志配置
 logging:
   level:
-    cc.lingnow: debug
+    root: ${LINGNOW_LOG_LEVEL:INFO}
+    cc.lingnow: ${LINGNOW_APP_LOG_LEVEL:INFO}
     org.springframework: info
+
+knife4j:
+  enable: ${LINGNOW_API_DOC_ENABLED:false}

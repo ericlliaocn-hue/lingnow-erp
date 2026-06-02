@@ -1,13 +1,17 @@
 package cc.lingnow.admin.controller;
 
 import cc.lingnow.admin.util.StpAdminUtil;
+import cc.lingnow.admin.util.CsvExportUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.common.enums.ErrorCode;
+import cc.lingnow.common.exception.BusinessException;
 import cc.lingnow.common.vo.PageResult;
 import cc.lingnow.common.vo.Result;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,9 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.LinkedHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -152,9 +161,457 @@ public class ErpReportController {
         return Result.success(data);
     }
 
+    @GetMapping("/bill-stat")
+    public Result<List<Map<String, Object>>> billStat(String billType,
+                                                      String groupBy,
+                                                      LocalDate beginDate,
+                                                      LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:" + ("SALE".equals(billType) ? "sale-stat" : "purchase-stat"));
+        return Result.success(groupBills(billType, groupBy, beginDate, endDate));
+    }
+
+    @GetMapping("/profit")
+    public Result<List<Map<String, Object>>> profit(String groupBy, LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:profit");
+        List<ErpBill> saleBills = billService.list(billWrapper("SALE", beginDate, endDate));
+        Map<Long, ErpBill> billMap = saleBills.stream().collect(Collectors.toMap(ErpBill::getId, Function.identity(), (a, b) -> a));
+        if (billMap.isEmpty()) {
+            return Result.success(List.of());
+        }
+        List<Long> saleIds = new ArrayList<>(billMap.keySet());
+        Map<String, Map<String, Object>> rows = new HashMap<>();
+        for (ErpBillItem item : billItemService.list(new QueryWrapper<ErpBillItem>().in("bill_id", saleIds))) {
+            ErpBill bill = billMap.get(item.getBillId());
+            BigDecimal costAmount = stockFlowService.list(new QueryWrapper<ErpStockFlow>()
+                            .eq("source_bill_id", bill.getId()).eq("source_bill_type", bill.getBillType()).eq("product_id", item.getProductId()))
+                    .stream().map(ErpStockFlow::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            String key = profitKey(groupBy, bill, item);
+            Map<String, Object> row = rows.computeIfAbsent(key, k -> baseProfitRow(groupBy, bill, item));
+            add(row, "saleAmount", item.getFinalAmount());
+            add(row, "costAmount", costAmount);
+            add(row, "profitAmount", item.getFinalAmount().subtract(costAmount));
+            add(row, "qty", item.getQty());
+        }
+        return Result.success(sortAmount(rows.values().stream().toList(), "profitAmount"));
+    }
+
+    @GetMapping("/trend")
+    public Result<List<Map<String, Object>>> trend(LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:sale-analysis");
+        Map<LocalDate, Map<String, Object>> rows = new HashMap<>();
+        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>().eq("audit_status", 1)
+                .in("bill_type", List.of("SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"))
+                .ge(beginDate != null, "bill_date", beginDate)
+                .le(endDate != null, "bill_date", endDate))) {
+            Map<String, Object> row = rows.computeIfAbsent(bill.getBillDate(), date -> {
+                Map<String, Object> created = new HashMap<>();
+                created.put("date", date);
+                created.put("saleAmount", BigDecimal.ZERO);
+                created.put("saleReturnAmount", BigDecimal.ZERO);
+                created.put("purchaseAmount", BigDecimal.ZERO);
+                created.put("purchaseReturnAmount", BigDecimal.ZERO);
+                return created;
+            });
+            switch (bill.getBillType()) {
+                case "SALE" -> add(row, "saleAmount", bill.getPayableAmount());
+                case "SALE_RETURN" -> add(row, "saleReturnAmount", bill.getPayableAmount());
+                case "PURCHASE" -> add(row, "purchaseAmount", bill.getPayableAmount());
+                case "PURCHASE_RETURN" -> add(row, "purchaseReturnAmount", bill.getPayableAmount());
+                default -> {
+                }
+            }
+        }
+        return Result.success(rows.values().stream().sorted(Comparator.comparing(row -> (LocalDate) row.get("date"))).toList());
+    }
+
+    @GetMapping("/business-profit")
+    public Result<Map<String, Object>> businessProfit(LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:business-profit");
+        BigDecimal saleAmount = billTotal("SALE", beginDate, endDate);
+        BigDecimal saleReturnAmount = billTotal("SALE_RETURN", beginDate, endDate);
+        BigDecimal purchaseAmount = billTotal("PURCHASE", beginDate, endDate);
+        BigDecimal purchaseReturnAmount = billTotal("PURCHASE_RETURN", beginDate, endDate);
+        BigDecimal otherIncome = financeTotal("INCOME", beginDate, endDate);
+        BigDecimal otherExpense = financeTotal("EXPENSE", beginDate, endDate);
+        Map<String, Object> row = new HashMap<>();
+        row.put("saleAmount", saleAmount);
+        row.put("saleReturnAmount", saleReturnAmount);
+        row.put("purchaseAmount", purchaseAmount);
+        row.put("purchaseReturnAmount", purchaseReturnAmount);
+        row.put("otherIncome", otherIncome);
+        row.put("otherExpense", otherExpense);
+        row.put("grossProfit", saleAmount.subtract(saleReturnAmount).subtract(purchaseAmount).add(purchaseReturnAmount));
+        row.put("netProfit", saleAmount.subtract(saleReturnAmount).subtract(purchaseAmount).add(purchaseReturnAmount).add(otherIncome).subtract(otherExpense));
+        return Result.success(row);
+    }
+
+    @GetMapping("/hot-products")
+    public Result<List<Map<String, Object>>> hotProducts(LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:hot-products");
+        List<ErpBill> saleBills = billService.list(billWrapper("SALE", beginDate, endDate));
+        if (saleBills.isEmpty()) {
+            return Result.success(List.of());
+        }
+        List<Long> billIds = saleBills.stream().map(ErpBill::getId).toList();
+        Map<Long, ErpBill> billMap = saleBills.stream().collect(Collectors.toMap(ErpBill::getId, Function.identity(), (a, b) -> a));
+        Map<Long, Map<String, Object>> rows = new HashMap<>();
+        for (ErpBillItem item : billItemService.list(new QueryWrapper<ErpBillItem>().in("bill_id", billIds))) {
+            Map<String, Object> row = rows.computeIfAbsent(item.getProductId(), id -> productRow(item));
+            add(row, "qty", item.getQty());
+            add(row, "saleAmount", item.getFinalAmount());
+            row.put("lastBillDate", billMap.get(item.getBillId()).getBillDate());
+        }
+        return Result.success(sortAmount(rows.values().stream().toList(), "qty"));
+    }
+
+    @GetMapping("/employee-performance")
+    public Result<List<Map<String, Object>>> employeePerformance(LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:employee-performance");
+        Map<Long, Map<String, Object>> rows = new HashMap<>();
+        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>().eq("audit_status", 1)
+                .in("bill_type", List.of("SALE", "SALE_RETURN"))
+                .ge(beginDate != null, "bill_date", beginDate)
+                .le(endDate != null, "bill_date", endDate))) {
+            Long employeeId = bill.getEmployeeId() == null ? 0L : bill.getEmployeeId();
+            Map<String, Object> row = rows.computeIfAbsent(employeeId, id -> {
+                Map<String, Object> created = new HashMap<>();
+                created.put("employeeId", id);
+                created.put("employeeName", id == 0L ? "未指定业务员" : String.valueOf(id));
+                created.put("saleAmount", BigDecimal.ZERO);
+                created.put("returnAmount", BigDecimal.ZERO);
+                created.put("netAmount", BigDecimal.ZERO);
+                created.put("commissionAmount", BigDecimal.ZERO);
+                return created;
+            });
+            if ("SALE".equals(bill.getBillType())) {
+                add(row, "saleAmount", bill.getPayableAmount());
+                add(row, "netAmount", bill.getPayableAmount());
+                add(row, "commissionAmount", bill.getPayableAmount().multiply(new BigDecimal("0.01")));
+            } else {
+                add(row, "returnAmount", bill.getPayableAmount());
+                add(row, "netAmount", bill.getPayableAmount().negate());
+                add(row, "commissionAmount", bill.getPayableAmount().multiply(new BigDecimal("-0.01")));
+            }
+        }
+        return Result.success(sortAmount(rows.values().stream().toList(), "netAmount"));
+    }
+
+    @GetMapping("/stock-summary")
+    public Result<List<Map<String, Object>>> stockSummary(LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:stock-summary");
+        Map<String, Map<String, Object>> rows = new HashMap<>();
+        for (ErpStockFlow flow : stockFlowService.list(new QueryWrapper<ErpStockFlow>()
+                .ge(beginDate != null, "operate_time", beginDate == null ? null : beginDate.atStartOfDay())
+                .lt(endDate != null, "operate_time", endDate == null ? null : endDate.plusDays(1).atStartOfDay()))) {
+            String key = flow.getProductId() + ":" + flow.getWarehouseId();
+            Map<String, Object> row = rows.computeIfAbsent(key, k -> {
+                Map<String, Object> created = new HashMap<>();
+                created.put("productId", flow.getProductId());
+                created.put("productName", productName(flow.getProductId()));
+                created.put("warehouseId", flow.getWarehouseId());
+                created.put("warehouseName", masterName(warehouseService.getById(flow.getWarehouseId())));
+                created.put("inQty", BigDecimal.ZERO);
+                created.put("outQty", BigDecimal.ZERO);
+                created.put("inAmount", BigDecimal.ZERO);
+                created.put("outAmount", BigDecimal.ZERO);
+                created.put("netQty", BigDecimal.ZERO);
+                return created;
+            });
+            if ("IN".equals(flow.getDirection())) {
+                add(row, "inQty", flow.getQty());
+                add(row, "inAmount", flow.getAmount());
+                add(row, "netQty", flow.getQty());
+            } else {
+                add(row, "outQty", flow.getQty());
+                add(row, "outAmount", flow.getAmount());
+                add(row, "netQty", flow.getQty().negate());
+            }
+        }
+        return Result.success(rows.values().stream().toList());
+    }
+
+    @GetMapping("/inventory-change")
+    public Result<List<Map<String, Object>>> inventoryChange(LocalDate beginDate, LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:inventory-change");
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> row : stockSummary(beginDate, endDate).getData()) {
+            Map<String, Object> changed = new HashMap<>(row);
+            changed.put("currentQty", stockBalanceService.list(new QueryWrapper<ErpStockBalance>()
+                            .eq("product_id", row.get("productId")).eq("warehouse_id", row.get("warehouseId"))).stream()
+                    .map(ErpStockBalance::getQty).reduce(BigDecimal.ZERO, BigDecimal::add));
+            rows.add(changed);
+        }
+        return Result.success(rows);
+    }
+
+    @GetMapping("/export")
+    public void export(String reportCode,
+                       String billType,
+                       String groupBy,
+                       LocalDate beginDate,
+                       LocalDate endDate,
+                       HttpServletResponse response) throws Exception {
+        ReportExport export = reportExport(reportCode, billType, groupBy, beginDate, endDate);
+        List<List<String>> rows = export.rows().stream()
+                .map(row -> export.columns().keySet().stream().map(key -> text(row.get(key))).toList())
+                .toList();
+        CsvExportUtil.write(response, export.title() + ".csv", export.columns().values().stream().toList(), rows);
+    }
+
     private BigDecimal billAmount(String billType, LocalDate date) {
         return billService.list(new QueryWrapper<ErpBill>().eq("bill_type", billType).eq("bill_date", date).eq("audit_status", 1))
                 .stream().map(ErpBill::getPayableAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private ReportExport reportExport(String reportCode, String billType, String groupBy, LocalDate beginDate, LocalDate endDate) {
+        String code = Objects.toString(reportCode, "");
+        return switch (code) {
+            case "sale-stat" -> new ReportExport("销售统计", statColumns("销售额"), groupBills("SALE", blankDefault(groupBy, "date"), beginDate, endDate));
+            case "purchase-stat" -> new ReportExport("进货统计", statColumns("进货额"), groupBills("PURCHASE", blankDefault(groupBy, "date"), beginDate, endDate));
+            case "sale-profit-product" -> new ReportExport("销售利润表-按商品", profitColumns(), profit("product", beginDate, endDate).getData());
+            case "sale-profit-bill" -> new ReportExport("销售利润表-按单据", profitColumns(), profit("bill", beginDate, endDate).getData());
+            case "sale-profit-customer" -> new ReportExport("销售利润表-按客户", profitColumns(), profit("customer", beginDate, endDate).getData());
+            case "sale-analysis" -> new ReportExport("销售分析", trendColumns(), trend(beginDate, endDate).getData());
+            case "business-profit" -> new ReportExport("经营利润", profitSummaryColumns(), List.of(businessProfit(beginDate, endDate).getData()));
+            case "hot-products" -> new ReportExport("商品热销榜", hotProductColumns(), hotProducts(beginDate, endDate).getData());
+            case "employee-performance" -> new ReportExport("员工业绩统计", employeeColumns(true), employeePerformance(beginDate, endDate).getData());
+            case "employee-commission" -> new ReportExport("员工业绩提成", employeeColumns(false), employeePerformance(beginDate, endDate).getData());
+            case "stock-summary" -> new ReportExport("商品收发汇总表", stockColumns(false), stockSummary(beginDate, endDate).getData());
+            case "inventory-change" -> new ReportExport("商品进销存变动统计", stockColumns(true), inventoryChange(beginDate, endDate).getData());
+            case "bill-detail" -> new ReportExport(("PURCHASE".equals(billType) ? "进货明细" : "销售明细"), billDetailColumns(),
+                    billDetail(1L, 100000L, billType, null).getData().getRecords());
+            default -> throw new BusinessException(ErrorCode.PARAM_ERROR, "报表类型不支持导出");
+        };
+    }
+
+    private LinkedHashMap<String, String> statColumns(String amountLabel) {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("groupName", "统计维度");
+        columns.put("billCount", "单据数");
+        columns.put("totalQty", "数量");
+        columns.put("payableAmount", amountLabel);
+        columns.put("paidAmount", "已收/已付");
+        columns.put("debtAmount", "欠款");
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> profitColumns() {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("groupName", "统计维度");
+        columns.put("qty", "数量");
+        columns.put("saleAmount", "销售额");
+        columns.put("costAmount", "成本额");
+        columns.put("profitAmount", "利润");
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> trendColumns() {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("date", "日期");
+        columns.put("saleAmount", "销售额");
+        columns.put("saleReturnAmount", "销售退货");
+        columns.put("purchaseAmount", "进货额");
+        columns.put("purchaseReturnAmount", "进货退货");
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> profitSummaryColumns() {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("saleAmount", "销售额");
+        columns.put("saleReturnAmount", "销售退货");
+        columns.put("purchaseAmount", "进货额");
+        columns.put("purchaseReturnAmount", "进货退货");
+        columns.put("otherIncome", "其他收入");
+        columns.put("otherExpense", "其他支出");
+        columns.put("grossProfit", "毛利");
+        columns.put("netProfit", "净利润");
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> hotProductColumns() {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("productCode", "商品编号");
+        columns.put("productName", "商品名称");
+        columns.put("qty", "销售数量");
+        columns.put("saleAmount", "销售额");
+        columns.put("lastBillDate", "最近销售日期");
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> employeeColumns(boolean full) {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("employeeName", "业务员");
+        if (full) {
+            columns.put("saleAmount", "销售额");
+            columns.put("returnAmount", "退货额");
+        }
+        columns.put("netAmount", "净业绩");
+        columns.put("commissionAmount", "提成");
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> stockColumns(boolean current) {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("productName", "商品");
+        columns.put("warehouseName", "仓库");
+        columns.put("inQty", "入库数量");
+        columns.put("outQty", "出库数量");
+        columns.put("inAmount", "入库金额");
+        columns.put("outAmount", "出库金额");
+        columns.put("netQty", "净变动");
+        if (current) {
+            columns.put("currentQty", "当前库存");
+        }
+        return columns;
+    }
+
+    private LinkedHashMap<String, String> billDetailColumns() {
+        LinkedHashMap<String, String> columns = new LinkedHashMap<>();
+        columns.put("billNo", "单号");
+        columns.put("billDate", "日期");
+        columns.put("partnerName", "往来单位");
+        columns.put("productCode", "商品编号");
+        columns.put("productName", "商品名称");
+        columns.put("spec", "规格");
+        columns.put("warehouseName", "仓库");
+        columns.put("qty", "数量");
+        columns.put("price", "单价");
+        columns.put("amount", "金额");
+        columns.put("discountAmount", "优惠");
+        columns.put("finalAmount", "折后金额");
+        return columns;
+    }
+
+    private String blankDefault(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private String text(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private record ReportExport(String title, LinkedHashMap<String, String> columns, List<Map<String, Object>> rows) {
+    }
+
+    private QueryWrapper<ErpBill> billWrapper(String billType, LocalDate beginDate, LocalDate endDate) {
+        return new QueryWrapper<ErpBill>()
+                .eq("bill_type", billType)
+                .eq("audit_status", 1)
+                .ge(beginDate != null, "bill_date", beginDate)
+                .le(endDate != null, "bill_date", endDate);
+    }
+
+    private List<Map<String, Object>> groupBills(String billType, String groupBy, LocalDate beginDate, LocalDate endDate) {
+        List<ErpBill> bills = billService.list(billWrapper(billType, beginDate, endDate));
+        Map<String, Map<String, Object>> rows = new HashMap<>();
+        for (ErpBill bill : bills) {
+            String key = groupBillKey(groupBy, bill);
+            Map<String, Object> row = rows.computeIfAbsent(key, k -> baseBillStatRow(groupBy, bill));
+            add(row, "billCount", BigDecimal.ONE);
+            add(row, "totalQty", bill.getTotalQty());
+            add(row, "totalAmount", bill.getTotalAmount());
+            add(row, "discountAmount", bill.getDiscountAmount());
+            add(row, "payableAmount", bill.getPayableAmount());
+            add(row, "paidAmount", bill.getPaidAmount());
+            add(row, "debtAmount", bill.getDebtAmount());
+        }
+        return sortAmount(rows.values().stream().toList(), "payableAmount");
+    }
+
+    private String groupBillKey(String groupBy, ErpBill bill) {
+        if ("date".equals(groupBy)) {
+            return bill.getBillDate().format(DateTimeFormatter.ISO_DATE);
+        }
+        if ("customer".equals(groupBy) || "supplier".equals(groupBy)) {
+            return String.valueOf(bill.getPartnerId());
+        }
+        if ("employee".equals(groupBy)) {
+            return String.valueOf(bill.getEmployeeId() == null ? 0L : bill.getEmployeeId());
+        }
+        return bill.getBillType();
+    }
+
+    private Map<String, Object> baseBillStatRow(String groupBy, ErpBill bill) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("groupKey", groupBillKey(groupBy, bill));
+        row.put("groupName", groupBillName(groupBy, bill));
+        row.put("billCount", BigDecimal.ZERO);
+        row.put("totalQty", BigDecimal.ZERO);
+        row.put("totalAmount", BigDecimal.ZERO);
+        row.put("discountAmount", BigDecimal.ZERO);
+        row.put("payableAmount", BigDecimal.ZERO);
+        row.put("paidAmount", BigDecimal.ZERO);
+        row.put("debtAmount", BigDecimal.ZERO);
+        return row;
+    }
+
+    private String groupBillName(String groupBy, ErpBill bill) {
+        if ("date".equals(groupBy)) {
+            return bill.getBillDate().format(DateTimeFormatter.ISO_DATE);
+        }
+        if ("customer".equals(groupBy) || "supplier".equals(groupBy)) {
+            return partnerName(bill.getPartnerType(), bill.getPartnerId());
+        }
+        if ("employee".equals(groupBy)) {
+            return bill.getEmployeeId() == null ? "未指定业务员" : String.valueOf(bill.getEmployeeId());
+        }
+        return bill.getBillType();
+    }
+
+    private String profitKey(String groupBy, ErpBill bill, ErpBillItem item) {
+        if ("bill".equals(groupBy)) {
+            return String.valueOf(bill.getId());
+        }
+        if ("customer".equals(groupBy)) {
+            return String.valueOf(bill.getPartnerId());
+        }
+        return String.valueOf(item.getProductId());
+    }
+
+    private Map<String, Object> baseProfitRow(String groupBy, ErpBill bill, ErpBillItem item) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("groupKey", profitKey(groupBy, bill, item));
+        row.put("groupName", switch (Objects.toString(groupBy, "product")) {
+            case "bill" -> bill.getBillNo();
+            case "customer" -> partnerName(bill.getPartnerType(), bill.getPartnerId());
+            default -> item.getProductName();
+        });
+        row.put("qty", BigDecimal.ZERO);
+        row.put("saleAmount", BigDecimal.ZERO);
+        row.put("costAmount", BigDecimal.ZERO);
+        row.put("profitAmount", BigDecimal.ZERO);
+        return row;
+    }
+
+    private Map<String, Object> productRow(ErpBillItem item) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("productId", item.getProductId());
+        row.put("productCode", item.getProductCode());
+        row.put("productName", item.getProductName());
+        row.put("qty", BigDecimal.ZERO);
+        row.put("saleAmount", BigDecimal.ZERO);
+        return row;
+    }
+
+    private BigDecimal billTotal(String billType, LocalDate beginDate, LocalDate endDate) {
+        return billService.list(billWrapper(billType, beginDate, endDate)).stream()
+                .map(ErpBill::getPayableAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal financeTotal(String billType, LocalDate beginDate, LocalDate endDate) {
+        return fundFlowService.list(new QueryWrapper<ErpFundFlow>()
+                        .eq("source_bill_type", billType)
+                        .ge(beginDate != null, "operate_time", beginDate == null ? null : beginDate.atStartOfDay())
+                        .lt(endDate != null, "operate_time", endDate == null ? null : endDate.plusDays(1).atStartOfDay()))
+                .stream().map(ErpFundFlow::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private void add(Map<String, Object> row, String key, BigDecimal amount) {
+        row.put(key, amount(row.get(key)).add(amount == null ? BigDecimal.ZERO : amount));
+    }
+
+    private List<Map<String, Object>> sortAmount(List<Map<String, Object>> rows, String key) {
+        return rows.stream().sorted((a, b) -> amount(b.get(key)).compareTo(amount(a.get(key)))).toList();
     }
 
     private BigDecimal partnerTotal(String direction) {

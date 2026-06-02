@@ -10,21 +10,21 @@
     {
       "path": "pages/business/category/index",
       "style": {
-        "navigationBarTitleText": "分类",
+        "navigationBarTitleText": "客户",
         "navigationStyle": "custom"
       }
     },
     {
       "path": "pages/business/cart/index",
       "style": {
-        "navigationBarTitleText": "购物车",
+        "navigationBarTitleText": "商品",
         "navigationStyle": "custom"
       }
     },
     {
       "path": "pages/business/order/index",
       "style": {
-        "navigationBarTitleText": "订单",
+        "navigationBarTitleText": "单据",
         "navigationStyle": "custom"
       }
     },
@@ -45,7 +45,7 @@
     {
       "path": "pages/business/checkout/index",
       "style": {
-        "navigationBarTitleText": "确认下单",
+        "navigationBarTitleText": "新建单据",
         "navigationStyle": "custom"
       }
     },
@@ -67,16 +67,52 @@
         "navigationBarTitleText": "忘记密码"
       }
     },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "账号设置"
+      }
+    },
+    {
+      "path": "pages/settings/profile-edit",
+      "style": {
+        "navigationBarTitleText": "个人资料"
+      }
+    },
+    {
+      "path": "pages/settings/account-binding",
+      "style": {
+        "navigationBarTitleText": "账号绑定"
+      }
+    },
+    {
+      "path": "pages/settings/mobile",
+      "style": {
+        "navigationBarTitleText": "修改手机号"
+      }
+    },
+    {
+      "path": "pages/settings/password",
+      "style": {
+        "navigationBarTitleText": "修改密码"
+      }
+    },
+    {
+      "path": "pages/settings/security",
+      "style": {
+        "navigationBarTitleText": "账号安全"
+      }
+    }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "业务端",
+    "navigationBarTitleText": "ERP业务端",
     "navigationBarBackgroundColor": "#FFFFFF",
     "backgroundColor": "#F8F8F8"
   },
   "tabBar": {
     "color": "#909399",
-    "selectedColor": "#FF6F61",
+    "selectedColor": "#2F7D57",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
@@ -86,15 +122,15 @@
       },
       {
         "pagePath": "pages/business/category/index",
-        "text": "分类"
+        "text": "客户"
       },
       {
         "pagePath": "pages/business/cart/index",
-        "text": "购物车"
+        "text": "商品"
       },
       {
         "pagePath": "pages/business/order/index",
-        "text": "订单"
+        "text": "单据"
       },
       {
         "pagePath": "pages/business/mine/index",

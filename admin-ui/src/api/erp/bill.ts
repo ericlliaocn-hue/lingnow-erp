@@ -1,7 +1,8 @@
 import request from '@/utils/request'
 import type { PageResult } from '@/api/types'
+import type { ApprovalStatus } from './approval'
 
-export type BillModule = 'sale' | 'purchase'
+export type BillModule = 'sale' | 'sale-return' | 'purchase' | 'purchase-return'
 
 export interface BillItem {
   id?: string
@@ -40,6 +41,11 @@ export interface ErpBill {
   paidAmount?: number
   debtAmount?: number
   auditStatus?: number
+  approvalStatus?: ApprovalStatus
+  approvalInstanceId?: string
+  approvalSubmitBy?: string
+  approvalSubmitTime?: string
+  approvalFinishTime?: string
   paymentStatus?: string
   remark?: string
   items: BillItem[]
@@ -76,6 +82,18 @@ export function updateBill(module: BillModule, data: ErpBill) {
 
 export function deleteBill(module: BillModule, ids: string | string[]) {
   return request({ url: `/erp/${module}/${Array.isArray(ids) ? ids.join(',') : ids}`, method: 'delete' })
+}
+
+export function copyBill(module: BillModule, id: string) {
+  return request<string>({ url: `/erp/${module}/copy/${id}`, method: 'post' })
+}
+
+export function exportBill(module: BillModule, params: BillQuery) {
+  return request<Blob>({ url: `/erp/${module}/export`, method: 'get', params, responseType: 'blob' })
+}
+
+export function printBill(module: BillModule, id: string) {
+  return request<Record<string, any>>({ url: `/erp/${module}/print/${id}`, method: 'get' })
 }
 
 export function auditBill(module: BillModule, id: string) {

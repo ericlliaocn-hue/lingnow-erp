@@ -40,6 +40,9 @@ public class SysUserNotification extends BaseEntity implements Serializable {
     @Schema(description = "类型(info/success/warning/error)")
     private String type;
 
+    @Schema(description = "分类(SYSTEM/BUSINESS/APPROVAL/WARNING)")
+    private String category;
+
     @Schema(description = "是否已读(0否 1是)")
     private Integer isRead;
 
@@ -48,4 +51,16 @@ public class SysUserNotification extends BaseEntity implements Serializable {
 
     @Schema(description = "业务类型")
     private String bizType;
+
+    @Schema(description = "动作类型")
+    private String actionType;
+
+    @Schema(description = "动作跳转地址")
+    private String actionUrl;
+
+    @Schema(description = "优先级")
+    private Integer priority;
+
+    @Schema(description = "发送用户ID")
+    private Long senderId;
 }

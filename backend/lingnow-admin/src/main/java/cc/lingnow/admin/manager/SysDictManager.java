@@ -4,6 +4,7 @@ import cn.hutool.cache.CacheUtil;
 import cn.hutool.cache.impl.TimedCache;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cc.lingnow.admin.model.bo.DictDataQueryBO;
 import cc.lingnow.admin.model.bo.DictDataSaveBO;
@@ -107,6 +108,18 @@ public class SysDictManager {
             throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
         }
         return BeanUtil.copyProperties(dictType, DictTypeVO.class);
+    }
+
+    /**
+     * 查询可选字典类型。
+     */
+    public List<DictTypeVO> optionSelect() {
+        return dictTypeService.list(new LambdaQueryWrapper<SysDictType>()
+                        .eq(SysDictType::getStatus, 1)
+                        .orderByDesc(SysDictType::getCreateTime))
+                .stream()
+                .map(item -> BeanUtil.copyProperties(item, DictTypeVO.class))
+                .collect(Collectors.toList());
     }
 
     /**

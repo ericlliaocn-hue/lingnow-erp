@@ -1,0 +1,142 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: lingnow-erp-mysql
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --log-bin-trust-function-creators=1
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-lingnow_erp}
+      MYSQL_USER: ${MYSQL_USER:-lingnow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: lingnow-erp-redis
+    restart: unless-stopped
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  admin:
+    build:
+      context: .
+      dockerfile: docker/backend/admin.Dockerfile
+    image: lingnow-erp-admin:latest
+    container_name: lingnow-erp-admin
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SPRING_PROFILES_ACTIVE: prod
+      ADMIN_SERVER_PORT: ${ADMIN_SERVER_PORT:-6060}
+      LINGNOW_DB_URL: ${LINGNOW_DB_URL}
+      LINGNOW_DB_USERNAME: ${LINGNOW_DB_USERNAME}
+      LINGNOW_DB_PASSWORD: ${LINGNOW_DB_PASSWORD}
+      LINGNOW_REDIS_HOST: ${LINGNOW_REDIS_HOST:-redis}
+      LINGNOW_REDIS_PORT: ${LINGNOW_REDIS_PORT:-6379}
+      LINGNOW_REDIS_PASSWORD: ${LINGNOW_REDIS_PASSWORD}
+      LINGNOW_ADMIN_REDIS_DATABASE: ${LINGNOW_ADMIN_REDIS_DATABASE:-1}
+      LINGNOW_FILE_BASE_PATH: ${LINGNOW_FILE_BASE_PATH:-/data/lingnow/files/}
+      LINGNOW_FILE_DOMAIN: ${LINGNOW_FILE_DOMAIN:-/files/}
+      LINGNOW_LOG_LEVEL: ${LINGNOW_LOG_LEVEL:-INFO}
+      LINGNOW_APP_LOG_LEVEL: ${LINGNOW_APP_LOG_LEVEL:-INFO}
+      LINGNOW_API_DOC_ENABLED: ${LINGNOW_API_DOC_ENABLED:-false}
+    volumes:
+      - app_files:/data/lingnow/files
+      - admin_logs:/data/lingnow/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ADMIN_SERVER_PORT:-6060}/welcome >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/backend/app.Dockerfile
+    image: lingnow-erp-app:latest
+    container_name: lingnow-erp-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SPRING_PROFILES_ACTIVE: prod
+      APP_SERVER_PORT: ${APP_SERVER_PORT:-6061}
+      LINGNOW_DB_URL: ${LINGNOW_DB_URL}
+      LINGNOW_DB_USERNAME: ${LINGNOW_DB_USERNAME}
+      LINGNOW_DB_PASSWORD: ${LINGNOW_DB_PASSWORD}
+      LINGNOW_REDIS_HOST: ${LINGNOW_REDIS_HOST:-redis}
+      LINGNOW_REDIS_PORT: ${LINGNOW_REDIS_PORT:-6379}
+      LINGNOW_REDIS_PASSWORD: ${LINGNOW_REDIS_PASSWORD}
+      LINGNOW_APP_REDIS_DATABASE: ${LINGNOW_APP_REDIS_DATABASE:-11}
+      LINGNOW_LOG_LEVEL: ${LINGNOW_LOG_LEVEL:-INFO}
+      LINGNOW_APP_LOG_LEVEL: ${LINGNOW_APP_LOG_LEVEL:-INFO}
+      LINGNOW_API_DOC_ENABLED: ${LINGNOW_API_DOC_ENABLED:-false}
+    volumes:
+      - app_files:/data/lingnow/files
+      - app_logs:/data/lingnow/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${APP_SERVER_PORT:-6061}/welcome >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    image: lingnow-erp-web:latest
+    container_name: lingnow-erp-web
+    restart: unless-stopped
+    depends_on:
+      admin:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    ports:
+      - "${NGINX_HTTP_PORT:-8080}:80"
+    volumes:
+      - app_files:/data/lingnow/files:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql_data:
+  redis_data:
+  app_files:
+  admin_logs:
+  app_logs:

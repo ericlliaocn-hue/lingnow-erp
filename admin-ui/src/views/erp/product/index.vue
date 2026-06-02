@@ -30,6 +30,9 @@
           <strong>商品管理</strong>
           <div>
             <el-button type="primary" :icon="Plus" @click="handleAdd" v-permission="'erp:product:add'">新增</el-button>
+            <el-button @click="handleImport" v-permission="'erp:product:import'">导入</el-button>
+            <el-button @click="handleTemplate" v-permission="'erp:product:import'">模板下载</el-button>
+            <el-button @click="handleExport" v-permission="'erp:product:export'">导出</el-button>
             <el-button type="success" :icon="Edit" :disabled="single" @click="handleUpdate()" v-permission="'erp:product:edit'">修改</el-button>
             <el-button type="danger" :icon="Delete" :disabled="multiple" @click="handleDelete()" v-permission="'erp:product:remove'">删除</el-button>
           </div>
@@ -93,16 +96,33 @@
         <el-button type="primary" @click="submitForm" v-permission="form.id ? 'erp:product:edit' : 'erp:product:add'">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="importOpen" title="导入商品" width="560px" append-to-body>
+      <el-upload drag :auto-upload="false" :limit="1" accept=".csv" :on-change="onImportFile" :on-remove="onRemoveImportFile">
+        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+        <div class="el-upload__text">拖拽 CSV 文件到此处，或点击选择</div>
+        <template #tip><div class="el-upload__tip">请先下载模板，按字段填写后上传。</div></template>
+      </el-upload>
+      <el-alert v-if="importResult" class="import-result" :title="`成功 ${importResult.success} 条，失败 ${importResult.fail} 条`" type="info" :closable="false" />
+      <ul v-if="importResult?.errors?.length" class="import-errors">
+        <li v-for="item in importResult.errors" :key="item">{{ item }}</li>
+      </ul>
+      <template #footer>
+        <el-button @click="importOpen = false">关闭</el-button>
+        <el-button type="primary" :disabled="!importFile" @click="submitImport">开始导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, toRefs } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, Refresh, Search, UploadFilled } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
-import { addProduct, deleteProduct, getProduct, listProduct, updateProduct, type ErpProduct, type ErpProductQuery } from '@/api/erp/product'
+import { addProduct, deleteProduct, downloadProductTemplate, exportProduct, getProduct, importProduct, listProduct, updateProduct, type ErpProduct, type ErpProductQuery } from '@/api/erp/product'
 import { listMaster, type ErpMasterVO } from '@/api/erp/master'
+import { downloadBlob } from '@/utils/download'
 
 const queryFormRef = ref()
 const formRef = ref()
@@ -117,6 +137,9 @@ const multiple = ref(true)
 const categories = ref<ErpMasterVO[]>([])
 const brands = ref<ErpMasterVO[]>([])
 const units = ref<ErpMasterVO[]>([])
+const importOpen = ref(false)
+const importFile = ref<File | null>(null)
+const importResult = ref<{ success: number; fail: number; errors: string[] } | null>(null)
 
 const state = reactive({
   queryParams: { current: 1, size: 10 } as ErpProductQuery,
@@ -201,6 +224,39 @@ function handleDelete(row?: ErpProduct) {
     })
 }
 
+function handleExport() {
+  exportProduct(queryParams.value).then(blob => downloadBlob(blob, '商品管理.csv'))
+}
+
+function handleTemplate() {
+  downloadProductTemplate().then(blob => downloadBlob(blob, '商品导入模板.csv'))
+}
+
+function handleImport() {
+  importOpen.value = true
+  importFile.value = null
+  importResult.value = null
+}
+
+function onImportFile(file: any) {
+  importFile.value = file.raw
+}
+
+function onRemoveImportFile() {
+  importFile.value = null
+}
+
+function submitImport() {
+  if (!importFile.value) return
+  const data = new FormData()
+  data.append('file', importFile.value)
+  importProduct(data).then(res => {
+    importResult.value = res
+    ElMessage.success('导入处理完成')
+    getList()
+  })
+}
+
 function cancel() {
   open.value = false
   reset()
@@ -216,4 +272,6 @@ onMounted(() => {
 .search-wrapper { margin-bottom: 16px; }
 .table-wrapper { height: calc(100vh - 230px); }
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.import-result { margin-top: 16px; }
+.import-errors { margin: 12px 0 0; padding-left: 18px; color: var(--el-color-danger); max-height: 180px; overflow: auto; }
 </style>

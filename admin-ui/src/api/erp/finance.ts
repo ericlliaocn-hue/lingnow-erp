@@ -1,19 +1,25 @@
 import request from '@/utils/request'
 import type { PageResult } from '@/api/types'
+import type { ApprovalStatus } from './approval'
 
-export type FinanceModule = 'receipt' | 'payment'
+export type FinanceModule = 'receipt' | 'payment' | 'income' | 'expense'
 
 export interface FinanceBill {
   id?: string
   billNo?: string
   billType?: string
   billDate: string
-  partnerId: string
+  partnerId?: string
   partnerName?: string
   accountId: string
   accountName?: string
   amount: number
   auditStatus?: number
+  approvalStatus?: ApprovalStatus
+  approvalInstanceId?: string
+  approvalSubmitBy?: string
+  approvalSubmitTime?: string
+  approvalFinishTime?: string
   remark?: string
 }
 

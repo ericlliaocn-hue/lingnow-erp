@@ -5,6 +5,8 @@ import cc.lingnow.admin.model.bo.erp.ErpMasterDataSaveBO;
 import cc.lingnow.admin.model.vo.erp.ErpMasterDataVO;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.common.annotation.Log;
+import cc.lingnow.common.enums.BusinessType;
 import cc.lingnow.common.enums.ErrorCode;
 import cc.lingnow.common.exception.BusinessException;
 import cc.lingnow.common.vo.PageResult;
@@ -39,6 +41,16 @@ public class ErpMasterDataController {
     private final ErpWarehouseService warehouseService;
     private final ErpAccountService accountService;
     private final ErpAgentLevelService agentLevelService;
+    private final ErpProductService productService;
+    private final ErpBillService billService;
+    private final ErpBillItemService billItemService;
+    private final ErpStockBalanceService stockBalanceService;
+    private final ErpStockFlowService stockFlowService;
+    private final ErpStockCheckService stockCheckService;
+    private final ErpStockCheckItemService stockCheckItemService;
+    private final ErpFinanceBillService financeBillService;
+    private final ErpFundFlowService fundFlowService;
+    private final ErpPartnerFlowService partnerFlowService;
 
     @Operation(summary = "ERP基础资料列表")
     @GetMapping("/{type}/list")
@@ -65,6 +77,7 @@ public class ErpMasterDataController {
 
     @Operation(summary = "ERP基础资料新增")
     @PostMapping("/{type}")
+    @Log(title = "ERP基础资料", businessType = BusinessType.INSERT)
     public Result<Void> add(@PathVariable String type, @Valid @RequestBody ErpMasterDataSaveBO bo) {
         StpAdminUtil.stpLogic.checkPermission(permission(type, "add"));
         IService service = service(type);
@@ -75,6 +88,7 @@ public class ErpMasterDataController {
 
     @Operation(summary = "ERP基础资料修改")
     @PutMapping("/{type}")
+    @Log(title = "ERP基础资料", businessType = BusinessType.UPDATE)
     public Result<Void> edit(@PathVariable String type, @Valid @RequestBody ErpMasterDataSaveBO bo) {
         if (bo.getId() == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
@@ -88,8 +102,10 @@ public class ErpMasterDataController {
 
     @Operation(summary = "ERP基础资料删除")
     @DeleteMapping("/{type}/{ids}")
+    @Log(title = "ERP基础资料", businessType = BusinessType.DELETE)
     public Result<Void> remove(@PathVariable String type, @PathVariable List<Long> ids) {
         StpAdminUtil.stpLogic.checkPermission(permission(type, "remove"));
+        ensureNotReferenced(type, ids);
         service(type).removeByIds(ids);
         return Result.success();
     }
@@ -112,6 +128,95 @@ public class ErpMasterDataController {
         ErpMasterData exists = (ErpMasterData) service.getOne(wrapper);
         if (exists != null && !exists.getId().equals(id)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "编码已存在");
+        }
+    }
+
+    private void ensureNotReferenced(String type, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+        for (Long id : ids) {
+            switch (type) {
+                case "product-category" -> {
+                    ensureNoProductRef("category_id", id, "商品分类已被商品引用，不能删除，请停用");
+                    ensureNoMasterChild(productCategoryService, id, "商品分类存在下级分类，不能删除");
+                }
+                case "unit" -> {
+                    ensureNoProductRef("unit_id", id, "单位已被商品引用，不能删除，请停用");
+                    ensureNoBillItemRef("unit_id", id, "单位已被单据明细引用，不能删除，请停用");
+                    ensureNoStockCheckItemRef("unit_id", id, "单位已被盘点明细引用，不能删除，请停用");
+                }
+                case "product-brand" -> ensureNoProductRef("brand_id", id, "商品品牌已被商品引用，不能删除，请停用");
+                case "product-attribute" -> {
+                    // 当前商品只保存辅助属性文本，没有属性ID外键；未产生真实引用时允许删除。
+                }
+                case "customer" -> ensureNoPartnerRef(id, "CUSTOMER", "客户已被单据、财务单据或往来流水引用，不能删除，请停用");
+                case "supplier" -> ensureNoPartnerRef(id, "SUPPLIER", "供应商已被单据、财务单据或往来流水引用，不能删除，请停用");
+                case "warehouse" -> ensureNoWarehouseRef(id);
+                case "account" -> ensureNoAccountRef(id);
+                case "agent-level" -> ensureNoCustomerLevelRef(id);
+                default -> throw new BusinessException(ErrorCode.PARAM_ERROR, "不支持的基础资料类型");
+            }
+        }
+    }
+
+    private void ensureNoProductRef(String column, Long id, String message) {
+        if (productService.count(new QueryWrapper<ErpProduct>().eq(column, id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoBillItemRef(String column, Long id, String message) {
+        if (billItemService.count(new QueryWrapper<ErpBillItem>().eq(column, id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoStockCheckItemRef(String column, Long id, String message) {
+        if (stockCheckItemService.count(new QueryWrapper<ErpStockCheckItem>().eq(column, id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoMasterChild(IService service, Long id, String message) {
+        if (service.count(new QueryWrapper<ErpMasterData>().eq("parent_id", id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoPartnerRef(Long id, String partnerType, String message) {
+        boolean referenced = billService.count(new QueryWrapper<ErpBill>().eq("partner_type", partnerType).eq("partner_id", id)) > 0
+                || financeBillService.count(new QueryWrapper<ErpFinanceBill>().eq("partner_type", partnerType).eq("partner_id", id)) > 0
+                || partnerFlowService.count(new QueryWrapper<ErpPartnerFlow>().eq("partner_type", partnerType).eq("partner_id", id)) > 0;
+        if (referenced) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoWarehouseRef(Long id) {
+        boolean referenced = billService.count(new QueryWrapper<ErpBill>().eq("warehouse_id", id)) > 0
+                || billItemService.count(new QueryWrapper<ErpBillItem>().eq("warehouse_id", id)) > 0
+                || stockBalanceService.count(new QueryWrapper<ErpStockBalance>().eq("warehouse_id", id)) > 0
+                || stockFlowService.count(new QueryWrapper<ErpStockFlow>().eq("warehouse_id", id)) > 0
+                || stockCheckService.count(new QueryWrapper<ErpStockCheck>().eq("warehouse_id", id)) > 0
+                || stockCheckItemService.count(new QueryWrapper<ErpStockCheckItem>().eq("warehouse_id", id)) > 0;
+        if (referenced) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "仓库已被单据、库存或盘点引用，不能删除，请停用");
+        }
+    }
+
+    private void ensureNoAccountRef(Long id) {
+        boolean referenced = billService.count(new QueryWrapper<ErpBill>().eq("account_id", id)) > 0
+                || financeBillService.count(new QueryWrapper<ErpFinanceBill>().eq("account_id", id)) > 0
+                || fundFlowService.count(new QueryWrapper<ErpFundFlow>().eq("account_id", id)) > 0;
+        if (referenced) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "账户已被单据、财务单据或资金流水引用，不能删除，请停用");
+        }
+    }
+
+    private void ensureNoCustomerLevelRef(Long id) {
+        if (customerService.count(new QueryWrapper<ErpCustomer>().eq("level_id", id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "代理等级已被客户引用，不能删除，请停用");
         }
     }
 

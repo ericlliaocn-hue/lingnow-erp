@@ -60,3 +60,15 @@ export function updateProduct(data: ErpProduct) {
 export function deleteProduct(ids: string | string[]) {
   return request({ url: `/erp/product/${Array.isArray(ids) ? ids.join(',') : ids}`, method: 'delete' })
 }
+
+export function exportProduct(params: ErpProductQuery) {
+  return request<Blob>({ url: '/erp/product/export', method: 'get', params, responseType: 'blob' })
+}
+
+export function downloadProductTemplate() {
+  return request<Blob>({ url: '/erp/product/import-template', method: 'get', responseType: 'blob' })
+}
+
+export function importProduct(data: FormData) {
+  return request<{ success: number; fail: number; errors: string[] }>({ url: '/erp/product/import', method: 'post', data })
+}

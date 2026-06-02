@@ -27,14 +27,23 @@ public class SysUserNotificationServiceImpl extends ServiceImpl<SysUserNotificat
 
     @Override
     public void sendNotification(Long userId, String title, String content, String type, Long bizId, String bizType) {
+        sendNotification(userId, title, content, type, bizId, bizType, "SYSTEM", null, null);
+    }
+
+    @Override
+    public void sendNotification(Long userId, String title, String content, String type, Long bizId, String bizType,
+                                 String category, String actionType, String actionUrl) {
         SysUserNotification notification = new SysUserNotification();
         notification.setUserId(userId);
         notification.setTitle(title);
         notification.setContent(content);
         notification.setType(type == null ? "info" : type);
+        notification.setCategory(category == null ? "SYSTEM" : category);
         notification.setIsRead(0);
         notification.setBizId(bizId);
         notification.setBizType(bizType);
+        notification.setActionType(actionType);
+        notification.setActionUrl(actionUrl);
         this.save(notification);
 
         // 更新缓存
@@ -42,7 +51,8 @@ public class SysUserNotificationServiceImpl extends ServiceImpl<SysUserNotificat
         redisTemplate.opsForValue().increment(key);
 
         // 发布事件
-        eventPublisher.publishEvent(new NotificationEvent(userId, title, content, notification.getType(), bizId, bizType));
+        eventPublisher.publishEvent(new NotificationEvent(userId, title, content, notification.getType(), bizId, bizType,
+                notification.getCategory(), actionType, actionUrl));
     }
 
     @Override

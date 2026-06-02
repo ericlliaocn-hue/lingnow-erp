@@ -1,11 +1,17 @@
 package cc.lingnow.admin.controller;
 
+import cc.lingnow.admin.model.bo.erp.ErpApprovalSubmitBO;
 import cc.lingnow.admin.model.bo.erp.ErpFinanceBillQueryBO;
 import cc.lingnow.admin.model.bo.erp.ErpFinanceBillSaveBO;
+import cc.lingnow.admin.model.enums.ErpApprovalStatus;
 import cc.lingnow.admin.model.vo.erp.ErpFinanceBillVO;
+import cc.lingnow.admin.service.ErpApprovalService;
+import cc.lingnow.admin.service.ErpAuditService;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.common.annotation.Log;
+import cc.lingnow.common.enums.BusinessType;
 import cc.lingnow.common.enums.ErrorCode;
 import cc.lingnow.common.exception.BusinessException;
 import cc.lingnow.common.vo.PageResult;
@@ -37,8 +43,11 @@ public class ErpFinanceController {
     private final ErpAccountService accountService;
     private final ErpFundFlowService fundFlowService;
     private final ErpPartnerFlowService partnerFlowService;
+    private final ErpBillNoRuleService billNoRuleService;
+    private final ErpApprovalService approvalService;
+    private final ErpAuditService auditService;
 
-    @GetMapping("/{module:receipt|payment}/list")
+    @GetMapping("/{module:receipt|payment|income|expense}/list")
     public Result<PageResult<ErpFinanceBillVO>> list(@PathVariable String module, ErpFinanceBillQueryBO query) {
         check(module, "list");
         QueryWrapper<ErpFinanceBill> wrapper = wrapper(billType(module), query);
@@ -46,20 +55,21 @@ public class ErpFinanceController {
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords().stream().map(this::toVO).toList()));
     }
 
-    @GetMapping("/{module:receipt|payment}/nextNo")
+    @GetMapping("/{module:receipt|payment|income|expense}/nextNo")
     public Result<String> nextNo(@PathVariable String module) {
         check(module, "add");
         return Result.success(nextBillNo(billType(module)));
     }
 
-    @GetMapping("/{module:receipt|payment}/{id}")
+    @GetMapping("/{module:receipt|payment|income|expense}/{id}")
     public Result<ErpFinanceBillVO> getInfo(@PathVariable String module, @PathVariable Long id) {
         check(module, "list");
         return Result.success(toVO(requireBill(id, billType(module))));
     }
 
-    @PostMapping("/{module:receipt|payment}")
+    @PostMapping("/{module:receipt|payment|income|expense}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP财务单据", businessType = BusinessType.INSERT)
     public Result<Void> add(@PathVariable String module, @Valid @RequestBody ErpFinanceBillSaveBO bo) {
         check(module, "add");
         String type = billType(module);
@@ -70,8 +80,9 @@ public class ErpFinanceController {
         return Result.success();
     }
 
-    @PutMapping("/{module:receipt|payment}")
+    @PutMapping("/{module:receipt|payment|income|expense}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP财务单据", businessType = BusinessType.UPDATE)
     public Result<Void> edit(@PathVariable String module, @Valid @RequestBody ErpFinanceBillSaveBO bo) {
         if (bo.getId() == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
@@ -88,8 +99,9 @@ public class ErpFinanceController {
         return Result.success();
     }
 
-    @DeleteMapping("/{module:receipt|payment}/{ids}")
+    @DeleteMapping("/{module:receipt|payment|income|expense}/{ids}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP财务单据", businessType = BusinessType.DELETE)
     public Result<Void> remove(@PathVariable String module, @PathVariable List<Long> ids) {
         check(module, "remove");
         String type = billType(module);
@@ -100,39 +112,30 @@ public class ErpFinanceController {
         return Result.success();
     }
 
-    @PutMapping("/{module:receipt|payment}/audit/{id}")
+    @PutMapping("/{module:receipt|payment|income|expense}/audit/{id}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP财务单据审核", businessType = BusinessType.UPDATE)
     public Result<Void> audit(@PathVariable String module, @PathVariable Long id) {
         check(module, "audit");
-        ErpFinanceBill bill = requireBill(id, billType(module));
-        ensureUnaudited(bill);
-        if ("RECEIPT".equals(bill.getBillType())) {
-            addFundFlow(bill, "IN", "收款单");
-            addPartnerFlow(bill, "RECEIVE", "客户收款");
-        } else {
-            addFundFlow(bill, "OUT", "付款单");
-            addPartnerFlow(bill, "PAY", "供应商付款");
-        }
-        bill.setAuditStatus(1);
-        bill.setAuditTime(LocalDateTime.now());
-        bill.setAuditBy(String.valueOf(StpAdminUtil.getLoginIdDefaultNull()));
-        financeBillService.updateById(bill);
+        ErpApprovalSubmitBO bo = new ErpApprovalSubmitBO();
+        bo.setBizType(billType(module));
+        bo.setBizId(id);
+        approvalService.submit(bo);
         return Result.success();
     }
 
-    @PutMapping("/{module:receipt|payment}/unaudit/{id}")
+    @PutMapping("/{module:receipt|payment|income|expense}/unaudit/{id}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP财务单据反审核", businessType = BusinessType.UPDATE)
     public Result<Void> unaudit(@PathVariable String module, @PathVariable Long id) {
         check(module, "unaudit");
         ErpFinanceBill bill = requireBill(id, billType(module));
-        if (!Integer.valueOf(1).equals(bill.getAuditStatus())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "单据未审核");
-        }
-        fundFlowService.remove(new QueryWrapper<ErpFundFlow>().eq("source_bill_id", bill.getId()).eq("source_bill_type", bill.getBillType()));
-        partnerFlowService.remove(new QueryWrapper<ErpPartnerFlow>().eq("source_bill_id", bill.getId()).eq("source_bill_type", bill.getBillType()));
+        auditService.unauditFinanceBill(id);
         bill.setAuditStatus(0);
         bill.setAuditTime(null);
         bill.setAuditBy(null);
+        bill.setApprovalStatus(ErpApprovalStatus.NONE);
+        bill.setApprovalFinishTime(null);
         financeBillService.updateById(bill);
         return Result.success();
     }
@@ -183,8 +186,19 @@ public class ErpFinanceController {
         }
         ErpFinanceBill bill = BeanUtil.copyProperties(bo, ErpFinanceBill.class);
         bill.setBillType(type);
-        bill.setPartnerType("RECEIPT".equals(type) ? "CUSTOMER" : "SUPPLIER");
+        if ("RECEIPT".equals(type)) {
+            requireCustomer(bo.getPartnerId());
+            bill.setPartnerType("CUSTOMER");
+        } else if ("PAYMENT".equals(type)) {
+            requireSupplier(bo.getPartnerId());
+            bill.setPartnerType("SUPPLIER");
+        } else {
+            bill.setPartnerId(0L);
+            bill.setPartnerType("NONE");
+        }
         bill.setAuditStatus(0);
+        bill.setApprovalStatus(ErpApprovalStatus.NONE);
+        requireEnabledAccount(bill.getAccountId());
         return bill;
     }
 
@@ -207,6 +221,9 @@ public class ErpFinanceController {
     }
 
     private void addPartnerFlow(ErpFinanceBill bill, String direction, String remark) {
+        if (bill.getPartnerId() == null || "NONE".equals(bill.getPartnerType())) {
+            return;
+        }
         ErpPartnerFlow flow = new ErpPartnerFlow();
         flow.setSourceBillId(bill.getId());
         flow.setSourceBillNo(bill.getBillNo());
@@ -233,7 +250,7 @@ public class ErpFinanceController {
         ErpFinanceBillVO vo = BeanUtil.copyProperties(bill, ErpFinanceBillVO.class);
         vo.setPartnerName("CUSTOMER".equals(bill.getPartnerType())
                 ? masterName(customerService.getById(bill.getPartnerId()))
-                : masterName(supplierService.getById(bill.getPartnerId())));
+                : "SUPPLIER".equals(bill.getPartnerType()) ? masterName(supplierService.getById(bill.getPartnerId())) : null);
         vo.setAccountName(masterName(accountService.getById(bill.getAccountId())));
         return vo;
     }
@@ -250,6 +267,15 @@ public class ErpFinanceController {
         if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "已审核单据不能修改或删除");
         }
+        if (ErpApprovalStatus.PENDING.equals(bill.getApprovalStatus()) || ErpApprovalStatus.APPROVED.equals(bill.getApprovalStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "审批中或已审批单据不能修改或删除");
+        }
+    }
+
+    private void ensureCanAudit(ErpFinanceBill bill) {
+        if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "单据已审核，不能重复审核");
+        }
     }
 
     private void ensureBillNoUnique(String billNo, Long id) {
@@ -260,7 +286,16 @@ public class ErpFinanceController {
     }
 
     private String nextBillNo(String type) {
-        String prefix = "RECEIPT".equals(type) ? "SK" : "FK";
+        String ruleNo = billNoRuleService.nextNo(type);
+        if (StrUtil.isNotBlank(ruleNo)) {
+            return ruleNo;
+        }
+        String prefix = switch (type) {
+            case "RECEIPT" -> "SK";
+            case "PAYMENT" -> "FK";
+            case "INCOME" -> "QTSR";
+            default -> "QTZC";
+        };
         String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String like = prefix + "-" + date + "-";
         long count = financeBillService.count(new QueryWrapper<ErpFinanceBill>().likeRight("bill_no", like));
@@ -272,7 +307,12 @@ public class ErpFinanceController {
     }
 
     private String billType(String module) {
-        return "receipt".equals(module) ? "RECEIPT" : "PAYMENT";
+        return switch (module) {
+            case "receipt" -> "RECEIPT";
+            case "payment" -> "PAYMENT";
+            case "income" -> "INCOME";
+            default -> "EXPENSE";
+        };
     }
 
     private void check(String module, String action) {
@@ -310,10 +350,39 @@ public class ErpFinanceController {
         row.put("partnerType", flow.getPartnerType());
         row.put("partnerName", "CUSTOMER".equals(flow.getPartnerType())
                 ? masterName(customerService.getById(flow.getPartnerId()))
-                : masterName(supplierService.getById(flow.getPartnerId())));
+                : "SUPPLIER".equals(flow.getPartnerType()) ? masterName(supplierService.getById(flow.getPartnerId())) : null);
         row.put("direction", flow.getDirection());
         row.put("amount", flow.getAmount());
         row.put("remark", flow.getRemark());
         return row;
+    }
+
+    private void requirePartner(Long partnerId) {
+        if (partnerId == null) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "往来单位不能为空");
+        }
+    }
+
+    private void requireCustomer(Long partnerId) {
+        requirePartner(partnerId);
+        ErpCustomer customer = customerService.getById(partnerId);
+        if (customer == null || !Integer.valueOf(1).equals(customer.getStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "客户不存在或已停用");
+        }
+    }
+
+    private void requireSupplier(Long partnerId) {
+        requirePartner(partnerId);
+        ErpSupplier supplier = supplierService.getById(partnerId);
+        if (supplier == null || !Integer.valueOf(1).equals(supplier.getStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "供应商不存在或已停用");
+        }
+    }
+
+    private void requireEnabledAccount(Long accountId) {
+        ErpAccount account = accountService.getById(accountId);
+        if (account == null || !Integer.valueOf(1).equals(account.getStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "账户不存在或已停用");
+        }
     }
 }

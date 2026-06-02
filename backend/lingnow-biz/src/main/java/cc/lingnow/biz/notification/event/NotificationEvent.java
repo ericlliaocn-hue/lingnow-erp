@@ -21,4 +21,7 @@ public class NotificationEvent implements Serializable {
     private String type;
     private Long bizId;
     private String bizType;
+    private String category;
+    private String actionType;
+    private String actionUrl;
 }

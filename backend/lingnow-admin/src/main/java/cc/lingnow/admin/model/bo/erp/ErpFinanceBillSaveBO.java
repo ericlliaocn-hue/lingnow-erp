@@ -12,7 +12,6 @@ public class ErpFinanceBillSaveBO {
     private String billNo;
     @NotNull(message = "单据日期不能为空")
     private LocalDate billDate;
-    @NotNull(message = "往来单位不能为空")
     private Long partnerId;
     @NotNull(message = "账户不能为空")
     private Long accountId;

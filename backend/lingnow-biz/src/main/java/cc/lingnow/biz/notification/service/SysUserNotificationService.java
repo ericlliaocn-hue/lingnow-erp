@@ -23,6 +23,12 @@ public interface SysUserNotificationService extends IService<SysUserNotification
     void sendNotification(Long userId, String title, String content, String type, Long bizId, String bizType);
 
     /**
+     * 发送可跳转通知
+     */
+    void sendNotification(Long userId, String title, String content, String type, Long bizId, String bizType,
+                          String category, String actionType, String actionUrl);
+
+    /**
      * 获取未读数量
      * sendNotification
      *

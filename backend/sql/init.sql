@@ -35,6 +35,66 @@ CREATE TABLE IF NOT EXISTS `sys_user`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='用户实体';
 
+-- App User
+CREATE TABLE IF NOT EXISTS `app_user`
+(
+    `user_id`     bigint(20)   NOT NULL COMMENT '主键ID',
+    `username`    varchar(64)  NOT NULL COMMENT '用户名',
+    `password`    varchar(128) NOT NULL COMMENT '密码',
+    `phone`       varchar(32)  NOT NULL COMMENT '手机号',
+    `nickname`    varchar(64)  DEFAULT NULL COMMENT '昵称',
+    `avatar`      varchar(500) DEFAULT NULL COMMENT '头像',
+    `status`      tinyint(1)   DEFAULT '1' COMMENT '状态 (1-正常 0-禁用)',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0' COMMENT '删除标记 (0-未删除 1-已删除)',
+    PRIMARY KEY (`user_id`),
+    UNIQUE KEY `idx_app_user_username` (`username`),
+    UNIQUE KEY `idx_app_user_phone` (`phone`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='App用户基础表';
+
+-- App User Info
+CREATE TABLE IF NOT EXISTS `app_user_info`
+(
+    `user_id`     bigint(20) NOT NULL COMMENT '用户ID',
+    `gender`      tinyint(1)   DEFAULT '2' COMMENT '性别 (0-女 1-男 2-其他)',
+    `birthday`    date         DEFAULT NULL COMMENT '生日',
+    `region`      varchar(128) DEFAULT NULL COMMENT '所在地区',
+    `signature`   varchar(255) DEFAULT NULL COMMENT '个性签名',
+    `tags`        varchar(500) DEFAULT NULL COMMENT '标签JSON',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0' COMMENT '删除标记 (0-未删除 1-已删除)',
+    PRIMARY KEY (`user_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='App用户扩展信息表';
+
+-- App Social User
+CREATE TABLE IF NOT EXISTS `app_social_user`
+(
+    `id`          bigint(20)  NOT NULL COMMENT '主键ID',
+    `user_id`     bigint(20)  NOT NULL COMMENT '用户ID',
+    `provider`    varchar(32) NOT NULL COMMENT '第三方平台',
+    `open_id`     varchar(128) DEFAULT NULL COMMENT '平台OpenID',
+    `union_id`    varchar(128) DEFAULT NULL COMMENT '平台UnionID',
+    `nickname`    varchar(64)  DEFAULT NULL COMMENT '平台昵称',
+    `avatar`      varchar(500) DEFAULT NULL COMMENT '平台头像',
+    `create_time` datetime     DEFAULT NULL,
+    `update_time` datetime     DEFAULT NULL,
+    `create_by`   varchar(64)  DEFAULT NULL,
+    `update_by`   varchar(64)  DEFAULT NULL,
+    `del_flag`    tinyint(1)   DEFAULT '0' COMMENT '删除标记 (0-未删除 1-已删除)',
+    PRIMARY KEY (`id`),
+    KEY `idx_app_social_user_id` (`user_id`),
+    KEY `idx_app_social_open` (`provider`, `open_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='App社交账号绑定表';
+
 -- System Role
 CREATE TABLE IF NOT EXISTS `sys_role`
 (
@@ -323,9 +383,14 @@ CREATE TABLE IF NOT EXISTS `sys_user_notification`
     `title`       varchar(128)  DEFAULT NULL COMMENT '标题',
     `content`     varchar(1000) DEFAULT NULL COMMENT '内容',
     `type`        varchar(32)   DEFAULT NULL COMMENT '类型',
+    `category`    varchar(32)   DEFAULT 'SYSTEM' COMMENT '分类',
     `is_read`     tinyint(1)    DEFAULT '0' COMMENT '是否已读',
     `biz_id`      bigint(20)    DEFAULT NULL COMMENT '业务ID',
     `biz_type`    varchar(64)   DEFAULT NULL COMMENT '业务类型',
+    `action_type` varchar(32)   DEFAULT NULL COMMENT '动作类型',
+    `action_url`  varchar(255)  DEFAULT NULL COMMENT '动作跳转地址',
+    `priority`    int(11)       DEFAULT '0' COMMENT '优先级',
+    `sender_id`   bigint(20)    DEFAULT NULL COMMENT '发送用户ID',
     `create_time` datetime      DEFAULT NULL,
     `update_time` datetime      DEFAULT NULL,
     `create_by`   varchar(64)   DEFAULT NULL,
@@ -442,6 +507,187 @@ CREATE TABLE IF NOT EXISTS `sys_job_log`
     KEY `idx_job_log_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='定时任务调度日志表';
+
+-- Warm-Flow Definition
+CREATE TABLE IF NOT EXISTS `flow_definition`
+(
+    `id`              bigint       NOT NULL COMMENT '主键id',
+    `flow_code`       varchar(40)  NOT NULL COMMENT '流程编码',
+    `flow_name`       varchar(100) NOT NULL COMMENT '流程名称',
+    `model_value`     varchar(40)  NOT NULL DEFAULT 'CLASSICS' COMMENT '设计器模型',
+    `category`        varchar(100)          DEFAULT NULL COMMENT '流程类别',
+    `version`         varchar(20)  NOT NULL COMMENT '流程版本',
+    `is_publish`      tinyint(1)   NOT NULL DEFAULT '0' COMMENT '是否发布',
+    `form_custom`     char(1)               DEFAULT 'N' COMMENT '是否自定义表单',
+    `form_path`       varchar(100)          DEFAULT NULL COMMENT '表单路径',
+    `activity_status` tinyint(1)   NOT NULL DEFAULT '1' COMMENT '激活状态',
+    `listener_type`   varchar(100)          DEFAULT NULL COMMENT '监听器类型',
+    `listener_path`   varchar(400)          DEFAULT NULL COMMENT '监听器路径',
+    `ext`             varchar(500)          DEFAULT NULL COMMENT '扩展字段',
+    `create_time`     datetime              DEFAULT NULL COMMENT '创建时间',
+    `create_by`       varchar(64)           DEFAULT '' COMMENT '创建人',
+    `update_time`     datetime              DEFAULT NULL COMMENT '更新时间',
+    `update_by`       varchar(64)           DEFAULT '' COMMENT '更新人',
+    `del_flag`        char(1)               DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`       varchar(40)           DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='流程定义表';
+
+-- Warm-Flow Node
+CREATE TABLE IF NOT EXISTS `flow_node`
+(
+    `id`              bigint       NOT NULL COMMENT '主键id',
+    `node_type`       tinyint(1)   NOT NULL COMMENT '节点类型',
+    `definition_id`   bigint       NOT NULL COMMENT '流程定义id',
+    `node_code`       varchar(100) NOT NULL COMMENT '流程节点编码',
+    `node_name`       varchar(100) DEFAULT NULL COMMENT '流程节点名称',
+    `permission_flag` varchar(200) DEFAULT NULL COMMENT '权限标识',
+    `node_ratio`      varchar(200) DEFAULT NULL COMMENT '流程签署比例值',
+    `coordinate`      varchar(100) DEFAULT NULL COMMENT '坐标',
+    `any_node_skip`   varchar(100) DEFAULT NULL COMMENT '任意结点跳转',
+    `listener_type`   varchar(100) DEFAULT NULL COMMENT '监听器类型',
+    `listener_path`   varchar(400) DEFAULT NULL COMMENT '监听器路径',
+    `form_custom`     char(1)      DEFAULT 'N' COMMENT '是否自定义表单',
+    `form_path`       varchar(100) DEFAULT NULL COMMENT '表单路径',
+    `version`         varchar(20)  NOT NULL COMMENT '版本',
+    `create_time`     datetime     DEFAULT NULL COMMENT '创建时间',
+    `create_by`       varchar(64)  DEFAULT '' COMMENT '创建人',
+    `update_time`     datetime     DEFAULT NULL COMMENT '更新时间',
+    `update_by`       varchar(64)  DEFAULT '' COMMENT '更新人',
+    `ext`             text COMMENT '节点扩展属性',
+    `del_flag`        char(1)      DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`       varchar(40)  DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='流程节点表';
+
+-- Warm-Flow Skip
+CREATE TABLE IF NOT EXISTS `flow_skip`
+(
+    `id`             bigint       NOT NULL COMMENT '主键id',
+    `definition_id`  bigint       NOT NULL COMMENT '流程定义id',
+    `now_node_code`  varchar(100) NOT NULL COMMENT '当前节点编码',
+    `now_node_type`  tinyint(1)   DEFAULT NULL COMMENT '当前节点类型',
+    `next_node_code` varchar(100) NOT NULL COMMENT '下一个节点编码',
+    `next_node_type` tinyint(1)   DEFAULT NULL COMMENT '下一个节点类型',
+    `skip_name`      varchar(100) DEFAULT NULL COMMENT '跳转名称',
+    `skip_type`      varchar(40)  DEFAULT NULL COMMENT '跳转类型',
+    `skip_condition` varchar(200) DEFAULT NULL COMMENT '跳转条件',
+    `coordinate`     varchar(100) DEFAULT NULL COMMENT '坐标',
+    `create_time`    datetime     DEFAULT NULL COMMENT '创建时间',
+    `create_by`      varchar(64)  DEFAULT '' COMMENT '创建人',
+    `update_time`    datetime     DEFAULT NULL COMMENT '更新时间',
+    `update_by`      varchar(64)  DEFAULT '' COMMENT '更新人',
+    `del_flag`       char(1)      DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`      varchar(40)  DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='节点跳转关联表';
+
+-- Warm-Flow Instance
+CREATE TABLE IF NOT EXISTS `flow_instance`
+(
+    `id`              bigint      NOT NULL COMMENT '主键id',
+    `definition_id`   bigint      NOT NULL COMMENT '流程定义id',
+    `flow_name`       varchar(100)         DEFAULT NULL COMMENT '流程名称',
+    `business_id`     varchar(80) NOT NULL COMMENT '业务id',
+    `node_type`       tinyint(1)  NOT NULL COMMENT '节点类型',
+    `node_code`       varchar(40) NOT NULL COMMENT '流程节点编码',
+    `node_name`       varchar(100)         DEFAULT NULL COMMENT '流程节点名称',
+    `variable`        text COMMENT '任务变量',
+    `flow_status`     varchar(20) NOT NULL COMMENT '流程状态',
+    `activity_status` tinyint(1)  NOT NULL DEFAULT '1' COMMENT '激活状态',
+    `def_json`        text COMMENT '流程定义json',
+    `create_time`     datetime             DEFAULT NULL COMMENT '创建时间',
+    `create_by`       varchar(64)          DEFAULT '' COMMENT '创建人',
+    `update_time`     datetime             DEFAULT NULL COMMENT '更新时间',
+    `update_by`       varchar(64)          DEFAULT '' COMMENT '更新人',
+    `ext`             varchar(500)         DEFAULT NULL COMMENT '扩展字段',
+    `del_flag`        char(1)              DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`       varchar(40)          DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`),
+    KEY `idx_flow_instance_business` (`business_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='流程实例表';
+
+-- Warm-Flow Task
+CREATE TABLE IF NOT EXISTS `flow_task`
+(
+    `id`            bigint       NOT NULL COMMENT '主键id',
+    `definition_id` bigint       NOT NULL COMMENT '流程定义id',
+    `instance_id`   bigint       NOT NULL COMMENT '流程实例id',
+    `flow_name`     varchar(100) DEFAULT NULL COMMENT '流程名称',
+    `business_id`   varchar(80)  DEFAULT NULL COMMENT '业务id',
+    `node_code`     varchar(100) NOT NULL COMMENT '节点编码',
+    `node_name`     varchar(100) DEFAULT NULL COMMENT '节点名称',
+    `node_type`     tinyint(1)   NOT NULL COMMENT '节点类型',
+    `flow_status`   varchar(20)  NOT NULL DEFAULT '1' COMMENT '流程状态',
+    `form_custom`   char(1)      DEFAULT 'N' COMMENT '是否自定义表单',
+    `form_path`     varchar(100) DEFAULT NULL COMMENT '表单路径',
+    `create_time`   datetime     DEFAULT NULL COMMENT '创建时间',
+    `create_by`     varchar(64)  DEFAULT '' COMMENT '创建人',
+    `update_time`   datetime     DEFAULT NULL COMMENT '更新时间',
+    `update_by`     varchar(64)  DEFAULT '' COMMENT '更新人',
+    `del_flag`      char(1)      DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`     varchar(40)  DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`),
+    KEY `idx_flow_task_instance` (`instance_id`),
+    KEY `idx_flow_task_business` (`business_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='待办任务表';
+
+-- Warm-Flow History Task
+CREATE TABLE IF NOT EXISTS `flow_his_task`
+(
+    `id`               bigint       NOT NULL COMMENT '主键id',
+    `definition_id`    bigint       NOT NULL COMMENT '流程定义id',
+    `instance_id`      bigint       NOT NULL COMMENT '流程实例id',
+    `task_id`          bigint       NOT NULL COMMENT '任务id',
+    `business_id`      varchar(80)  DEFAULT NULL COMMENT '业务id',
+    `node_code`        varchar(100) DEFAULT NULL COMMENT '开始节点编码',
+    `node_name`        varchar(100) DEFAULT NULL COMMENT '开始节点名称',
+    `node_type`        tinyint(1)   DEFAULT NULL COMMENT '开始节点类型',
+    `target_node_code` varchar(200) DEFAULT NULL COMMENT '目标节点编码',
+    `target_node_name` varchar(200) DEFAULT NULL COMMENT '目标节点名称',
+    `approver`         varchar(40)  DEFAULT NULL COMMENT '审批人',
+    `cooperate_type`   tinyint(1)   NOT NULL DEFAULT '0' COMMENT '协作方式',
+    `collaborator`     varchar(500) DEFAULT NULL COMMENT '协作人',
+    `skip_type`        varchar(10)  NOT NULL COMMENT '流转类型',
+    `flow_status`      varchar(20)  NOT NULL COMMENT '流程状态',
+    `form_custom`      char(1)      DEFAULT 'N' COMMENT '是否自定义表单',
+    `form_path`        varchar(100) DEFAULT NULL COMMENT '表单路径',
+    `message`          varchar(500) DEFAULT NULL COMMENT '审批意见',
+    `variable`         text COMMENT '任务变量',
+    `ext`              text COMMENT '业务详情',
+    `create_time`      datetime     DEFAULT NULL COMMENT '任务开始时间',
+    `update_time`      datetime     DEFAULT NULL COMMENT '审批完成时间',
+    `del_flag`         char(1)      DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`        varchar(40)  DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`),
+    KEY `idx_flow_his_instance` (`instance_id`),
+    KEY `idx_flow_his_approver` (`approver`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='历史任务记录表';
+
+-- Warm-Flow User
+CREATE TABLE IF NOT EXISTS `flow_user`
+(
+    `id`           bigint      NOT NULL COMMENT '主键id',
+    `type`         char(1)     NOT NULL COMMENT '人员类型',
+    `processed_by` varchar(80) DEFAULT NULL COMMENT '权限人',
+    `associated`   bigint      NOT NULL COMMENT '任务表id',
+    `create_time`  datetime    DEFAULT NULL COMMENT '创建时间',
+    `create_by`    varchar(80) DEFAULT NULL COMMENT '创建人',
+    `update_time`  datetime    DEFAULT NULL COMMENT '更新时间',
+    `update_by`    varchar(64) DEFAULT '' COMMENT '更新人',
+    `del_flag`     char(1)     DEFAULT '0' COMMENT '删除标志',
+    `tenant_id`    varchar(40) DEFAULT NULL COMMENT '租户id',
+    PRIMARY KEY (`id`),
+    KEY `user_processed_type` (`processed_by`, `type`),
+    KEY `user_associated` (`associated`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='流程用户表';
 
 -- ---------------------------------------------------------
 -- 1. ERP Master Data Tables
@@ -738,6 +984,11 @@ CREATE TABLE IF NOT EXISTS `erp_bill`
     `debt_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '欠款金额',
     `audit_status`   tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态 0未审核 1已审核',
     `payment_status` varchar(32)     NOT NULL DEFAULT 'UNPAID' COMMENT '收付款状态',
+    `approval_status` varchar(20)     NOT NULL DEFAULT 'NONE' COMMENT '审批状态',
+    `approval_instance_id` bigint(20) DEFAULT NULL COMMENT '审批实例ID',
+    `approval_submit_by` varchar(64)  DEFAULT NULL COMMENT '审批提交人',
+    `approval_submit_time` datetime   DEFAULT NULL COMMENT '审批提交时间',
+    `approval_finish_time` datetime   DEFAULT NULL COMMENT '审批完成时间',
     `audit_time`     datetime                 DEFAULT NULL COMMENT '审核时间',
     `audit_by`       varchar(64)              DEFAULT NULL COMMENT '审核人',
     `remark`         varchar(500)             DEFAULT NULL COMMENT '备注',
@@ -751,7 +1002,8 @@ CREATE TABLE IF NOT EXISTS `erp_bill`
     UNIQUE KEY `uk_bill_no` (`bill_no`, `del_flag`),
     KEY `idx_bill_type_date` (`bill_type`, `bill_date`),
     KEY `idx_bill_partner` (`partner_type`, `partner_id`),
-    KEY `idx_bill_audit` (`audit_status`)
+    KEY `idx_bill_audit` (`audit_status`),
+    KEY `idx_bill_approval` (`approval_status`, `approval_instance_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP业务单据';
 
@@ -890,6 +1142,11 @@ CREATE TABLE IF NOT EXISTS `erp_finance_bill`
     `account_id`     bigint(20)      NOT NULL COMMENT '账户ID',
     `amount`         decimal(18, 4)  NOT NULL COMMENT '金额',
     `audit_status`   tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态',
+    `approval_status` varchar(20)     NOT NULL DEFAULT 'NONE' COMMENT '审批状态',
+    `approval_instance_id` bigint(20) DEFAULT NULL COMMENT '审批实例ID',
+    `approval_submit_by` varchar(64)  DEFAULT NULL COMMENT '审批提交人',
+    `approval_submit_time` datetime   DEFAULT NULL COMMENT '审批提交时间',
+    `approval_finish_time` datetime   DEFAULT NULL COMMENT '审批完成时间',
     `audit_time`     datetime                 DEFAULT NULL COMMENT '审核时间',
     `audit_by`       varchar(64)              DEFAULT NULL COMMENT '审核人',
     `remark`         varchar(500)             DEFAULT NULL COMMENT '备注',
@@ -901,9 +1158,135 @@ CREATE TABLE IF NOT EXISTS `erp_finance_bill`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_finance_bill_no` (`bill_no`, `del_flag`),
     KEY `idx_finance_bill_type_date` (`bill_type`, `bill_date`),
-    KEY `idx_finance_bill_partner` (`partner_type`, `partner_id`)
+    KEY `idx_finance_bill_partner` (`partner_type`, `partner_id`),
+    KEY `idx_finance_bill_approval` (`approval_status`, `approval_instance_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP财务单据';
+
+CREATE TABLE IF NOT EXISTS `erp_stock_check`
+(
+    `id`                  bigint(20)     NOT NULL COMMENT '盘点单ID',
+    `check_no`            varchar(64)     NOT NULL COMMENT '盘点单号',
+    `check_date`          date            NOT NULL COMMENT '盘点日期',
+    `warehouse_id`        bigint(20)      NOT NULL COMMENT '仓库ID',
+    `total_profit_qty`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '盘盈数量',
+    `total_loss_qty`      decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '盘亏数量',
+    `total_profit_amount` decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '盘盈金额',
+    `total_loss_amount`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '盘亏金额',
+    `audit_status`        tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态',
+    `approval_status`     varchar(20)     NOT NULL DEFAULT 'NONE' COMMENT '审批状态',
+    `approval_instance_id` bigint(20)      DEFAULT NULL COMMENT '审批实例ID',
+    `approval_submit_by`  varchar(64)      DEFAULT NULL COMMENT '审批提交人',
+    `approval_submit_time` datetime        DEFAULT NULL COMMENT '审批提交时间',
+    `approval_finish_time` datetime        DEFAULT NULL COMMENT '审批完成时间',
+    `audit_time`          datetime                 DEFAULT NULL COMMENT '审核时间',
+    `audit_by`            varchar(64)              DEFAULT NULL COMMENT '审核人',
+    `remark`              varchar(500)             DEFAULT NULL COMMENT '备注',
+    `create_time`         datetime                 DEFAULT NULL,
+    `update_time`         datetime                 DEFAULT NULL,
+    `create_by`           varchar(64)              DEFAULT NULL,
+    `update_by`           varchar(64)              DEFAULT NULL,
+    `del_flag`            tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_stock_check_no` (`check_no`, `del_flag`),
+    KEY `idx_stock_check_date` (`check_date`),
+    KEY `idx_stock_check_warehouse` (`warehouse_id`),
+    KEY `idx_stock_check_approval` (`approval_status`, `approval_instance_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP库存盘点';
+
+CREATE TABLE IF NOT EXISTS `erp_stock_check_item`
+(
+    `id`           bigint(20)     NOT NULL COMMENT '盘点明细ID',
+    `check_id`     bigint(20)     NOT NULL COMMENT '盘点单ID',
+    `product_id`   bigint(20)     NOT NULL COMMENT '商品ID',
+    `product_code` varchar(64)     NOT NULL COMMENT '商品编号',
+    `product_name` varchar(128)    NOT NULL COMMENT '商品名称',
+    `spec`         varchar(128)             DEFAULT NULL COMMENT '规格型号',
+    `unit_id`      bigint(20)               DEFAULT NULL COMMENT '单位ID',
+    `warehouse_id` bigint(20)      NOT NULL COMMENT '仓库ID',
+    `book_qty`     decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '账面数量',
+    `check_qty`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '盘点数量',
+    `diff_qty`     decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '差异数量',
+    `cost_price`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '成本单价',
+    `diff_amount`  decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '差异金额',
+    `remark`       varchar(500)             DEFAULT NULL COMMENT '备注',
+    `create_time`  datetime                 DEFAULT NULL,
+    `update_time`  datetime                 DEFAULT NULL,
+    `create_by`    varchar(64)              DEFAULT NULL,
+    `update_by`    varchar(64)              DEFAULT NULL,
+    `del_flag`     tinyint(1)      NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_stock_check_item_check` (`check_id`),
+    KEY `idx_stock_check_item_product` (`product_id`, `warehouse_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP库存盘点明细';
+
+CREATE TABLE IF NOT EXISTS `erp_bill_no_rule`
+(
+    `id`            bigint(20)    NOT NULL COMMENT '规则ID',
+    `bill_type`     varchar(32)    NOT NULL COMMENT '单据类型',
+    `bill_name`     varchar(64)    NOT NULL COMMENT '规则名称',
+    `prefix`        varchar(32)    NOT NULL COMMENT '单号前缀',
+    `date_pattern`  varchar(32)    NOT NULL DEFAULT 'yyyyMMdd' COMMENT '日期格式',
+    `serial_length` int(11)        NOT NULL DEFAULT '4' COMMENT '流水长度',
+    `next_serial`   bigint(20)     NOT NULL DEFAULT '1' COMMENT '下一流水号',
+    `reset_cycle`   varchar(16)    NOT NULL DEFAULT 'DAY' COMMENT '重置周期 DAY/MONTH/NONE',
+    `last_date_part` varchar(32)             DEFAULT NULL COMMENT '最近编号日期片段',
+    `enabled`       tinyint(1)     NOT NULL DEFAULT '1' COMMENT '是否启用',
+    `remark`        varchar(500)            DEFAULT NULL COMMENT '备注',
+    `create_time`   datetime                DEFAULT NULL,
+    `update_time`   datetime                DEFAULT NULL,
+    `create_by`     varchar(64)             DEFAULT NULL,
+    `update_by`     varchar(64)             DEFAULT NULL,
+    `del_flag`      tinyint(1)     NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_bill_no_rule_type` (`bill_type`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP单号规则';
+
+CREATE TABLE IF NOT EXISTS `erp_field_setting`
+(
+    `id`           bigint(20)   NOT NULL COMMENT '字段设置ID',
+    `module_code`  varchar(64)   NOT NULL COMMENT '模块编码',
+    `field_key`    varchar(64)   NOT NULL COMMENT '字段键',
+    `field_label`  varchar(128)  NOT NULL COMMENT '字段名称',
+    `visible`      tinyint(1)    NOT NULL DEFAULT '1' COMMENT '是否显示',
+    `required`     tinyint(1)    NOT NULL DEFAULT '0' COMMENT '是否必填',
+    `sort_order`   int(11)       NOT NULL DEFAULT '0' COMMENT '排序',
+    `width`        int(11)                DEFAULT NULL COMMENT '显示宽度',
+    `remark`       varchar(500)           DEFAULT NULL COMMENT '备注',
+    `create_time`  datetime               DEFAULT NULL,
+    `update_time`  datetime               DEFAULT NULL,
+    `create_by`    varchar(64)            DEFAULT NULL,
+    `update_by`    varchar(64)            DEFAULT NULL,
+    `del_flag`     tinyint(1)    NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_field_setting` (`module_code`, `field_key`, `del_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP字段设置';
+
+CREATE TABLE IF NOT EXISTS `erp_print_template`
+(
+    `id`            bigint(20)   NOT NULL COMMENT '模板ID',
+    `template_code` varchar(64)   NOT NULL COMMENT '模板编码',
+    `template_name` varchar(128)  NOT NULL COMMENT '模板名称',
+    `bill_type`     varchar(32)   NOT NULL COMMENT '单据类型',
+    `paper_type`    varchar(32)   NOT NULL DEFAULT 'A4' COMMENT '纸张类型',
+    `content_json`  longtext               DEFAULT NULL COMMENT '模板JSON',
+    `is_default`    tinyint(1)    NOT NULL DEFAULT '0' COMMENT '是否默认',
+    `status`        tinyint(1)    NOT NULL DEFAULT '1' COMMENT '状态',
+    `remark`        varchar(500)           DEFAULT NULL COMMENT '备注',
+    `create_time`   datetime               DEFAULT NULL,
+    `update_time`   datetime               DEFAULT NULL,
+    `create_by`     varchar(64)            DEFAULT NULL,
+    `update_by`     varchar(64)            DEFAULT NULL,
+    `del_flag`      tinyint(1)    NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_print_template_code` (`template_code`, `del_flag`),
+    KEY `idx_print_template_bill_type` (`bill_type`, `is_default`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP打印模板';
 
 -- ---------------------------------------------------------
 -- 2. Initial Seed Data (Admin Account & Roles)
@@ -938,6 +1321,20 @@ VALUES (1, 1);
 INSERT IGNORE INTO `sys_user_post` (`user_id`, `post_id`)
 VALUES (1, 1);
 
+-- Default ERP bill number rules
+INSERT IGNORE INTO `erp_bill_no_rule`
+(`id`, `bill_type`, `bill_name`, `prefix`, `date_pattern`, `serial_length`, `next_serial`, `reset_cycle`, `enabled`, `remark`, `create_time`, `del_flag`)
+VALUES
+(30001, 'SALE', '销售单', 'XS', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认销售单号规则', NOW(), 0),
+(30002, 'SALE_RETURN', '销售退货单', 'XSTH', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认销售退货单号规则', NOW(), 0),
+(30003, 'PURCHASE', '进货单', 'JH', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认进货单号规则', NOW(), 0),
+(30004, 'PURCHASE_RETURN', '进货退货单', 'JHTH', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认进货退货单号规则', NOW(), 0),
+(30005, 'RECEIPT', '收款单', 'SK', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认收款单号规则', NOW(), 0),
+(30006, 'PAYMENT', '付款单', 'FK', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认付款单号规则', NOW(), 0),
+(30007, 'INCOME', '其他收入', 'QTSR', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认其他收入单号规则', NOW(), 0),
+(30008, 'EXPENSE', '其他支出', 'QTZC', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认其他支出单号规则', NOW(), 0),
+(30009, 'STOCK_CHECK', '库存盘点', 'PD', 'yyyyMMdd', 4, 1, 'DAY', 1, '系统默认库存盘点单号规则', NOW(), 0);
+
 -- Default Menus
 INSERT IGNORE INTO `sys_menu`
 (`menu_id`, `parent_id`, `menu_name`, `menu_type`, `icon`, `path`, `component`, `permission`, `sort_order`, `visible`, `status`, `is_cache`, `create_time`, `del_flag`)
@@ -966,6 +1363,11 @@ VALUES
 (1430, 1400, '在线用户', 1, 'Connection', '/monitor/online', 'monitor/online/index', 'monitor:online:view', 43, 1, 1, 'N', NOW(), 0),
 (1440, 1400, '实时日志', 1, 'Document', '/monitor/log', 'monitor/log/index', 'monitor:log:view', 44, 1, 1, 'N', NOW(), 0),
 (1450, 1400, '任务监控', 1, 'Timer', '/monitor/job', 'monitor/job/index', 'monitor:job:list', 45, 1, 1, 'N', NOW(), 0),
+(1500, 0, '审批中心', 0, 'Stamp', '/erp/approval', 'Layout', NULL, 50, 1, 1, 'N', NOW(), 0),
+(1510, 1500, '待我审批', 1, 'Checked', '/erp/approval/todo', 'erp/approval/todo', 'erp:approval:task', 51, 1, 1, 'N', NOW(), 0),
+(1520, 1500, '我发起的', 1, 'Promotion', '/erp/approval/mine', 'erp/approval/mine', 'erp:approval:task', 52, 1, 1, 'N', NOW(), 0),
+(1530, 1500, '已办审批', 1, 'Finished', '/erp/approval/done', 'erp/approval/done', 'erp:approval:task', 53, 1, 1, 'N', NOW(), 0),
+(1540, 1500, '流程设计器', 1, 'Share', '/erp/workflow/designer', 'erp/approval/designer', 'erp:workflow:designer', 54, 1, 1, 'N', NOW(), 0),
 (2000, 0, '商品', 0, 'Goods', '/erp/product', 'Layout', NULL, 100, 1, 1, 'N', NOW(), 0),
 (2010, 2000, '商品分类', 1, 'FolderOpened', '/erp/product/category', 'erp/master/index', 'erp:product-category:list', 101, 1, 1, 'N', NOW(), 0),
 (2020, 2000, '单位管理', 1, 'CollectionTag', '/erp/product/unit', 'erp/master/index', 'erp:unit:list', 102, 1, 1, 'N', NOW(), 0),
@@ -978,27 +1380,51 @@ VALUES
 (2130, 2100, '仓库管理', 1, 'House', '/erp/setting/warehouse', 'erp/master/index', 'erp:warehouse:list', 113, 1, 1, 'N', NOW(), 0),
 (2140, 2100, '账户管理', 1, 'Wallet', '/erp/setting/account', 'erp/master/index', 'erp:account:list', 114, 1, 1, 'N', NOW(), 0),
 (2150, 2100, '代理等级', 1, 'Medal', '/erp/setting/agent-level', 'erp/master/index', 'erp:agent-level:list', 115, 1, 1, 'N', NOW(), 0),
+(2160, 2100, '单号规则', 1, 'Tickets', '/erp/setting/bill-no-rule', 'erp/config/billNoRule', 'erp:config:bill-no-rule:list', 116, 1, 1, 'N', NOW(), 0),
+(2170, 2100, '字段设置', 1, 'SetUp', '/erp/setting/field-setting', 'erp/config/fieldSetting', 'erp:config:field-setting:list', 117, 1, 1, 'N', NOW(), 0),
+(2180, 2100, '打印模板', 1, 'Printer', '/erp/setting/print-template', 'erp/config/printTemplate', 'erp:config:print-template:list', 118, 1, 1, 'N', NOW(), 0),
 (2200, 0, '销售', 0, 'Sell', '/erp/sale', 'Layout', NULL, 120, 1, 1, 'N', NOW(), 0),
 (2210, 2200, '销售单', 1, 'Document', '/erp/sale/list', 'erp/bill/index', 'erp:sale:list', 121, 1, 1, 'N', NOW(), 0),
 (2220, 2200, '新增销售单', 1, 'Plus', '/erp/sale/add', 'erp/bill/form', 'erp:sale:add', 122, 1, 1, 'N', NOW(), 0),
+(2230, 2200, '销售退货单', 1, 'Document', '/erp/sale-return/list', 'erp/bill/index', 'erp:sale-return:list', 123, 1, 1, 'N', NOW(), 0),
+(2240, 2200, '新增销售退货', 1, 'Plus', '/erp/sale-return/add', 'erp/bill/form', 'erp:sale-return:add', 124, 1, 1, 'N', NOW(), 0),
 (2300, 0, '进货', 0, 'ShoppingCart', '/erp/purchase', 'Layout', NULL, 130, 1, 1, 'N', NOW(), 0),
 (2310, 2300, '进货单', 1, 'Document', '/erp/purchase/list', 'erp/bill/index', 'erp:purchase:list', 131, 1, 1, 'N', NOW(), 0),
 (2320, 2300, '新增进货单', 1, 'Plus', '/erp/purchase/add', 'erp/bill/form', 'erp:purchase:add', 132, 1, 1, 'N', NOW(), 0),
+(2330, 2300, '进货退货单', 1, 'Document', '/erp/purchase-return/list', 'erp/bill/index', 'erp:purchase-return:list', 133, 1, 1, 'N', NOW(), 0),
+(2340, 2300, '新增进货退货', 1, 'Plus', '/erp/purchase-return/add', 'erp/bill/form', 'erp:purchase-return:add', 134, 1, 1, 'N', NOW(), 0),
 (2400, 0, '库存', 0, 'Box', '/erp/stock', 'Layout', NULL, 140, 1, 1, 'N', NOW(), 0),
 (2410, 2400, '库存查询', 1, 'Search', '/erp/stock/balance', 'erp/stock/balance', 'erp:stock:balance', 141, 1, 1, 'N', NOW(), 0),
 (2420, 2400, '商品收发明细', 1, 'Tickets', '/erp/stock/flow', 'erp/stock/flow', 'erp:stock:flow', 142, 1, 1, 'N', NOW(), 0),
+(2430, 2400, '库存盘点', 1, 'Checked', '/erp/stock/check', 'erp/stock/check', 'erp:stock-check:list', 143, 1, 1, 'N', NOW(), 0),
+(2440, 2400, '新增库存盘点', 1, 'Plus', '/erp/stock/check-add', 'erp/stock/checkForm', 'erp:stock-check:add', 144, 1, 1, 'N', NOW(), 0),
+(2450, 2400, '库存预警', 1, 'Warning', '/erp/stock/warning', 'erp/stock/warning', 'erp:stock:warning', 145, 1, 1, 'N', NOW(), 0),
 (2500, 0, '财务', 0, 'Money', '/erp/finance', 'Layout', NULL, 150, 1, 1, 'N', NOW(), 0),
 (2510, 2500, '收款单', 1, 'Wallet', '/erp/finance/receipt', 'erp/finance/form', 'erp:finance:receipt:list', 151, 1, 1, 'N', NOW(), 0),
 (2520, 2500, '付款单', 1, 'WalletFilled', '/erp/finance/payment', 'erp/finance/form', 'erp:finance:payment:list', 152, 1, 1, 'N', NOW(), 0),
-(2530, 2500, '资金流水', 1, 'List', '/erp/finance/fund-flow', 'erp/finance/fundFlow', 'erp:finance:fund-flow', 153, 1, 1, 'N', NOW(), 0),
-(2540, 2500, '往来流水', 1, 'List', '/erp/finance/partner-flow', 'erp/finance/partnerFlow', 'erp:finance:partner-flow', 154, 1, 1, 'N', NOW(), 0),
+(2530, 2500, '其他收入', 1, 'CirclePlus', '/erp/finance/income', 'erp/finance/form', 'erp:finance:income:list', 153, 1, 1, 'N', NOW(), 0),
+(2540, 2500, '其他支出', 1, 'Remove', '/erp/finance/expense', 'erp/finance/form', 'erp:finance:expense:list', 154, 1, 1, 'N', NOW(), 0),
+(2550, 2500, '资金流水', 1, 'List', '/erp/finance/fund-flow', 'erp/finance/fundFlow', 'erp:finance:fund-flow', 155, 1, 1, 'N', NOW(), 0),
+(2560, 2500, '往来流水', 1, 'List', '/erp/finance/partner-flow', 'erp/finance/partnerFlow', 'erp:finance:partner-flow', 156, 1, 1, 'N', NOW(), 0),
 (2600, 0, '报表', 0, 'TrendCharts', '/erp/report', 'Layout', NULL, 160, 1, 1, 'N', NOW(), 0),
-(2610, 2600, '销售明细', 1, 'DataLine', '/erp/report/sale-detail', 'erp/report/billDetail', 'erp:report:sale-detail', 161, 1, 1, 'N', NOW(), 0),
-(2620, 2600, '进货明细', 1, 'DataLine', '/erp/report/purchase-detail', 'erp/report/billDetail', 'erp:report:purchase-detail', 162, 1, 1, 'N', NOW(), 0),
-(2630, 2600, '库存余额', 1, 'DataAnalysis', '/erp/report/stock-balance', 'erp/report/stockBalance', 'erp:report:stock-balance', 163, 1, 1, 'N', NOW(), 0),
-(2640, 2600, '应收应付', 1, 'DataBoard', '/erp/report/partner-balance', 'erp/report/partnerBalance', 'erp:report:partner-balance', 164, 1, 1, 'N', NOW(), 0),
-(2650, 2600, '账户余额', 1, 'CreditCard', '/erp/report/account-balance', 'erp/report/accountBalance', 'erp:report:account-balance', 165, 1, 1, 'N', NOW(), 0),
-(2660, 2600, '经营汇总', 1, 'Histogram', '/erp/report/summary', 'erp/report/summary', 'erp:report:summary', 166, 1, 1, 'N', NOW(), 0);
+(2610, 2600, '销售统计', 1, 'DataLine', '/erp/report/sale-stat', 'erp/report/generic', 'erp:report:sale-stat', 161, 1, 1, 'N', NOW(), 0),
+(2620, 2600, '销售明细', 1, 'DataLine', '/erp/report/sale-detail', 'erp/report/billDetail', 'erp:report:sale-detail', 162, 1, 1, 'N', NOW(), 0),
+(2630, 2600, '销售利润表（按商品）', 1, 'DataAnalysis', '/erp/report/sale-profit-product', 'erp/report/generic', 'erp:report:profit', 163, 1, 1, 'N', NOW(), 0),
+(2640, 2600, '销售利润表（按单据）', 1, 'DataAnalysis', '/erp/report/sale-profit-bill', 'erp/report/generic', 'erp:report:profit', 164, 1, 1, 'N', NOW(), 0),
+(2650, 2600, '销售利润表（按客户）', 1, 'DataAnalysis', '/erp/report/sale-profit-customer', 'erp/report/generic', 'erp:report:profit', 165, 1, 1, 'N', NOW(), 0),
+(2660, 2600, '销售分析', 1, 'TrendCharts', '/erp/report/sale-analysis', 'erp/report/generic', 'erp:report:sale-analysis', 166, 1, 1, 'N', NOW(), 0),
+(2670, 2600, '经营利润', 1, 'Histogram', '/erp/report/business-profit', 'erp/report/generic', 'erp:report:business-profit', 167, 1, 1, 'N', NOW(), 0),
+(2680, 2600, '商品热销榜', 1, 'Goods', '/erp/report/hot-products', 'erp/report/generic', 'erp:report:hot-products', 168, 1, 1, 'N', NOW(), 0),
+(2690, 2600, '进货统计', 1, 'DataLine', '/erp/report/purchase-stat', 'erp/report/generic', 'erp:report:purchase-stat', 169, 1, 1, 'N', NOW(), 0),
+(2700, 2600, '进货明细', 1, 'DataLine', '/erp/report/purchase-detail', 'erp/report/billDetail', 'erp:report:purchase-detail', 170, 1, 1, 'N', NOW(), 0),
+(2710, 2600, '库存余额', 1, 'DataAnalysis', '/erp/report/stock-balance', 'erp/report/stockBalance', 'erp:report:stock-balance', 171, 1, 1, 'N', NOW(), 0),
+(2720, 2600, '应收应付', 1, 'DataBoard', '/erp/report/partner-balance', 'erp/report/partnerBalance', 'erp:report:partner-balance', 172, 1, 1, 'N', NOW(), 0),
+(2730, 2600, '账户余额', 1, 'CreditCard', '/erp/report/account-balance', 'erp/report/accountBalance', 'erp:report:account-balance', 173, 1, 1, 'N', NOW(), 0),
+(2740, 2600, '员工业绩统计', 1, 'User', '/erp/report/employee-performance', 'erp/report/generic', 'erp:report:employee-performance', 174, 1, 1, 'N', NOW(), 0),
+(2750, 2600, '员工业绩提成', 1, 'Money', '/erp/report/employee-commission', 'erp/report/generic', 'erp:report:employee-performance', 175, 1, 1, 'N', NOW(), 0),
+(2760, 2600, '商品收发汇总表', 1, 'Tickets', '/erp/report/stock-summary', 'erp/report/generic', 'erp:report:stock-summary', 176, 1, 1, 'N', NOW(), 0),
+(2770, 2600, '商品进销存变动统计', 1, 'Operation', '/erp/report/inventory-change', 'erp/report/generic', 'erp:report:inventory-change', 177, 1, 1, 'N', NOW(), 0),
+(2780, 2600, '经营汇总', 1, 'Histogram', '/erp/report/summary', 'erp/report/summary', 'erp:report:summary', 178, 1, 1, 'N', NOW(), 0);
 
 -- Default Button Permissions
 INSERT IGNORE INTO `sys_menu`
@@ -1046,6 +1472,12 @@ VALUES
 (1456, 1450, '任务日志查询', 2, NULL, NULL, NULL, 'monitor:job:log', 6, 1, 1, 'N', NOW(), 0),
 (1457, 1450, '任务日志删除', 2, NULL, NULL, NULL, 'monitor:job:logRemove', 7, 1, 1, 'N', NOW(), 0),
 (1458, 1450, '任务日志清空', 2, NULL, NULL, NULL, 'monitor:job:logClean', 8, 1, 1, 'N', NOW(), 0),
+(1511, 1510, '审批提交', 2, NULL, NULL, NULL, 'erp:approval:submit', 1, 1, 1, 'N', NOW(), 0),
+(1512, 1510, '审批通过', 2, NULL, NULL, NULL, 'erp:approval:approve', 2, 1, 1, 'N', NOW(), 0),
+(1513, 1510, '审批驳回', 2, NULL, NULL, NULL, 'erp:approval:reject', 3, 1, 1, 'N', NOW(), 0),
+(1514, 1510, '审批撤回', 2, NULL, NULL, NULL, 'erp:approval:revoke', 4, 1, 1, 'N', NOW(), 0),
+(1515, 1510, '审批转交', 2, NULL, NULL, NULL, 'erp:approval:transfer', 5, 1, 1, 'N', NOW(), 0),
+(1541, 1540, '流程定义', 2, NULL, NULL, NULL, 'erp:workflow:definition', 1, 1, 1, 'N', NOW(), 0),
 (2011, 2010, '商品分类新增', 2, NULL, NULL, NULL, 'erp:product-category:add', 1, 1, 1, 'N', NOW(), 0),
 (2012, 2010, '商品分类编辑', 2, NULL, NULL, NULL, 'erp:product-category:edit', 2, 1, 1, 'N', NOW(), 0),
 (2013, 2010, '商品分类删除', 2, NULL, NULL, NULL, 'erp:product-category:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -1062,6 +1494,8 @@ VALUES
 (2052, 2050, '商品编辑', 2, NULL, NULL, NULL, 'erp:product:edit', 2, 1, 1, 'N', NOW(), 0),
 (2053, 2050, '商品删除', 2, NULL, NULL, NULL, 'erp:product:remove', 3, 1, 1, 'N', NOW(), 0),
 (2054, 2050, '商品选项', 2, NULL, NULL, NULL, 'erp:product:options', 4, 1, 1, 'N', NOW(), 0),
+(2055, 2050, '商品导入', 2, NULL, NULL, NULL, 'erp:product:import', 5, 1, 1, 'N', NOW(), 0),
+(2056, 2050, '商品导出', 2, NULL, NULL, NULL, 'erp:product:export', 6, 1, 1, 'N', NOW(), 0),
 (2111, 2110, '客户新增', 2, NULL, NULL, NULL, 'erp:customer:add', 1, 1, 1, 'N', NOW(), 0),
 (2112, 2110, '客户编辑', 2, NULL, NULL, NULL, 'erp:customer:edit', 2, 1, 1, 'N', NOW(), 0),
 (2113, 2110, '客户删除', 2, NULL, NULL, NULL, 'erp:customer:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -1077,16 +1511,30 @@ VALUES
 (2151, 2150, '代理等级新增', 2, NULL, NULL, NULL, 'erp:agent-level:add', 1, 1, 1, 'N', NOW(), 0),
 (2152, 2150, '代理等级编辑', 2, NULL, NULL, NULL, 'erp:agent-level:edit', 2, 1, 1, 'N', NOW(), 0),
 (2153, 2150, '代理等级删除', 2, NULL, NULL, NULL, 'erp:agent-level:remove', 3, 1, 1, 'N', NOW(), 0),
+(2161, 2160, '单号规则新增', 2, NULL, NULL, NULL, 'erp:config:bill-no-rule:add', 1, 1, 1, 'N', NOW(), 0),
+(2162, 2160, '单号规则编辑', 2, NULL, NULL, NULL, 'erp:config:bill-no-rule:edit', 2, 1, 1, 'N', NOW(), 0),
+(2163, 2160, '单号规则删除', 2, NULL, NULL, NULL, 'erp:config:bill-no-rule:remove', 3, 1, 1, 'N', NOW(), 0),
+(2171, 2170, '字段设置新增', 2, NULL, NULL, NULL, 'erp:config:field-setting:add', 1, 1, 1, 'N', NOW(), 0),
+(2172, 2170, '字段设置编辑', 2, NULL, NULL, NULL, 'erp:config:field-setting:edit', 2, 1, 1, 'N', NOW(), 0),
+(2173, 2170, '字段设置删除', 2, NULL, NULL, NULL, 'erp:config:field-setting:remove', 3, 1, 1, 'N', NOW(), 0),
+(2181, 2180, '打印模板新增', 2, NULL, NULL, NULL, 'erp:config:print-template:add', 1, 1, 1, 'N', NOW(), 0),
+(2182, 2180, '打印模板编辑', 2, NULL, NULL, NULL, 'erp:config:print-template:edit', 2, 1, 1, 'N', NOW(), 0),
+(2183, 2180, '打印模板删除', 2, NULL, NULL, NULL, 'erp:config:print-template:remove', 3, 1, 1, 'N', NOW(), 0),
+(2184, 2100, 'ERP参数读取', 2, NULL, NULL, NULL, 'erp:config:params', 119, 1, 1, 'N', NOW(), 0),
 (2211, 2210, '销售新增', 2, NULL, NULL, NULL, 'erp:sale:add', 1, 1, 1, 'N', NOW(), 0),
 (2212, 2210, '销售编辑', 2, NULL, NULL, NULL, 'erp:sale:edit', 2, 1, 1, 'N', NOW(), 0),
 (2213, 2210, '销售删除', 2, NULL, NULL, NULL, 'erp:sale:remove', 3, 1, 1, 'N', NOW(), 0),
 (2214, 2210, '销售审核', 2, NULL, NULL, NULL, 'erp:sale:audit', 4, 1, 1, 'N', NOW(), 0),
 (2215, 2210, '销售反审核', 2, NULL, NULL, NULL, 'erp:sale:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2216, 2210, '销售导出', 2, NULL, NULL, NULL, 'erp:sale:export', 6, 1, 1, 'N', NOW(), 0),
+(2217, 2210, '销售打印', 2, NULL, NULL, NULL, 'erp:sale:print', 7, 1, 1, 'N', NOW(), 0),
 (2311, 2310, '进货新增', 2, NULL, NULL, NULL, 'erp:purchase:add', 1, 1, 1, 'N', NOW(), 0),
 (2312, 2310, '进货编辑', 2, NULL, NULL, NULL, 'erp:purchase:edit', 2, 1, 1, 'N', NOW(), 0),
 (2313, 2310, '进货删除', 2, NULL, NULL, NULL, 'erp:purchase:remove', 3, 1, 1, 'N', NOW(), 0),
 (2314, 2310, '进货审核', 2, NULL, NULL, NULL, 'erp:purchase:audit', 4, 1, 1, 'N', NOW(), 0),
 (2315, 2310, '进货反审核', 2, NULL, NULL, NULL, 'erp:purchase:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2316, 2310, '进货导出', 2, NULL, NULL, NULL, 'erp:purchase:export', 6, 1, 1, 'N', NOW(), 0),
+(2317, 2310, '进货打印', 2, NULL, NULL, NULL, 'erp:purchase:print', 7, 1, 1, 'N', NOW(), 0),
 (2511, 2510, '收款新增', 2, NULL, NULL, NULL, 'erp:finance:receipt:add', 1, 1, 1, 'N', NOW(), 0),
 (2512, 2510, '收款编辑', 2, NULL, NULL, NULL, 'erp:finance:receipt:edit', 2, 1, 1, 'N', NOW(), 0),
 (2513, 2510, '收款删除', 2, NULL, NULL, NULL, 'erp:finance:receipt:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -1096,7 +1544,36 @@ VALUES
 (2522, 2520, '付款编辑', 2, NULL, NULL, NULL, 'erp:finance:payment:edit', 2, 1, 1, 'N', NOW(), 0),
 (2523, 2520, '付款删除', 2, NULL, NULL, NULL, 'erp:finance:payment:remove', 3, 1, 1, 'N', NOW(), 0),
 (2524, 2520, '付款审核', 2, NULL, NULL, NULL, 'erp:finance:payment:audit', 4, 1, 1, 'N', NOW(), 0),
-(2525, 2520, '付款反审核', 2, NULL, NULL, NULL, 'erp:finance:payment:unaudit', 5, 1, 1, 'N', NOW(), 0);
+(2525, 2520, '付款反审核', 2, NULL, NULL, NULL, 'erp:finance:payment:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2231, 2230, '销售退货新增', 2, NULL, NULL, NULL, 'erp:sale-return:add', 1, 1, 1, 'N', NOW(), 0),
+(2232, 2230, '销售退货编辑', 2, NULL, NULL, NULL, 'erp:sale-return:edit', 2, 1, 1, 'N', NOW(), 0),
+(2233, 2230, '销售退货删除', 2, NULL, NULL, NULL, 'erp:sale-return:remove', 3, 1, 1, 'N', NOW(), 0),
+(2234, 2230, '销售退货审核', 2, NULL, NULL, NULL, 'erp:sale-return:audit', 4, 1, 1, 'N', NOW(), 0),
+(2235, 2230, '销售退货反审核', 2, NULL, NULL, NULL, 'erp:sale-return:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2236, 2230, '销售退货导出', 2, NULL, NULL, NULL, 'erp:sale-return:export', 6, 1, 1, 'N', NOW(), 0),
+(2237, 2230, '销售退货打印', 2, NULL, NULL, NULL, 'erp:sale-return:print', 7, 1, 1, 'N', NOW(), 0),
+(2331, 2330, '进货退货新增', 2, NULL, NULL, NULL, 'erp:purchase-return:add', 1, 1, 1, 'N', NOW(), 0),
+(2332, 2330, '进货退货编辑', 2, NULL, NULL, NULL, 'erp:purchase-return:edit', 2, 1, 1, 'N', NOW(), 0),
+(2333, 2330, '进货退货删除', 2, NULL, NULL, NULL, 'erp:purchase-return:remove', 3, 1, 1, 'N', NOW(), 0),
+(2334, 2330, '进货退货审核', 2, NULL, NULL, NULL, 'erp:purchase-return:audit', 4, 1, 1, 'N', NOW(), 0),
+(2335, 2330, '进货退货反审核', 2, NULL, NULL, NULL, 'erp:purchase-return:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2336, 2330, '进货退货导出', 2, NULL, NULL, NULL, 'erp:purchase-return:export', 6, 1, 1, 'N', NOW(), 0),
+(2337, 2330, '进货退货打印', 2, NULL, NULL, NULL, 'erp:purchase-return:print', 7, 1, 1, 'N', NOW(), 0),
+(2431, 2430, '盘点新增', 2, NULL, NULL, NULL, 'erp:stock-check:add', 1, 1, 1, 'N', NOW(), 0),
+(2432, 2430, '盘点编辑', 2, NULL, NULL, NULL, 'erp:stock-check:edit', 2, 1, 1, 'N', NOW(), 0),
+(2433, 2430, '盘点删除', 2, NULL, NULL, NULL, 'erp:stock-check:remove', 3, 1, 1, 'N', NOW(), 0),
+(2434, 2430, '盘点审核', 2, NULL, NULL, NULL, 'erp:stock-check:audit', 4, 1, 1, 'N', NOW(), 0),
+(2435, 2430, '盘点反审核', 2, NULL, NULL, NULL, 'erp:stock-check:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2531, 2530, '其他收入新增', 2, NULL, NULL, NULL, 'erp:finance:income:add', 1, 1, 1, 'N', NOW(), 0),
+(2532, 2530, '其他收入编辑', 2, NULL, NULL, NULL, 'erp:finance:income:edit', 2, 1, 1, 'N', NOW(), 0),
+(2533, 2530, '其他收入删除', 2, NULL, NULL, NULL, 'erp:finance:income:remove', 3, 1, 1, 'N', NOW(), 0),
+(2534, 2530, '其他收入审核', 2, NULL, NULL, NULL, 'erp:finance:income:audit', 4, 1, 1, 'N', NOW(), 0),
+(2535, 2530, '其他收入反审核', 2, NULL, NULL, NULL, 'erp:finance:income:unaudit', 5, 1, 1, 'N', NOW(), 0),
+(2541, 2540, '其他支出新增', 2, NULL, NULL, NULL, 'erp:finance:expense:add', 1, 1, 1, 'N', NOW(), 0),
+(2542, 2540, '其他支出编辑', 2, NULL, NULL, NULL, 'erp:finance:expense:edit', 2, 1, 1, 'N', NOW(), 0),
+(2543, 2540, '其他支出删除', 2, NULL, NULL, NULL, 'erp:finance:expense:remove', 3, 1, 1, 'N', NOW(), 0),
+(2544, 2540, '其他支出审核', 2, NULL, NULL, NULL, 'erp:finance:expense:audit', 4, 1, 1, 'N', NOW(), 0),
+(2545, 2540, '其他支出反审核', 2, NULL, NULL, NULL, 'erp:finance:expense:unaudit', 5, 1, 1, 'N', NOW(), 0);
 
 -- Assign Super Admin Role to All Menus
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
@@ -1165,4 +1642,8 @@ VALUES
 INSERT IGNORE INTO `sys_config`
 (`config_id`, `config_name`, `config_key`, `config_value`, `config_type`, `remark`, `create_time`, `del_flag`)
 VALUES
-(1, '系统名称', 'sys.name', 'LingNow ERP', 'Y', '系统显示名称', NOW(), 0);
+(1, '系统名称', 'sys.name', 'LingNow ERP', 'Y', '系统显示名称', NOW(), 0),
+(20, 'ERP允许负库存', 'erp.allowNegativeStock', 'N', 'Y', 'Y允许，N不允许；当前库存审核按此参数控制', NOW(), 0),
+(21, 'ERP审核后只读', 'erp.auditReadonly', 'Y', 'Y', 'Y表示已审核单据必须反审核后才能修改或删除', NOW(), 0),
+(22, 'ERP数量精度', 'erp.qtyPrecision', '2', 'Y', 'ERP数量显示和录入精度', NOW(), 0),
+(23, 'ERP金额精度', 'erp.amountPrecision', '2', 'Y', 'ERP金额显示和录入精度', NOW(), 0);

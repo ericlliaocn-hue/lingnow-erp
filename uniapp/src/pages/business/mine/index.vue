@@ -8,17 +8,15 @@
       </view>
     </view>
     <view class="panel">
-      <view class="item" @click="goAddress">收货地址</view>
-      <view class="item" @click="goCoupon">优惠券</view>
-      <view class="item" @click="goOrder">我的订单</view>
+      <view class="item" @click="goProfile">个人资料</view>
+      <view class="item" @click="goBills">我的单据</view>
+      <view class="item" @click="goSettings">账号设置</view>
     </view>
-    <TabBar :current="4"/>
   </view>
 </template>
 
 <script lang="ts" setup>
 import {computed, onMounted, ref} from 'vue'
-import TabBar from '@/components/TabBar.vue'
 import {getProfile} from '@/api/user'
 
 const user = ref<any>(null)
@@ -36,13 +34,12 @@ const loadData = async () => {
       uni.setStorageSync('userInfo', res.data)
     }
   } catch (e) {
-    console.error(e)
   }
 }
 
-const goAddress = () => uni.showToast({title: '地址模块暂未接入', icon: 'none'})
-const goCoupon = () => uni.showToast({title: '优惠券模块暂未接入', icon: 'none'})
-const goOrder = () => uni.switchTab({url: '/pages/business/order/index'})
+const goProfile = () => uni.navigateTo({url: '/pages/settings/profile-edit'})
+const goBills = () => uni.switchTab({url: '/pages/business/order/index'})
+const goSettings = () => uni.navigateTo({url: '/pages/settings/index'})
 
 onMounted(() => loadData())
 </script>

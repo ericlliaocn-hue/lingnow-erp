@@ -33,6 +33,13 @@ public class ErpFinanceBill extends BaseEntity implements Serializable {
     private Long accountId;
     private BigDecimal amount;
     private Integer auditStatus;
+    private String approvalStatus;
+    private Long approvalInstanceId;
+    private String approvalSubmitBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime approvalSubmitTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime approvalFinishTime;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime auditTime;
     private String auditBy;

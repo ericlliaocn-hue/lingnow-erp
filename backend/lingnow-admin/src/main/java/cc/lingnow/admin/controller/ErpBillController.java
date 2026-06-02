@@ -2,10 +2,17 @@ package cc.lingnow.admin.controller;
 
 import cc.lingnow.admin.model.bo.erp.ErpBillQueryBO;
 import cc.lingnow.admin.model.bo.erp.ErpBillSaveBO;
+import cc.lingnow.admin.model.bo.erp.ErpApprovalSubmitBO;
+import cc.lingnow.admin.model.enums.ErpApprovalStatus;
 import cc.lingnow.admin.model.vo.erp.ErpBillVO;
+import cc.lingnow.admin.service.ErpApprovalService;
+import cc.lingnow.admin.service.ErpAuditService;
+import cc.lingnow.admin.util.CsvExportUtil;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.common.annotation.Log;
+import cc.lingnow.common.enums.BusinessType;
 import cc.lingnow.common.enums.ErrorCode;
 import cc.lingnow.common.exception.BusinessException;
 import cc.lingnow.common.vo.PageResult;
@@ -16,6 +23,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +35,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "ERP销售进货单")
 @RestController
@@ -49,41 +59,78 @@ public class ErpBillController {
     private final ErpStockFlowService stockFlowService;
     private final ErpFundFlowService fundFlowService;
     private final ErpPartnerFlowService partnerFlowService;
+    private final ErpBillNoRuleService billNoRuleService;
+    private final ErpApprovalService approvalService;
+    private final ErpAuditService auditService;
 
-    @GetMapping("/{module:sale|purchase}/list")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/list")
     public Result<PageResult<ErpBillVO>> list(@PathVariable String module, ErpBillQueryBO query) {
         String type = billType(module);
         check(module, "list");
-        QueryWrapper<ErpBill> wrapper = new QueryWrapper<ErpBill>()
-                .eq("bill_type", type)
-                .like(StrUtil.isNotBlank(query.getBillNo()), "bill_no", query.getBillNo())
-                .eq(query.getPartnerId() != null, "partner_id", query.getPartnerId())
-                .eq(query.getAuditStatus() != null, "audit_status", query.getAuditStatus())
-                .eq(StrUtil.isNotBlank(query.getPaymentStatus()), "payment_status", query.getPaymentStatus())
-                .ge(query.getBeginDate() != null, "bill_date", query.getBeginDate())
-                .le(query.getEndDate() != null, "bill_date", query.getEndDate())
-                .orderByDesc("bill_date")
-                .orderByDesc("create_time");
+        QueryWrapper<ErpBill> wrapper = billListWrapper(type, query);
         IPage<ErpBill> page = billService.page(new Page<>(query.getCurrent(), query.getSize()), wrapper);
         List<ErpBillVO> records = page.getRecords().stream().map(item -> toVO(item, false)).toList();
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), records));
     }
 
-    @GetMapping("/{module:sale|purchase}/nextNo")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/nextNo")
     public Result<String> nextNo(@PathVariable String module) {
         check(module, "add");
         return Result.success(nextBillNo(billType(module)));
     }
 
-    @GetMapping("/{module:sale|purchase}/{id}")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/{id}")
     public Result<ErpBillVO> getInfo(@PathVariable String module, @PathVariable Long id) {
         check(module, "list");
         ErpBill bill = requireBill(id, billType(module));
         return Result.success(toVO(bill, true));
     }
 
-    @PostMapping("/{module:sale|purchase}")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/export")
+    @Log(title = "ERP业务单据", businessType = BusinessType.EXPORT, isSaveResponseData = false)
+    public void export(@PathVariable String module, ErpBillQueryBO query, HttpServletResponse response) throws Exception {
+        String type = billType(module);
+        check(module, "export");
+        List<List<String>> rows = billService.list(billListWrapper(type, query)).stream().map(bill -> {
+            ErpBillVO vo = toVO(bill, false);
+            return List.of(
+                    text(vo.getBillNo()),
+                    text(vo.getBillDate()),
+                    text(vo.getPartnerName()),
+                    text(vo.getWarehouseName()),
+                    money(vo.getTotalAmount()),
+                    money(vo.getDiscountAmount()),
+                    money(vo.getOtherAmount()),
+                    money(vo.getPayableAmount()),
+                    money(vo.getPaidAmount()),
+                    money(vo.getDebtAmount()),
+                    Integer.valueOf(1).equals(vo.getAuditStatus()) ? "已审核" : "未审核",
+                    text(vo.getPaymentStatus()),
+                    text(vo.getRemark())
+            );
+        }).toList();
+        CsvExportUtil.write(response, titleName(module) + ".csv",
+                List.of("单号", "日期", partnerTitle(type), "仓库", "合计金额", "优惠金额", "其他费用", "应收应付", "实收实付", "欠款", "审核状态", "收付状态", "备注"),
+                rows);
+    }
+
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/print/{id}")
+    @Log(title = "ERP业务单据", businessType = BusinessType.OTHER)
+    public Result<Map<String, Object>> printPreview(@PathVariable String module, @PathVariable Long id) {
+        check(module, "print");
+        ErpBillVO bill = toVO(requireBill(id, billType(module)), true);
+        Map<String, Object> data = new HashMap<>();
+        data.put("title", titleName(module));
+        data.put("bill", bill);
+        data.put("items", bill.getItems());
+        data.put("fields", List.of("单号", "日期", partnerTitle(bill.getBillType()), "仓库", "应收应付", "实收实付", "欠款", "审核状态", "备注"));
+        data.put("itemFields", List.of("商品编号", "商品名称", "规格", "单位", "仓库", "数量", "单价", "金额", "优惠", "折后金额", "备注"));
+        return Result.success(data);
+    }
+
+    @PostMapping("/{module:sale|sale-return|purchase|purchase-return}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP业务单据", businessType = BusinessType.INSERT)
     public Result<Void> add(@PathVariable String module, @Valid @RequestBody ErpBillSaveBO bo) {
         check(module, "add");
         String type = billType(module);
@@ -95,8 +142,9 @@ public class ErpBillController {
         return Result.success();
     }
 
-    @PutMapping("/{module:sale|purchase}")
+    @PutMapping("/{module:sale|sale-return|purchase|purchase-return}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP业务单据", businessType = BusinessType.UPDATE)
     public Result<Void> edit(@PathVariable String module, @Valid @RequestBody ErpBillSaveBO bo) {
         if (bo.getId() == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
@@ -115,8 +163,9 @@ public class ErpBillController {
         return Result.success();
     }
 
-    @DeleteMapping("/{module:sale|purchase}/{ids}")
+    @DeleteMapping("/{module:sale|sale-return|purchase|purchase-return}/{ids}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP业务单据", businessType = BusinessType.DELETE)
     public Result<Void> remove(@PathVariable String module, @PathVariable List<Long> ids) {
         check(module, "remove");
         String type = billType(module);
@@ -129,42 +178,63 @@ public class ErpBillController {
         return Result.success();
     }
 
-    @PutMapping("/{module:sale|purchase}/audit/{id}")
+    @PostMapping("/{module:sale|sale-return|purchase|purchase-return}/copy/{id}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP业务单据", businessType = BusinessType.INSERT)
+    public Result<Long> copy(@PathVariable String module, @PathVariable Long id) {
+        check(module, "add");
+        String type = billType(module);
+        ErpBill source = requireBill(id, type);
+        ErpBill copy = BeanUtil.copyProperties(source, ErpBill.class);
+        copy.setId(null);
+        copy.setBillNo(nextBillNo(type));
+        copy.setAuditStatus(0);
+        copy.setAuditTime(null);
+        copy.setAuditBy(null);
+        copy.setApprovalStatus(ErpApprovalStatus.NONE);
+        copy.setApprovalInstanceId(null);
+        copy.setApprovalSubmitBy(null);
+        copy.setApprovalSubmitTime(null);
+        copy.setApprovalFinishTime(null);
+        billService.save(copy);
+
+        List<ErpBillItem> sourceItems = billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", source.getId()));
+        List<ErpBillItem> copyItems = sourceItems.stream().map(item -> {
+            ErpBillItem copyItem = BeanUtil.copyProperties(item, ErpBillItem.class);
+            copyItem.setId(null);
+            copyItem.setBillId(copy.getId());
+            return copyItem;
+        }).toList();
+        if (!copyItems.isEmpty()) {
+            billItemService.saveBatch(copyItems);
+        }
+        return Result.success(copy.getId());
+    }
+
+    @PutMapping("/{module:sale|sale-return|purchase|purchase-return}/audit/{id}")
+    @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP业务单据审核", businessType = BusinessType.UPDATE)
     public Result<Void> audit(@PathVariable String module, @PathVariable Long id) {
         check(module, "audit");
-        ErpBill bill = requireBill(id, billType(module));
-        ensureUnaudited(bill);
-        List<ErpBillItem> items = billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", id));
-        if (items.isEmpty()) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "商品明细不能为空");
-        }
-        if ("SALE".equals(bill.getBillType())) {
-            auditSale(bill, items);
-        } else {
-            auditPurchase(bill, items);
-        }
-        bill.setAuditStatus(1);
-        bill.setAuditTime(LocalDateTime.now());
-        bill.setAuditBy(String.valueOf(StpAdminUtil.getLoginIdDefaultNull()));
-        billService.updateById(bill);
+        ErpApprovalSubmitBO bo = new ErpApprovalSubmitBO();
+        bo.setBizType(billType(module));
+        bo.setBizId(id);
+        approvalService.submit(bo);
         return Result.success();
     }
 
-    @PutMapping("/{module:sale|purchase}/unaudit/{id}")
+    @PutMapping("/{module:sale|sale-return|purchase|purchase-return}/unaudit/{id}")
     @Transactional(rollbackFor = Exception.class)
+    @Log(title = "ERP业务单据反审核", businessType = BusinessType.UPDATE)
     public Result<Void> unaudit(@PathVariable String module, @PathVariable Long id) {
         check(module, "unaudit");
         ErpBill bill = requireBill(id, billType(module));
-        if (!Integer.valueOf(1).equals(bill.getAuditStatus())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "单据未审核");
-        }
-        rollbackStock(bill);
-        fundFlowService.remove(new QueryWrapper<ErpFundFlow>().eq("source_bill_id", bill.getId()).eq("source_bill_type", bill.getBillType()));
-        partnerFlowService.remove(new QueryWrapper<ErpPartnerFlow>().eq("source_bill_id", bill.getId()).eq("source_bill_type", bill.getBillType()));
+        auditService.unauditBill(id);
         bill.setAuditStatus(0);
         bill.setAuditTime(null);
         bill.setAuditBy(null);
+        bill.setApprovalStatus(ErpApprovalStatus.NONE);
+        bill.setApprovalFinishTime(null);
         billService.updateById(bill);
         return Result.success();
     }
@@ -180,6 +250,17 @@ public class ErpBillController {
         }
     }
 
+    private void auditPurchaseReturn(ErpBill bill, List<ErpBillItem> items) {
+        for (ErpBillItem item : items) {
+            changeStock(bill, item, "OUT");
+        }
+        addPartnerFlow(bill, "PAY", bill.getPayableAmount(), "进货退货冲应付");
+        if (positive(bill.getPaidAmount())) {
+            addFundFlow(bill.getId(), bill.getBillNo(), bill.getBillType(), bill.getAccountId(), "IN", bill.getPaidAmount(), "进货退货退款");
+            addPartnerFlow(bill, "PAYABLE", bill.getPaidAmount(), "进货退货退款冲往来");
+        }
+    }
+
     private void auditSale(ErpBill bill, List<ErpBillItem> items) {
         for (ErpBillItem item : items) {
             changeStock(bill, item, "OUT");
@@ -189,6 +270,30 @@ public class ErpBillController {
             addFundFlow(bill.getId(), bill.getBillNo(), bill.getBillType(), bill.getAccountId(), "IN", bill.getPaidAmount(), "销售收款");
             addPartnerFlow(bill, "RECEIVE", bill.getPaidAmount(), "销售收款");
         }
+    }
+
+    private void auditSaleReturn(ErpBill bill, List<ErpBillItem> items) {
+        for (ErpBillItem item : items) {
+            changeStock(bill, item, "IN");
+        }
+        addPartnerFlow(bill, "RECEIVE", bill.getPayableAmount(), "销售退货冲应收");
+        if (positive(bill.getPaidAmount())) {
+            addFundFlow(bill.getId(), bill.getBillNo(), bill.getBillType(), bill.getAccountId(), "OUT", bill.getPaidAmount(), "销售退货退款");
+            addPartnerFlow(bill, "RECEIVABLE", bill.getPaidAmount(), "销售退货退款冲往来");
+        }
+    }
+
+    private QueryWrapper<ErpBill> billListWrapper(String type, ErpBillQueryBO query) {
+        return new QueryWrapper<ErpBill>()
+                .eq("bill_type", type)
+                .like(StrUtil.isNotBlank(query.getBillNo()), "bill_no", query.getBillNo())
+                .eq(query.getPartnerId() != null, "partner_id", query.getPartnerId())
+                .eq(query.getAuditStatus() != null, "audit_status", query.getAuditStatus())
+                .eq(StrUtil.isNotBlank(query.getPaymentStatus()), "payment_status", query.getPaymentStatus())
+                .ge(query.getBeginDate() != null, "bill_date", query.getBeginDate())
+                .le(query.getEndDate() != null, "bill_date", query.getEndDate())
+                .orderByDesc("bill_date")
+                .orderByDesc("create_time");
     }
 
     private void changeStock(ErpBill bill, ErpBillItem item, String direction) {
@@ -331,13 +436,19 @@ public class ErpBillController {
         BigDecimal discountAmount = nvl(bo.getDiscountAmount());
         BigDecimal otherAmount = nvl(bo.getOtherAmount());
         BigDecimal paidAmount = nvl(bo.getPaidAmount());
+        if (discountAmount.compareTo(BigDecimal.ZERO) < 0 || otherAmount.compareTo(BigDecimal.ZERO) < 0 || paidAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "优惠、其他费用和实收实付金额不能小于0");
+        }
         BigDecimal payable = finalAmount.subtract(discountAmount).add(otherAmount);
         if (payable.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "应收应付金额不能小于0");
         }
+        if (paidAmount.compareTo(payable) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "实收实付金额不能大于应收应付金额");
+        }
         ErpBill bill = BeanUtil.copyProperties(bo, ErpBill.class);
         bill.setBillType(type);
-        bill.setPartnerType("SALE".equals(type) ? "CUSTOMER" : "SUPPLIER");
+        bill.setPartnerType(type.startsWith("SALE") ? "CUSTOMER" : "SUPPLIER");
         bill.setTotalQty(totalQty);
         bill.setTotalAmount(totalAmount);
         bill.setDiscountAmount(discountAmount.add(itemDiscount));
@@ -347,6 +458,8 @@ public class ErpBillController {
         bill.setDebtAmount(payable.subtract(paidAmount));
         bill.setPaymentStatus(paymentStatus(payable, paidAmount));
         bill.setAuditStatus(0);
+        bill.setApprovalStatus(ErpApprovalStatus.NONE);
+        validateBillReferences(bill);
         return bill;
     }
 
@@ -393,6 +506,7 @@ public class ErpBillController {
             item.setDiscountAmount(discountAmount);
             item.setFinalAmount(finalAmount);
             item.setRemark(source.getRemark());
+            requireEnabledWarehouse(item.getWarehouseId());
             items.add(item);
         }
         return items;
@@ -429,6 +543,46 @@ public class ErpBillController {
         if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "已审核单据不能修改或删除");
         }
+        if (ErpApprovalStatus.PENDING.equals(bill.getApprovalStatus()) || ErpApprovalStatus.APPROVED.equals(bill.getApprovalStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "审批中或已审批单据不能修改或删除");
+        }
+    }
+
+    private void ensureCanAudit(ErpBill bill) {
+        if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "单据已审核，不能重复审核");
+        }
+    }
+
+    private void validateBillReferences(ErpBill bill) {
+        if ("CUSTOMER".equals(bill.getPartnerType())) {
+            ErpCustomer customer = customerService.getById(bill.getPartnerId());
+            if (customer == null || !Integer.valueOf(1).equals(customer.getStatus())) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "客户不存在或已停用");
+            }
+        } else {
+            ErpSupplier supplier = supplierService.getById(bill.getPartnerId());
+            if (supplier == null || !Integer.valueOf(1).equals(supplier.getStatus())) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "供应商不存在或已停用");
+            }
+        }
+        requireEnabledWarehouse(bill.getWarehouseId());
+        if (bill.getAccountId() != null) {
+            ErpAccount account = accountService.getById(bill.getAccountId());
+            if (account == null || !Integer.valueOf(1).equals(account.getStatus())) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "账户不存在或已停用");
+            }
+        }
+        if (positive(bill.getPaidAmount()) && bill.getAccountId() == null) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "存在收付款金额时必须选择账户");
+        }
+    }
+
+    private void requireEnabledWarehouse(Long warehouseId) {
+        ErpWarehouse warehouse = warehouseService.getById(warehouseId);
+        if (warehouse == null || !Integer.valueOf(1).equals(warehouse.getStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "仓库不存在或已停用");
+        }
     }
 
     private void ensureBillNoUnique(String billNo, Long id) {
@@ -439,7 +593,16 @@ public class ErpBillController {
     }
 
     private String nextBillNo(String type) {
-        String prefix = "SALE".equals(type) ? "XS" : "JH";
+        String ruleNo = billNoRuleService.nextNo(type);
+        if (StrUtil.isNotBlank(ruleNo)) {
+            return ruleNo;
+        }
+        String prefix = switch (type) {
+            case "SALE" -> "XS";
+            case "SALE_RETURN" -> "XSTH";
+            case "PURCHASE_RETURN" -> "JHTH";
+            default -> "JH";
+        };
         String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String like = prefix + "-" + date + "-";
         long count = billService.count(new QueryWrapper<ErpBill>().likeRight("bill_no", like));
@@ -451,7 +614,25 @@ public class ErpBillController {
     }
 
     private String billType(String module) {
-        return "sale".equals(module) ? "SALE" : "PURCHASE";
+        return switch (module) {
+            case "sale" -> "SALE";
+            case "sale-return" -> "SALE_RETURN";
+            case "purchase-return" -> "PURCHASE_RETURN";
+            default -> "PURCHASE";
+        };
+    }
+
+    private String titleName(String module) {
+        return switch (module) {
+            case "sale" -> "销售单";
+            case "sale-return" -> "销售退货单";
+            case "purchase-return" -> "进货退货单";
+            default -> "进货单";
+        };
+    }
+
+    private String partnerTitle(String billType) {
+        return billType != null && billType.startsWith("SALE") ? "客户" : "供应商";
     }
 
     private void check(String module, String action) {
@@ -468,6 +649,14 @@ public class ErpBillController {
 
     private boolean positive(BigDecimal value) {
         return value != null && value.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private String money(BigDecimal value) {
+        return nvl(value).setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private String text(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 
     private String paymentStatus(BigDecimal payable, BigDecimal paid) {

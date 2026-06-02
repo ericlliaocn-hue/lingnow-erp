@@ -1,138 +1,58 @@
 <template>
   <view class="page">
-    <view class="nav">
-      <text class="title">购物车</text>
-    </view>
+    <view class="nav"><text class="title">商品</text></view>
     <scroll-view class="content" scroll-y>
-      <view v-for="item in cartItems" :key="item.id" class="card">
-        <image v-if="item.image" :src="item.image" class="thumb" mode="aspectFill"></image>
-        <view v-else class="thumb"></view>
+      <view v-for="item in products" :key="item.id" class="card" @click="goDetail(item)">
+        <view class="thumb"></view>
         <view class="info">
-          <text class="name">{{ item.productName || '商品' }}</text>
-          <text class="price">¥ {{ item.price || 0 }}</text>
+          <text class="name">{{ item.name || '未命名商品' }}</text>
+          <text class="line">编号：{{ item.code || '-' }}</text>
+          <text class="line">规格：{{ item.spec || '-' }}</text>
+          <text class="line">库存：{{ item.stockQty ?? '-' }}</text>
         </view>
-        <text class="qty">× {{ item.quantity || 1 }}</text>
       </view>
-      <view v-if="cartItems.length === 0" class="empty">购物车暂无商品</view>
+      <view v-if="loadError" class="empty error">{{ loadError }}</view>
+      <view v-else-if="products.length === 0" class="empty">暂无商品资料</view>
+      <view class="safe-area"></view>
     </scroll-view>
-    <view class="footer">
-      <button class="btn" @click="goCheckout">去结算</button>
-    </view>
-    <TabBar :current="2"/>
   </view>
 </template>
 
 <script lang="ts" setup>
 import {onMounted, ref} from 'vue'
-import TabBar from '@/components/TabBar.vue'
-import {getCartItems, getProducts} from '@/api/business'
+import {getMobileProducts} from '@/api/business'
 
-const cartItems = ref<any[]>([])
-const currentUser = uni.getStorageSync('userInfo') || null
+const products = ref<any[]>([])
+const loadError = ref('')
 
 const loadData = async () => {
-  if (!currentUser?.userId) {
-    cartItems.value = []
-    return
-  }
+  loadError.value = ''
   try {
-    const [cartRes, productRes] = await Promise.all([getCartItems(currentUser.userId), getProducts()])
-    const products = productRes?.data || []
-    cartItems.value = (cartRes?.data || []).map((item: any) => {
-      const prod = products.find((p: any) => Number(p.id) === Number(item.productId))
-      return {
-        ...item,
-        productName: prod?.name || item.productName,
-        image: prod?.image
-      }
-    })
+    const res = await getMobileProducts()
+    products.value = res?.data || []
   } catch (e) {
-    console.error(e)
+    loadError.value = '商品资料加载失败，请登录后重试'
   }
 }
 
-const goCheckout = () => {
-  if (cartItems.value.length === 0) {
-    uni.showToast({title: '购物车暂无商品', icon: 'none'})
-    return
-  }
-  uni.navigateTo({url: '/pages/business/checkout/index'})
+const goDetail = (item: any) => {
+  uni.navigateTo({url: '/pages/business/product/detail?id=' + (item.id || '')})
 }
 
-onMounted(() => {
-  loadData()
-})
+onMounted(loadData)
 </script>
 
 <style lang="scss" scoped>
-.page {
-  height: 100vh;
-  background: #f7f7f8;
-}
-
-.nav {
-  padding: 24rpx;
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.content {
-  height: calc(100vh - 260rpx);
-  padding: 0 24rpx;
-}
-
-.card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 16rpx;
-  display: flex;
-  gap: 16rpx;
-  margin-bottom: 16rpx;
-}
-
-.thumb {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 12rpx;
-  background: linear-gradient(135deg, #ffe2b8, #ffd1c4);
-}
-
-.info {
-  flex: 1;
-}
-
-.qty {
-  color: #666;
-  font-size: 24rpx;
-}
-
-.name {
-  font-size: 26rpx;
-  font-weight: 600;
-}
-
-.price {
-  color: #ff6f61;
-  margin-top: 8rpx;
-}
-
-.empty {
-  text-align: center;
-  color: #999;
-  margin-top: 80rpx;
-}
-
-.footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 110rpx;
-  padding: 0 24rpx 24rpx;
-}
-
-.btn {
-  background: #ff6f61;
-  color: #fff;
-  border-radius: 999rpx;
-}
+.page { height: 100vh; background: #f5f7f6; }
+.nav { padding: 28rpx 24rpx; background: #fff; border-bottom: 1rpx solid #e5ebe7; }
+.title { font-size: 32rpx; font-weight: 700; color: #1f2d2a; }
+.content { height: calc(100vh - 180rpx); padding: 24rpx; }
+.card { background: #fff; border-radius: 16rpx; padding: 18rpx; display: flex; gap: 18rpx; border: 1rpx solid #e5ebe7; margin-bottom: 16rpx; }
+.thumb { width: 112rpx; height: 112rpx; border-radius: 14rpx; background: #e8f2ec; }
+.info { flex: 1; }
+.name { display: block; font-size: 28rpx; font-weight: 700; color: #1f2d2a; margin-bottom: 8rpx; }
+.line { display: block; color: #66736e; font-size: 24rpx; margin-top: 6rpx; }
+.empty { text-align: center; color: #9aa4a0; margin-top: 80rpx; }
+.error { color: #c2410c; }
+.safe-area { height: 140rpx; }
 </style>

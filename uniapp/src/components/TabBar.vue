@@ -41,19 +41,19 @@ const list = [
   },
   {
     pagePath: "pages/business/category/index",
-    text: "分类",
+    text: "客户",
     icon: icons.category,
     selectedIcon: icons.categoryActive
   },
   {
     pagePath: "pages/business/cart/index",
-    text: "购物车",
-    icon: icons.cart,
-    selectedIcon: icons.cartActive
+    text: "商品",
+    icon: icons.product,
+    selectedIcon: icons.productActive
   },
   {
     pagePath: "pages/business/order/index",
-    text: "订单",
+    text: "单据",
     icon: icons.order,
     selectedIcon: icons.orderActive
   },

@@ -36,6 +36,18 @@
             <artifactId>spring-boot-starter-quartz</artifactId>
         </dependency>
 
+        <!-- Warm-Flow 审批流 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>warm-flow-mybatis-plus-sb3-starter</artifactId>
+        </dependency>
+
+        <!-- Warm-Flow 流程设计器 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>warm-flow-plugin-ui-sb-web</artifactId>
+        </dependency>
+
         <!-- MySQL Driver -->
         <dependency>
             <groupId>com.mysql</groupId>
