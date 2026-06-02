@@ -1,177 +1,152 @@
-# LingNow 匹配服务系统
+# LingNow ERP Backend
 
-## 项目介绍
+LingNow ERP 后端是 ERP 项目的服务端部分，基于 Spring Boot 3.2、Java 17、MyBatis-Plus、Sa-Token、Redis、MySQL 构建。
 
-LingNow 是一个高质量、高扩展性的匹配服务系统，采用**多模块单体架构**设计，虽然是单体应用，但通过合理的模块划分为未来微服务化预留了空间。
+本目录当前作为 `/Users/eric/workspace/cool/lingnow-erp` monorepo 的 `backend` 子目录存在；Git 根目录在上一级 `lingnow-erp`。如果在 IDE 中只打开 `backend`，只能看到后端文件视图，完整交付文档和 Docker 文件在仓库根目录。
 
-系统支持**两个独立部署的应用**：
+## 服务模块
 
-- **lingnow-app** (用户端): 提供面向C端用户的API，端口 `6061`
-- **lingnow-admin** (管理端): 提供后台管理API，端口 `6060`
+- `lingnow-admin`：管理端 API，默认端口 `6060`。
+- `lingnow-app`：移动端/业务端 API，默认端口 `6061`。
+- `lingnow-biz`：业务实体、Mapper、Service，包含 ERP 基础资料、单据、库存、财务、通知等共享业务能力。
+- `lingnow-core`：核心基础能力。
+- `lingnow-common`：通用返回、异常、工具、MyBatis-Plus、Redis 等基础设施。
+- `framework/*`：框架级扩展模块。
 
-## 技术栈
+## 当前能力
 
-### 后端核心
-- **框架**: Spring Boot 3.2.1
-- **Java版本**: JDK 17
-- **构建工具**: Maven 3.8+
-- **ORM**: MyBatis-Plus 3.5.5
-- **数据库**: MySQL 8.0
-- **缓存**: Redis 7.x (Redisson)
-- **安全**: Sa-Token 1.37.0 (轻量级权限认证)
-- **API文档**: Knife4j 4.4.0
-- **工具库**: Lombok, Hutool, Apache Commons
+- 基座能力：用户、角色、菜单、权限、文件、日志、字典、部门、岗位、系统参数、通知公告、监控。
+- ERP 基础资料：商品分类、单位、品牌、属性、商品、客户、供应商、仓库、账户、代理等级。
+- ERP 单据：销售单、销售退货、进货单、进货退货。
+- 库存：库存查询、库存流水、库存盘点、库存预警。
+- 财务：收款、付款、其他收入、其他支出、资金流水、往来流水。
+- 报表：销售/进货统计、利润、经营汇总、热销榜、库存收发、账户/往来余额等。
+- 审批：已接入 Warm-Flow，支持单据提交、通过、驳回、撤回、转交和审批记录。
+- 任务与监控：Quartz 任务监控、实时日志、缓存监控、在线用户、服务监控。
 
-### 架构特点
-1. **多模块设计**: common → core → app/admin 的依赖关系
-2. **两个独立JAR**: 用户端和管理端可独立部署
-3. **代码复用**: 核心业务逻辑通过 `lingnow-core` 模块共享
-4. **高扩展性**: 应用策略模式、工厂模式等设计模式
+## 环境要求
 
-## 项目结构
-
-```
-lingnow/backend/
-├── pom.xml                    # 父项目POM
-├── lingnow-common/            # 通用模块 (工具类、配置、异常处理)
-├── lingnow-core/              # 核心业务模块 (用户、匹配、消息)
-├── lingnow-app/               # 用户端应用 (端口: 6061)
-└── lingnow-admin/             # 管理端应用 (端口: 6060)
-```
-
-### 模块说明
-
-#### lingnow-common
-提供基础设施支持：
-- `BaseEntity`: 基础实体类
-- `Result/PageResult`: 统一返回结果封装
-- `GlobalExceptionHandler`: 全局异常处理
-- `RedisUtil`: Redis工具类
-- `MyBatisPlusConfig`: MyBatis-Plus配置
-
-#### lingnow-core
-核心业务逻辑：
-
-- `sysUser`: 用户管理模块
-- `match`: 匹配引擎模块（待实现）
-- `message`: 消息通信模块（待实现）
-- `recommend`: 推荐系统模块（待实现）
-
-#### lingnow-app
-用户端应用：
-- `AuthController`: 用户注册、登录、登出
-- `UserController`: 用户信息管理
-
-#### lingnow-admin
-管理端应用：
-- `AdminUserController`: C端用户管理
-
-## 快速开始
-
-### 环境要求
 - JDK 17+
 - Maven 3.8+
-- MySQL 8.0+
-- Redis 7.x
+- MySQL 8+
+- Redis 7+
 
-### 数据库初始化
+默认数据库名：
 
-1. 创建数据库并导入完整表结构及核心数据：
+```text
+lingnow_erp
+```
+
+## 初始化数据库
+
+在仓库根目录或 `backend` 目录执行均可：
+
 ```bash
 mysql -u root -p lingnow_erp < sql/init.sql
 ```
 
-初始化脚本会创建基座管理员账号，用于首次登录后继续配置系统资料。
+初始化脚本只写入系统必需的菜单、权限、字典和基础配置，不写入假 ERP 业务数据。验收脚本使用 `DELIVERY_%` 临时数据，并会在测试前后物理清理。
 
-### 启动 Redis
-```bash
-redis-server
-```
+## 本地启动
 
-### 编译项目
+启动 Admin：
+
 ```bash
 cd backend
-mvn clean compile
+mvn -pl lingnow-admin -am spring-boot:run
 ```
 
-### 启动用户端应用
+启动 App：
+
 ```bash
-cd lingnow-app
-mvn spring-boot:run
+cd backend
+mvn -pl lingnow-app -am spring-boot:run
 ```
 
-访问：
-- API文档: http://localhost:6061/doc.html
+默认地址：
 
-### 启动管理端应用（新终端）
+- Admin API：`http://localhost:6060`
+- App API：`http://localhost:6061`
+- Admin API 文档：`http://localhost:6060/doc.html`
+- App API 文档：`http://localhost:6061/doc.html`
+
+## 配置
+
+开发环境默认读取 `application-dev.yml`，可通过环境变量覆盖：
+
 ```bash
-cd lingnow-admin
-mvn spring-boot:run
+export LINGNOW_DB_URL='jdbc:mysql://localhost:3306/lingnow_erp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true'
+export LINGNOW_DB_USERNAME=root
+export LINGNOW_DB_PASSWORD='your-password'
+export LINGNOW_REDIS_HOST=localhost
+export LINGNOW_REDIS_PORT=9786
+export LINGNOW_REDIS_PASSWORD='your-redis-password'
 ```
 
-访问：
-- API文档: http://localhost:6060/doc.html
+生产环境通过 `application-prod.yml` 强制使用环境变量注入数据库、Redis、日志和 API 文档开关。
 
-## 开发指南
+## 构建
 
-### 配置文件
-- 开发环境: `application-dev.yml` (默认激活)
-- 生产环境: `application-prod.yml`
-
-修改配置：
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/lingnow_erp
-    username: root
-    password: your_password
-    
-  data:
-    redis:
-      host: localhost
-      port: 6379
-```
-
-### API 调试
-
-登录成功后返回结果包含 `token`，后续请求需携带 token：
-
-#### 获取用户信息（需要登录）
 ```bash
-curl http://localhost:6061/sysUser/info \
-  -H "satoken: your_token_here"
+cd backend
+mvn -q -DskipTests package
 ```
 
-## 打包部署
+单独构建 Admin：
 
-### 打包
 ```bash
-# 打包所有模块
-mvn clean package -DskipTests
-
-# 打包后的JAR文件位置：
-# lingnow-app/target/lingnow-app.jar
-# lingnow-admin/target/lingnow-admin.jar
+cd backend
+mvn -q -pl lingnow-admin -am -DskipTests package
 ```
 
-### 运行JAR
+单独构建 App：
+
 ```bash
-# 启动用户端
-java -jar lingnow-app/target/lingnow-app.jar
-
-# 启动管理端
-java -jar lingnow-admin/target/lingnow-admin.jar
+cd backend
+mvn -q -pl lingnow-app -am -DskipTests package
 ```
 
-## 后续开发
+构建产物：
 
-当前框架已完成基础架构和用户模块，后续需要实现：
+- `lingnow-admin/target/lingnow-admin.jar`
+- `lingnow-app/target/lingnow-app.jar`
 
-1. **匹配引擎模块** - 实现匹配算法和队列管理
-2. **消息通信模块** - WebSocket实时消息功能
-3. **推荐系统模块** - 用户推荐算法
-4. **管理端功能** - 系统管理、权限控制(RBAC)
+## Docker 交付
 
-## License
+Docker 编排文件在仓库根目录：
 
-MIT License
+- `docker-compose.yml`：完整单机模式，包含 MySQL、Redis、Admin、App、Web。
+- `docker-compose.host.example.yml`：本机依赖模式，只启动 Admin、App、Web，MySQL/Redis 使用宿主机服务。
+
+默认 Web 端口为 `8090`。
+
+本机依赖模式示例：
+
+```bash
+cd ..
+cp .env.example .env
+cp docker-compose.host.example.yml docker-compose.host.yml
+docker compose --env-file .env -f docker-compose.host.yml up -d --build
+```
+
+## 验收
+
+仓库根目录提供自动验收脚本：
+
+```bash
+cd ..
+ADMIN_BASE_URL=http://localhost:8090/admin-api \
+APP_BASE_URL=http://localhost:8090/app-api \
+MYSQL_PWD='<db-password>' \
+node scripts/acceptance-check.mjs
+```
+
+验收覆盖：
+
+- 管理员真实登录。
+- 菜单组件和权限绑定。
+- 89 个 Admin/API/CSV 接口。
+- App 缺 token 鉴权。
+- 采购、销售、收款 Warm-Flow 审批。
+- 库存变化、资金流水、反审核和删除。
+- `DELIVERY_%` 临时数据清理。
