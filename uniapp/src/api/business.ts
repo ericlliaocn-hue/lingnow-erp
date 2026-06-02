@@ -19,3 +19,7 @@ export const getMobileBills = () => {
 export const getMobileDashboard = () => {
     return request({url: '/app/erp/dashboard', method: 'GET'})
 }
+
+export const parseMobileAddress = (rawText: string) => {
+    return request({url: '/app/erp/address/parse', method: 'POST', data: {rawText}})
+}

@@ -21,6 +21,9 @@ public class ErpBillSaveBO {
     private Long warehouseId;
     private Long accountId;
     private Long employeeId;
+    private String receiverName;
+    private String receiverPhone;
+    private String receiverAddress;
     private BigDecimal discountAmount;
     private BigDecimal otherAmount;
     private BigDecimal paidAmount;

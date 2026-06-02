@@ -2,7 +2,7 @@
 
 LingNow ERP 后端是 ERP 项目的服务端部分，基于 Spring Boot 3.2、Java 17、MyBatis-Plus、Sa-Token、Redis、MySQL 构建。
 
-本目录当前作为 `/Users/eric/workspace/cool/lingnow-erp` monorepo 的 `backend` 子目录存在；Git 根目录在上一级 `lingnow-erp`。如果在 IDE 中只打开 `backend`，只能看到后端文件视图，完整交付文档和 Docker 文件在仓库根目录。
+本目录是仓库根目录下的 `backend` 子目录。如果在 IDE 中只打开 `backend`，只能看到后端文件视图；完整交付文档和 Docker 文件在仓库根目录。
 
 ## 服务模块
 
@@ -137,16 +137,18 @@ docker compose --env-file .env -f docker-compose.host.yml up -d --build
 cd ..
 ADMIN_BASE_URL=http://localhost:8090/admin-api \
 APP_BASE_URL=http://localhost:8090/app-api \
+DB_NAME=lingnow_erp \
+DB_USER=root \
 MYSQL_PWD='<db-password>' \
-node scripts/acceptance-check.mjs
+node scripts/release-acceptance.mjs
 ```
 
 验收覆盖：
 
 - 管理员真实登录。
 - 菜单组件和权限绑定。
-- 89 个 Admin/API/CSV 接口。
-- App 缺 token 鉴权。
-- 采购、销售、收款 Warm-Flow 审批。
-- 库存变化、资金流水、反审核和删除。
-- `DELIVERY_%` 临时数据清理。
+- 19 条发版验收流程。
+- Admin/API/CSV/App 接口。
+- Warm-Flow 审批。
+- 库存、资金、往来、报表、通知、权限和数据授权。
+- `ACCEPT_%` 临时数据清理。

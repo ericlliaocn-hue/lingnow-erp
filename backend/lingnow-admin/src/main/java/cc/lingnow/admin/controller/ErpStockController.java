@@ -10,6 +10,8 @@ import cc.lingnow.admin.service.ErpAuditService;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.biz.user.entity.SysUser;
+import cc.lingnow.biz.user.service.SysUserService;
 import cc.lingnow.common.annotation.Log;
 import cc.lingnow.common.enums.BusinessType;
 import cc.lingnow.common.enums.ErrorCode;
@@ -48,6 +50,8 @@ public class ErpStockController {
     private final ErpWarehouseService warehouseService;
     private final ErpUnitService unitService;
     private final ErpBillNoRuleService billNoRuleService;
+    private final ErpDataAuthService dataAuthService;
+    private final SysUserService userService;
     private final ErpApprovalService approvalService;
     private final ErpAuditService auditService;
 
@@ -58,10 +62,12 @@ public class ErpStockController {
                                                            Long warehouseId,
                                                            String warningType) {
         StpAdminUtil.stpLogic.checkPermission("erp:stock:warning");
-        IPage<ErpStockBalance> page = stockBalanceService.page(new Page<>(current, size), new QueryWrapper<ErpStockBalance>()
+        QueryWrapper<ErpStockBalance> wrapper = new QueryWrapper<ErpStockBalance>()
                 .eq(productId != null, "product_id", productId)
                 .eq(warehouseId != null, "warehouse_id", warehouseId)
-                .orderByDesc("update_time"));
+                .orderByDesc("update_time");
+        applyWarehouseAuth(wrapper);
+        IPage<ErpStockBalance> page = stockBalanceService.page(new Page<>(current, size), wrapper);
         List<Map<String, Object>> records = page.getRecords().stream()
                 .map(this::warningRow)
                 .filter(row -> StrUtil.isBlank(warningType) || warningType.equals(row.get("warningType")))
@@ -69,10 +75,12 @@ public class ErpStockController {
         if (StrUtil.isBlank(warningType)) {
             return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), records));
         }
-        List<Map<String, Object>> allRecords = stockBalanceService.list(new QueryWrapper<ErpStockBalance>()
-                        .eq(productId != null, "product_id", productId)
-                        .eq(warehouseId != null, "warehouse_id", warehouseId)
-                        .orderByDesc("update_time"))
+        QueryWrapper<ErpStockBalance> allWrapper = new QueryWrapper<ErpStockBalance>()
+                .eq(productId != null, "product_id", productId)
+                .eq(warehouseId != null, "warehouse_id", warehouseId)
+                .orderByDesc("update_time");
+        applyWarehouseAuth(allWrapper);
+        List<Map<String, Object>> allRecords = stockBalanceService.list(allWrapper)
                 .stream()
                 .map(this::warningRow)
                 .filter(row -> warningType.equals(row.get("warningType")))
@@ -92,9 +100,34 @@ public class ErpStockController {
                 .le(query.getEndDate() != null, "check_date", query.getEndDate())
                 .orderByDesc("check_date")
                 .orderByDesc("create_time");
+        applyWarehouseAuth(wrapper);
         IPage<ErpStockCheck> page = stockCheckService.page(new Page<>(query.getCurrent(), query.getSize()), wrapper);
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(),
                 page.getRecords().stream().map(item -> toVO(item, false)).toList()));
+    }
+
+    private <T> void applyWarehouseAuth(QueryWrapper<T> wrapper) {
+        if (isAdminUser()) {
+            return;
+        }
+        List<Long> warehouseIds = dataAuthService.authorizedIds(currentUserId(), "WAREHOUSE");
+        if (!warehouseIds.isEmpty()) {
+            wrapper.in("warehouse_id", warehouseIds);
+        }
+    }
+
+    private boolean isAdminUser() {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return false;
+        }
+        SysUser user = userService.getById(userId);
+        return user != null && "admin".equals(user.getUsername());
+    }
+
+    private Long currentUserId() {
+        Object loginId = StpAdminUtil.getLoginIdDefaultNull();
+        return loginId == null ? null : Long.valueOf(String.valueOf(loginId));
     }
 
     @GetMapping("/check/nextNo")

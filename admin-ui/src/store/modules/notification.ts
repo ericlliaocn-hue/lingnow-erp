@@ -4,9 +4,68 @@ import { ElNotification } from 'element-plus'
 import request from '@/utils/request'
 
 export const useNotificationStore = defineStore('notification', () => {
+  const VOICE_SETTINGS_KEY = 'erp-notification-voice-settings'
   const unreadCount = ref(0)
   const list = ref<any[]>([])
   const ws = ref<WebSocket | null>(null)
+  const voiceSettings = ref(loadVoiceSettings())
+
+  function loadVoiceSettings() {
+    try {
+      return {
+        enabled: false,
+        orderEnabled: true,
+        noticeEnabled: true,
+        ...JSON.parse(localStorage.getItem(VOICE_SETTINGS_KEY) || '{}')
+      }
+    } catch {
+      return { enabled: false, orderEnabled: true, noticeEnabled: true }
+    }
+  }
+
+  function saveVoiceSettings(settings: Partial<{ enabled: boolean; orderEnabled: boolean; noticeEnabled: boolean }>) {
+    voiceSettings.value = { ...voiceSettings.value, ...settings }
+    localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify(voiceSettings.value))
+  }
+
+  function speakText(text: string) {
+    const content = text.trim()
+    if (!content) return
+    if ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(content)
+      utterance.lang = 'zh-CN'
+      utterance.rate = 1
+      utterance.pitch = 1
+      window.speechSynthesis.speak(utterance)
+      return
+    }
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+    oscillator.frequency.value = 880
+    gain.gain.value = 0.08
+    oscillator.connect(gain)
+    gain.connect(audioContext.destination)
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.18)
+  }
+
+  function speakNotification(data: any) {
+    if (!voiceSettings.value.enabled) return
+    const category = data.category || 'SYSTEM'
+    if (category === 'ORDER' && !voiceSettings.value.orderEnabled) return
+    if (category !== 'ORDER' && !voiceSettings.value.noticeEnabled) return
+    if (category === 'ORDER') {
+      speakText(`有新的销售单，请及时处理。${data.content || ''}`)
+      return
+    }
+    speakText(`${data.title || '系统通知'}。${data.content || ''}`)
+  }
+
+  function testVoice() {
+    speakText('语音提醒已开启')
+  }
 
   // 获取未读数量
   const fetchUnreadCount = async () => {
@@ -104,6 +163,7 @@ export const useNotificationStore = defineStore('notification', () => {
           position: 'top-right',
           duration: 3000
         })
+        speakNotification(data)
         // 刷新列表（如果列表打开）
         fetchList()
       } catch (e) {
@@ -125,6 +185,9 @@ export const useNotificationStore = defineStore('notification', () => {
   return {
     unreadCount,
     list,
+    voiceSettings,
+    saveVoiceSettings,
+    testVoice,
     fetchUnreadCount,
     fetchList,
     markRead,

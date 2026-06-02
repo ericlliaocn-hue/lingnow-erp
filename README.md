@@ -14,6 +14,7 @@ git merge upstream/main
 - `backend`：Spring Boot 3.2、Java 17、MyBatis-Plus、Sa-Token、Redis、MySQL。
 - `admin-ui`：Vue 3、Vite、Element Plus 管理端。
 - `uniapp`：移动端基础壳，可继续改成业务员端、代理端或客户下单端。
+- `docs`：项目立项、需求、架构、部署、验收、交付说明等标准化文档。
 
 ## 已保留基座能力
 
@@ -53,4 +54,23 @@ git merge upstream/main
 cd backend && mvn -q -DskipTests package
 cd admin-ui && npm ci && npm run build
 cd uniapp && npm ci && npm run type-check && npm run build:h5
+```
+
+## 交付文档
+
+完整交付文档位于 `docs/`，入口为：
+
+```text
+docs/00-文档总览.md
+```
+
+发版验收主入口：
+
+```bash
+ADMIN_BASE_URL=http://localhost:8090/admin-api \
+APP_BASE_URL=http://localhost:8090/app-api \
+DB_NAME=lingnow_erp \
+DB_USER=root \
+MYSQL_PWD='你的MySQL密码' \
+node scripts/release-acceptance.mjs
 ```

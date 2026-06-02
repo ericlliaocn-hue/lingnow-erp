@@ -11,6 +11,10 @@ import cc.lingnow.admin.util.CsvExportUtil;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.biz.notification.service.SysUserNotificationService;
+import cc.lingnow.biz.role.service.SysRoleService;
+import cc.lingnow.biz.user.entity.SysUser;
+import cc.lingnow.biz.user.service.SysUserService;
 import cc.lingnow.common.annotation.Log;
 import cc.lingnow.common.enums.BusinessType;
 import cc.lingnow.common.enums.ErrorCode;
@@ -38,6 +42,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Tag(name = "ERP销售进货单")
 @RestController
@@ -60,8 +65,12 @@ public class ErpBillController {
     private final ErpFundFlowService fundFlowService;
     private final ErpPartnerFlowService partnerFlowService;
     private final ErpBillNoRuleService billNoRuleService;
+    private final ErpDataAuthService dataAuthService;
     private final ErpApprovalService approvalService;
     private final ErpAuditService auditService;
+    private final SysUserService userService;
+    private final SysRoleService roleService;
+    private final SysUserNotificationService notificationService;
 
     @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/list")
     public Result<PageResult<ErpBillVO>> list(@PathVariable String module, ErpBillQueryBO query) {
@@ -123,7 +132,7 @@ public class ErpBillController {
         data.put("title", titleName(module));
         data.put("bill", bill);
         data.put("items", bill.getItems());
-        data.put("fields", List.of("单号", "日期", partnerTitle(bill.getBillType()), "仓库", "应收应付", "实收实付", "欠款", "审核状态", "备注"));
+        data.put("fields", printFields(bill.getBillType()));
         data.put("itemFields", List.of("商品编号", "商品名称", "规格", "单位", "仓库", "数量", "单价", "金额", "优惠", "折后金额", "备注"));
         return Result.success(data);
     }
@@ -139,6 +148,7 @@ public class ErpBillController {
         ensureBillNoUnique(bill.getBillNo(), null);
         billService.save(bill);
         saveItems(bill, bo.getItems());
+        notifyNewSaleBill(bill);
         return Result.success();
     }
 
@@ -284,7 +294,7 @@ public class ErpBillController {
     }
 
     private QueryWrapper<ErpBill> billListWrapper(String type, ErpBillQueryBO query) {
-        return new QueryWrapper<ErpBill>()
+        QueryWrapper<ErpBill> wrapper = new QueryWrapper<ErpBill>()
                 .eq("bill_type", type)
                 .like(StrUtil.isNotBlank(query.getBillNo()), "bill_no", query.getBillNo())
                 .eq(query.getPartnerId() != null, "partner_id", query.getPartnerId())
@@ -294,6 +304,40 @@ public class ErpBillController {
                 .le(query.getEndDate() != null, "bill_date", query.getEndDate())
                 .orderByDesc("bill_date")
                 .orderByDesc("create_time");
+        applyDataAuth(wrapper, type);
+        return wrapper;
+    }
+
+    private void applyDataAuth(QueryWrapper<ErpBill> wrapper, String type) {
+        if (isAdminUser()) {
+            return;
+        }
+        Long userId = currentUserId();
+        applyIdAuth(wrapper, "warehouse_id", dataAuthService.authorizedIds(userId, "WAREHOUSE"));
+        if ("SALE".equals(type) || "SALE_RETURN".equals(type)) {
+            applyIdAuth(wrapper, "partner_id", dataAuthService.authorizedIds(userId, "CUSTOMER"));
+        }
+    }
+
+    private void applyIdAuth(QueryWrapper<ErpBill> wrapper, String column, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        wrapper.in(column, ids);
+    }
+
+    private boolean isAdminUser() {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return false;
+        }
+        SysUser user = userService.getById(userId);
+        return user != null && "admin".equals(user.getUsername());
+    }
+
+    private Long currentUserId() {
+        Object loginId = StpAdminUtil.getLoginIdDefaultNull();
+        return loginId == null ? null : Long.valueOf(String.valueOf(loginId));
     }
 
     private void changeStock(ErpBill bill, ErpBillItem item, String direction) {
@@ -531,6 +575,27 @@ public class ErpBillController {
         return vo;
     }
 
+    private void notifyNewSaleBill(ErpBill bill) {
+        if (!"SALE".equals(bill.getBillType())) {
+            return;
+        }
+        String content = bill.getBillNo() + " 已创建，请及时处理";
+        String actionUrl = "/erp/sale/list?billNo=" + bill.getBillNo();
+        for (SysUser user : userService.list(new QueryWrapper<SysUser>().eq("status", 1).eq("del_flag", 0))) {
+            if (canReceiveSaleNotification(user)) {
+                notificationService.sendNotification(user.getUserId(), "新销售单", content, "warning", bill.getId(), "SALE", "ORDER", "OPEN", actionUrl);
+            }
+        }
+    }
+
+    private boolean canReceiveSaleNotification(SysUser user) {
+        if ("admin".equals(user.getUsername())) {
+            return true;
+        }
+        Set<String> permissions = roleService.selectPermissionsByUserId(user.getUserId());
+        return permissions.contains("*:*:*") || permissions.contains("erp:sale:list");
+    }
+
     private ErpBill requireBill(Long id, String type) {
         ErpBill bill = billService.getById(id);
         if (bill == null || !type.equals(bill.getBillType())) {
@@ -633,6 +698,15 @@ public class ErpBillController {
 
     private String partnerTitle(String billType) {
         return billType != null && billType.startsWith("SALE") ? "客户" : "供应商";
+    }
+
+    private List<String> printFields(String billType) {
+        List<String> fields = new ArrayList<>(List.of("单号", "日期", partnerTitle(billType), "仓库"));
+        if (billType != null && billType.startsWith("SALE")) {
+            fields.addAll(List.of("收货人", "收货电话", "收货地址"));
+        }
+        fields.addAll(List.of("应收应付", "实收实付", "欠款", "审核状态", "备注"));
+        return fields;
     }
 
     private void check(String module, String action) {

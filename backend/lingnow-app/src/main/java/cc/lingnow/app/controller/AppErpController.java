@@ -7,6 +7,9 @@ import cc.lingnow.biz.erp.entity.ErpProduct;
 import cc.lingnow.biz.erp.entity.ErpStockBalance;
 import cc.lingnow.biz.erp.entity.ErpSupplier;
 import cc.lingnow.biz.erp.entity.ErpUnit;
+import cc.lingnow.biz.erp.model.ErpAddressParseBO;
+import cc.lingnow.biz.erp.model.ErpAddressParseVO;
+import cc.lingnow.biz.erp.service.ErpAddressParseService;
 import cc.lingnow.biz.erp.service.ErpBillService;
 import cc.lingnow.biz.erp.service.ErpCustomerService;
 import cc.lingnow.biz.erp.service.ErpPartnerFlowService;
@@ -19,9 +22,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -43,6 +49,7 @@ public class AppErpController {
     private final ErpBillService billService;
     private final ErpStockBalanceService stockBalanceService;
     private final ErpPartnerFlowService partnerFlowService;
+    private final ErpAddressParseService addressParseService;
 
     @GetMapping("/dashboard")
     public Result<Map<String, Object>> dashboard() {
@@ -126,6 +133,11 @@ public class AppErpController {
         return Result.success(billService.list(wrapper).stream().map(this::billRow).toList());
     }
 
+    @PostMapping("/address/parse")
+    public Result<ErpAddressParseVO> parseAddress(@Valid @RequestBody ErpAddressParseBO bo) {
+        return Result.success(addressParseService.parse(bo.getRawText()));
+    }
+
     private Map<String, Object> customerRow(ErpCustomer customer) {
         Map<String, Object> row = masterRow(customer.getId(), customer.getCode(), customer.getName(),
                 customer.getContact(), customer.getPhone(), customer.getAddress(), customer.getStatus(), customer.getRemark());
@@ -185,6 +197,9 @@ public class AppErpController {
         row.put("partnerId", bill.getPartnerId());
         row.put("partnerType", bill.getPartnerType());
         row.put("partnerName", partnerName(bill.getPartnerType(), bill.getPartnerId()));
+        row.put("receiverName", bill.getReceiverName());
+        row.put("receiverPhone", bill.getReceiverPhone());
+        row.put("receiverAddress", bill.getReceiverAddress());
         row.put("totalQty", bill.getTotalQty());
         row.put("payableAmount", bill.getPayableAmount());
         row.put("paidAmount", bill.getPaidAmount());

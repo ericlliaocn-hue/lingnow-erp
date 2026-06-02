@@ -21,6 +21,9 @@ public class ErpBillVO {
     private Long accountId;
     private String accountName;
     private Long employeeId;
+    private String receiverName;
+    private String receiverPhone;
+    private String receiverAddress;
     private BigDecimal totalQty;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;

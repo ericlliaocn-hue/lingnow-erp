@@ -33,6 +33,9 @@ public class ErpBill extends BaseEntity implements Serializable {
     private Long warehouseId;
     private Long accountId;
     private Long employeeId;
+    private String receiverName;
+    private String receiverPhone;
+    private String receiverAddress;
     private BigDecimal totalQty;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;

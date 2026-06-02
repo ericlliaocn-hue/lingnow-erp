@@ -2,7 +2,7 @@
 
 LingNow ERP Uniapp 是 ERP 移动端/H5 业务壳，基于 uni-app、Vue 3、Vite 构建。
 
-本目录当前作为 `/Users/eric/workspace/cool/lingnow-erp` monorepo 的 `uniapp` 子目录存在；Git 根目录在上一级 `lingnow-erp`。完整后端、管理端、Docker 和交付文档位于仓库根目录。
+本目录是仓库根目录下的 `uniapp` 子目录。完整后端、管理端、Docker 和交付文档位于仓库根目录。
 
 ## 当前定位
 
@@ -104,3 +104,9 @@ http://localhost:8090/h5/
 - `/#/pages/business/mine/index`
 
 页面级验收必须使用外置 Chrome 可见窗口，不使用 Codex 内置浏览器，不使用 headless。
+
+完整页面回归清单见：
+
+```text
+docs/09-外置Chrome页面回归清单.md
+```

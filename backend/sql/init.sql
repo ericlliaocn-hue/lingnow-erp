@@ -975,6 +975,9 @@ CREATE TABLE IF NOT EXISTS `erp_bill`
     `warehouse_id`   bigint(20)      NOT NULL COMMENT '仓库ID',
     `account_id`     bigint(20)               DEFAULT NULL COMMENT '结算账户ID',
     `employee_id`    bigint(20)               DEFAULT NULL COMMENT '业务员ID',
+    `receiver_name`  varchar(64)              DEFAULT NULL COMMENT '收货人',
+    `receiver_phone` varchar(32)              DEFAULT NULL COMMENT '收货电话',
+    `receiver_address` varchar(500)           DEFAULT NULL COMMENT '收货地址',
     `total_qty`      decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '总数量',
     `total_amount`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '单据金额',
     `discount_amount` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '优惠金额',
@@ -1221,6 +1224,24 @@ CREATE TABLE IF NOT EXISTS `erp_stock_check_item`
     KEY `idx_stock_check_item_product` (`product_id`, `warehouse_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP库存盘点明细';
+
+CREATE TABLE IF NOT EXISTS `erp_data_auth`
+(
+    `id`            bigint(20)  NOT NULL COMMENT '授权ID',
+    `user_id`       bigint(20)  NOT NULL COMMENT '用户ID',
+    `resource_type` varchar(32) NOT NULL COMMENT '资源类型 CUSTOMER/WAREHOUSE',
+    `resource_id`   bigint(20)  NOT NULL COMMENT '资源ID',
+    `remark`        varchar(500)         DEFAULT NULL COMMENT '备注',
+    `create_time`   datetime            DEFAULT NULL,
+    `update_time`   datetime            DEFAULT NULL,
+    `create_by`     varchar(64)         DEFAULT NULL,
+    `update_by`     varchar(64)         DEFAULT NULL,
+    `del_flag`      tinyint(1) NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_erp_data_auth_user_resource` (`user_id`, `resource_type`, `resource_id`, `del_flag`),
+    KEY `idx_erp_data_auth_user_type` (`user_id`, `resource_type`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP数据授权';
 
 CREATE TABLE IF NOT EXISTS `erp_bill_no_rule`
 (

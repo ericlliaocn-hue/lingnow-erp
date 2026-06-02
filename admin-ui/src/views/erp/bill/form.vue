@@ -23,6 +23,18 @@
           <el-col :span="6"><el-form-item label="整单优惠"><el-input-number v-model="form.discountAmount" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="其他费用"><el-input-number v-model="form.otherAmount" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
         </el-row>
+        <template v-if="showReceiver">
+          <el-divider />
+          <div class="section-title">
+            <strong>收货信息</strong>
+            <el-button :icon="Aim" :disabled="readonly" @click="openAddressParse">地址识别</el-button>
+          </div>
+          <el-row :gutter="16">
+            <el-col :span="6"><el-form-item label="收货人"><el-input v-model="form.receiverName" placeholder="请输入收货人" /></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="收货电话"><el-input v-model="form.receiverPhone" placeholder="请输入收货电话" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="收货地址"><el-input v-model="form.receiverAddress" placeholder="请输入收货地址" /></el-form-item></el-col>
+          </el-row>
+        </template>
         <el-divider />
         <div class="toolbar"><el-button type="primary" :disabled="readonly" @click="addRow">添加商品</el-button></div>
         <el-table :data="form.items" border>
@@ -48,6 +60,28 @@
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item>
       </el-form>
     </el-card>
+
+    <el-dialog v-model="addressOpen" title="地址识别" width="640px" append-to-body>
+      <el-form label-width="92px">
+        <el-form-item label="粘贴内容">
+          <el-input v-model="addressRawText" type="textarea" :rows="5" placeholder="粘贴姓名、手机号、完整地址" />
+        </el-form-item>
+        <el-form-item v-if="addressResult" label="识别结果">
+          <el-descriptions :column="1" border style="width: 100%">
+            <el-descriptions-item label="收货人">{{ addressResult.contactName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="收货电话">{{ addressResult.phone || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="收货地址">{{ addressResult.normalizedAddress || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="置信度">{{ addressResult.confidence ?? 0 }}%</el-descriptions-item>
+          </el-descriptions>
+        </el-form-item>
+        <el-alert v-if="addressResult?.warnings?.length" :title="addressResult.warnings.join('，')" type="warning" :closable="false" show-icon />
+      </el-form>
+      <template #footer>
+        <el-button @click="addressOpen = false">取消</el-button>
+        <el-button :loading="addressLoading" @click="doParseAddress">识别</el-button>
+        <el-button type="primary" :disabled="!addressResult" @click="applyAddress">确认回填</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -55,10 +89,12 @@
 import { computed, onMounted, reactive, ref, toRefs } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Aim } from '@element-plus/icons-vue'
 import { addBill, getBill, listBill, nextBillNo, updateBill, type BillItem, type BillModule, type ErpBill } from '@/api/erp/bill'
 import { submitApproval, type ApprovalBizType } from '@/api/erp/approval'
 import { productOptions, type ErpProduct } from '@/api/erp/product'
 import { listMaster, type ErpMasterVO } from '@/api/erp/master'
+import { parseAddress, type AddressParseResult } from '@/api/erp/address'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,6 +106,7 @@ const module = computed<BillModule>(() => {
 const titleMap: Record<BillModule, string> = { sale: '新增销售单', 'sale-return': '新增销售退货', purchase: '新增进货单', 'purchase-return': '新增进货退货' }
 const title = computed(() => titleMap[module.value])
 const partnerLabel = computed(() => module.value.startsWith('sale') ? '客户' : '供应商')
+const showReceiver = computed(() => module.value.startsWith('sale'))
 const bizType = computed<ApprovalBizType>(() => {
   const map: Record<BillModule, ApprovalBizType> = {
     sale: 'SALE',
@@ -84,6 +121,10 @@ const products = ref<ErpProduct[]>([])
 const partners = ref<ErpMasterVO[]>([])
 const warehouses = ref<ErpMasterVO[]>([])
 const accounts = ref<ErpMasterVO[]>([])
+const addressOpen = ref(false)
+const addressRawText = ref('')
+const addressResult = ref<AddressParseResult>()
+const addressLoading = ref(false)
 const readonly = computed(() => form.value.auditStatus === 1)
 const state = reactive({
   form: { billDate: new Date().toISOString().slice(0, 10), partnerId: '', warehouseId: '', paidAmount: 0, discountAmount: 0, otherAmount: 0, items: [] } as ErpBill,
@@ -129,6 +170,33 @@ function calc() {
     row.amount = Number(row.qty || 0) * Number(row.price || 0)
   })
 }
+function openAddressParse() {
+  addressRawText.value = [form.value.receiverName, form.value.receiverPhone, form.value.receiverAddress].filter(Boolean).join(' ')
+  addressResult.value = undefined
+  addressOpen.value = true
+}
+function doParseAddress() {
+  if (!addressRawText.value.trim()) {
+    ElMessage.warning('请先粘贴需要识别的地址内容')
+    return
+  }
+  addressLoading.value = true
+  parseAddress(addressRawText.value).then(res => {
+    addressResult.value = res
+  }).finally(() => addressLoading.value = false)
+}
+function applyAddress() {
+  if (!addressResult.value) return
+  if (addressResult.value.contactName) form.value.receiverName = addressResult.value.contactName
+  if (addressResult.value.phone) form.value.receiverPhone = addressResult.value.phone
+  if (addressResult.value.normalizedAddress) form.value.receiverAddress = addressResult.value.normalizedAddress
+  const matched = partners.value.find(item => item.phone && addressResult.value?.phone && item.phone === addressResult.value.phone)
+  if (matched) {
+    form.value.partnerId = matched.id
+    ElMessage.success(`已匹配客户：${matched.name}`)
+  }
+  addressOpen.value = false
+}
 function submit(needAudit: boolean) {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
@@ -171,8 +239,9 @@ onMounted(() => { loadOptions(); loadData() })
 </script>
 
 <style scoped>
-.card-header, .toolbar, .totals { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.card-header, .toolbar, .totals, .section-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .toolbar { justify-content: flex-start; margin-bottom: 12px; }
+.section-title { margin-bottom: 16px; }
 .totals { justify-content: flex-end; padding: 16px 0; font-weight: 600; }
 .readonly-alert { margin-bottom: 16px; }
 </style>

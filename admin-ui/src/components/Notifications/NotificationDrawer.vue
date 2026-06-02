@@ -28,6 +28,17 @@
     </template>
 
     <div class="drawer-content">
+      <div class="voice-settings">
+        <div class="voice-row">
+          <span>语音提醒</span>
+          <el-switch v-model="voiceSettings.enabled" @change="updateVoiceSettings" />
+        </div>
+        <div class="voice-options">
+          <el-checkbox v-model="voiceSettings.orderEnabled" :disabled="!voiceSettings.enabled" @change="updateVoiceSettings">新订单</el-checkbox>
+          <el-checkbox v-model="voiceSettings.noticeEnabled" :disabled="!voiceSettings.enabled" @change="updateVoiceSettings">通知</el-checkbox>
+          <el-button size="small" :disabled="!voiceSettings.enabled" @click="notificationStore.testVoice()">测试播报</el-button>
+        </div>
+      </div>
       <!-- Tabs -->
       <div class="notification-tabs">
         <div
@@ -97,6 +108,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Check, Close, Bell, Loading, InfoFilled, CircleCheckFilled, WarningFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import { useNotificationStore } from '@/store/modules/notification'
 import { useSettingsStore } from '@/store/modules/settings'
@@ -110,10 +122,11 @@ import 'dayjs/locale/fr'
 dayjs.extend(relativeTime)
 
 const visible = defineModel<boolean>({ default: false })
+const router = useRouter()
 const notificationStore = useNotificationStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
-const { list, unreadCount } = storeToRefs(notificationStore)
+const { list, unreadCount, voiceSettings } = storeToRefs(notificationStore)
 
 const activeTab = ref('all')
 const loading = ref(false)
@@ -160,6 +173,7 @@ const filteredNotifications = computed(() => {
       bg: typeInfo.bg,
       bizId: item.bizId,
       bizType: item.bizType,
+      actionUrl: item.actionUrl,
       raw: item
     }
   })
@@ -180,11 +194,22 @@ const handleItemClick = (item: any) => {
   if (item.unread) {
     notificationStore.markRead(item.id)
   }
-  // Handle navigation or other actions based on bizType
+  if (item.actionUrl) {
+    visible.value = false
+    router.push(item.actionUrl)
+  }
 }
 
 const handleOpen = () => {
   // Handled by watch
+}
+
+const updateVoiceSettings = () => {
+  notificationStore.saveVoiceSettings({
+    enabled: voiceSettings.value.enabled,
+    orderEnabled: voiceSettings.value.orderEnabled,
+    noticeEnabled: voiceSettings.value.noticeEnabled
+  })
 }
 
 watch(visible, (newVal) => {
@@ -221,6 +246,29 @@ watch(visible, (newVal) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.voice-settings {
+  padding: 0 20px 16px;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+}
+
+.voice-row,
+.voice-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voice-row {
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.voice-options {
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .notification-tabs {

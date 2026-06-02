@@ -88,7 +88,11 @@
           <el-input v-model="form.phone" placeholder="请输入联系电话" />
         </el-form-item>
         <el-form-item v-if="config.hasAddress" label="地址" prop="address">
-          <el-input v-model="form.address" placeholder="请输入地址" />
+          <el-input v-model="form.address" placeholder="请输入地址">
+            <template #append>
+              <el-button :icon="Aim" @click="openAddressParse">识别</el-button>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item v-if="type === 'account'" label="账户类型" prop="accountType">
           <el-select v-model="form.accountType" placeholder="请选择账户类型" style="width: 100%">
@@ -121,6 +125,28 @@
         <el-button type="primary" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="addressOpen" title="地址识别" width="640px" append-to-body>
+      <el-form label-width="92px">
+        <el-form-item label="粘贴内容">
+          <el-input v-model="addressRawText" type="textarea" :rows="5" placeholder="粘贴姓名、手机号、完整地址" />
+        </el-form-item>
+        <el-form-item v-if="addressResult" label="识别结果">
+          <el-descriptions :column="1" border style="width: 100%">
+            <el-descriptions-item label="联系人">{{ addressResult.contactName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="联系电话">{{ addressResult.phone || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="地址">{{ addressResult.normalizedAddress || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="置信度">{{ addressResult.confidence ?? 0 }}%</el-descriptions-item>
+          </el-descriptions>
+        </el-form-item>
+        <el-alert v-if="addressResult?.warnings?.length" :title="addressResult.warnings.join('，')" type="warning" :closable="false" show-icon />
+      </el-form>
+      <template #footer>
+        <el-button @click="addressOpen = false">取消</el-button>
+        <el-button :loading="addressLoading" @click="doParseAddress">识别</el-button>
+        <el-button type="primary" :disabled="!addressResult" @click="applyAddress">确认回填</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -128,9 +154,10 @@
 import { computed, onMounted, reactive, ref, toRefs, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Aim, Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { addMaster, deleteMaster, getMaster, listMaster, updateMaster, type ErpMasterForm, type ErpMasterQuery, type ErpMasterVO, type MasterType } from '@/api/erp/master'
+import { parseAddress, type AddressParseResult } from '@/api/erp/address'
 
 const route = useRoute()
 const pathTypeMap: Record<string, MasterType> = {
@@ -169,6 +196,10 @@ const dialogTitle = ref('')
 const ids = ref<string[]>([])
 const single = ref(true)
 const multiple = ref(true)
+const addressOpen = ref(false)
+const addressRawText = ref('')
+const addressResult = ref<AddressParseResult>()
+const addressLoading = ref(false)
 
 const state = reactive({
   queryParams: {
@@ -238,6 +269,31 @@ function handleAdd() {
   reset()
   dialogTitle.value = `新增${config.value.name}`
   open.value = true
+}
+
+function openAddressParse() {
+  addressRawText.value = [form.value.contact, form.value.phone, form.value.address].filter(Boolean).join(' ')
+  addressResult.value = undefined
+  addressOpen.value = true
+}
+
+function doParseAddress() {
+  if (!addressRawText.value.trim()) {
+    ElMessage.warning('请先粘贴需要识别的地址内容')
+    return
+  }
+  addressLoading.value = true
+  parseAddress(addressRawText.value).then(res => {
+    addressResult.value = res
+  }).finally(() => addressLoading.value = false)
+}
+
+function applyAddress() {
+  if (!addressResult.value) return
+  if (addressResult.value.contactName) form.value.contact = addressResult.value.contactName
+  if (addressResult.value.phone) form.value.phone = addressResult.value.phone
+  if (addressResult.value.normalizedAddress) form.value.address = addressResult.value.normalizedAddress
+  addressOpen.value = false
 }
 
 function handleUpdate(row?: ErpMasterVO) {

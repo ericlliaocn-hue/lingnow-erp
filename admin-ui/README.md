@@ -2,7 +2,7 @@
 
 LingNow ERP Admin UI 是 ERP 管理端前端，基于 Vue 3、Vite、TypeScript、Element Plus、Pinia、Vue Router 构建。
 
-本目录当前作为 `/Users/eric/workspace/cool/lingnow-erp` monorepo 的 `admin-ui` 子目录存在；Git 根目录在上一级 `lingnow-erp`。完整 Docker、后端、移动端和交付文档位于仓库根目录。
+本目录是仓库根目录下的 `admin-ui` 子目录。完整 Docker、后端、移动端和交付文档位于仓库根目录。
 
 ## 当前能力
 
@@ -90,11 +90,8 @@ admin / 123456
 
 页面级验收必须使用外置 Chrome 可见窗口，不使用 Codex 内置浏览器，不使用 headless。
 
-最新验收覆盖：
+页面回归清单见：
 
-- 73 个 Admin 路由打开。
-- 商品管理搜索/重置/新增弹窗。
-- 销售单新增必填校验。
-- 收款单新增必填校验。
-- 销售分析图表渲染。
-- 控制台无 error。
+```text
+docs/09-外置Chrome页面回归清单.md
+```

@@ -9,6 +9,7 @@ import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -100,8 +101,13 @@ public class NotificationWebSocket {
 
     @OnError
     public void onError(Session session, Throwable error) {
-        Long userId = (Long) session.getUserProperties().get("userId");
-        log.error("WebSocket发生错误: userId={}, sessionId={}", userId, session.getId(), error);
+        Long userId = session == null ? null : (Long) session.getUserProperties().get("userId");
+        String sessionId = session == null ? null : session.getId();
+        if (isNormalDisconnect(error)) {
+            log.debug("WebSocket客户端连接已断开: userId={}, sessionId={}, reason={}", userId, sessionId, error.getClass().getSimpleName());
+            return;
+        }
+        log.error("WebSocket发生错误: userId={}, sessionId={}", userId, sessionId, error);
     }
 
     @OnMessage
@@ -109,5 +115,20 @@ public class NotificationWebSocket {
         Long userId = (Long) session.getUserProperties().get("userId");
         // 客户端发送的消息处理 (如果有)
         log.info("收到客户端消息: userId={}, message={}", userId, message);
+    }
+
+    private boolean isNormalDisconnect(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof EOFException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && (message.contains("Broken pipe") || message.contains("Connection reset"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

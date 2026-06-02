@@ -43,6 +43,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -236,6 +237,7 @@ public class ErpApprovalServiceImpl implements ErpApprovalService {
         String userId = String.valueOf(StpAdminUtil.getLoginIdAsLong());
         List<ErpApprovalTaskVO> list = FlowFactory.hisTaskService().list(new FlowHisTask().setApprover(userId)).stream()
                 .map(this::hisTaskVO)
+                .filter(Objects::nonNull)
                 .sorted((a, b) -> nullSafe(b.getCreateTime()).compareTo(nullSafe(a.getCreateTime())))
                 .toList();
         return page(filter(list, query), query);
@@ -457,6 +459,9 @@ public class ErpApprovalServiceImpl implements ErpApprovalService {
     }
 
     private ErpApprovalTaskVO hisTaskVO(HisTask hisTask) {
+        if (hisTask == null || hisTask.getBusinessId() == null || hisTask.getBusinessId().isBlank()) {
+            return null;
+        }
         BizKey key = parseBusinessId(hisTask.getBusinessId());
         ErpApprovalBizType type = ErpApprovalBizType.of(key.bizType());
         ApprovalBill bill = requireBill(type, key.bizId());
@@ -554,6 +559,9 @@ public class ErpApprovalServiceImpl implements ErpApprovalService {
     }
 
     private BizKey parseBusinessId(String businessId) {
+        if (businessId == null || businessId.isBlank()) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "审批业务ID为空");
+        }
         String[] parts = businessId.split(":", 2);
         if (parts.length != 2) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "审批业务ID格式错误");

@@ -133,7 +133,7 @@ public class ErpReportController {
         StpAdminUtil.stpLogic.checkPermission("erp:report:account-balance");
         return Result.success(accountService.list().stream().map(account -> {
             BigDecimal balance = account.getOpeningBalance();
-            for (ErpFundFlow flow : fundFlowService.list(new QueryWrapper<ErpFundFlow>().eq("account_id", account.getId()))) {
+            for (ErpFundFlow flow : fundFlowService.list(new QueryWrapper<ErpFundFlow>().eq("account_id", account.getId()).eq("del_flag", 0))) {
                 balance = "IN".equals(flow.getDirection()) ? balance.add(flow.getAmount()) : balance.subtract(flow.getAmount());
             }
             Map<String, Object> row = new HashMap<>();

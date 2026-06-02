@@ -10,6 +10,8 @@ import cc.lingnow.admin.service.ErpAuditService;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.biz.user.entity.SysUser;
+import cc.lingnow.biz.user.service.SysUserService;
 import cc.lingnow.common.annotation.Log;
 import cc.lingnow.common.enums.BusinessType;
 import cc.lingnow.common.enums.ErrorCode;
@@ -44,6 +46,8 @@ public class ErpFinanceController {
     private final ErpFundFlowService fundFlowService;
     private final ErpPartnerFlowService partnerFlowService;
     private final ErpBillNoRuleService billNoRuleService;
+    private final ErpDataAuthService dataAuthService;
+    private final SysUserService userService;
     private final ErpApprovalService approvalService;
     private final ErpAuditService auditService;
 
@@ -167,7 +171,7 @@ public class ErpFinanceController {
     }
 
     private QueryWrapper<ErpFinanceBill> wrapper(String type, ErpFinanceBillQueryBO query) {
-        return new QueryWrapper<ErpFinanceBill>()
+        QueryWrapper<ErpFinanceBill> wrapper = new QueryWrapper<ErpFinanceBill>()
                 .eq("bill_type", type)
                 .like(StrUtil.isNotBlank(query.getBillNo()), "bill_no", query.getBillNo())
                 .eq(query.getPartnerId() != null, "partner_id", query.getPartnerId())
@@ -177,6 +181,35 @@ public class ErpFinanceController {
                 .le(query.getEndDate() != null, "bill_date", query.getEndDate())
                 .orderByDesc("bill_date")
                 .orderByDesc("create_time");
+        applyDataAuth(wrapper, type);
+        return wrapper;
+    }
+
+    private void applyDataAuth(QueryWrapper<ErpFinanceBill> wrapper, String type) {
+        if (isAdminUser()) {
+            return;
+        }
+        if (!"RECEIPT".equals(type)) {
+            return;
+        }
+        List<Long> customerIds = dataAuthService.authorizedIds(currentUserId(), "CUSTOMER");
+        if (!customerIds.isEmpty()) {
+            wrapper.in("partner_id", customerIds);
+        }
+    }
+
+    private boolean isAdminUser() {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return false;
+        }
+        SysUser user = userService.getById(userId);
+        return user != null && "admin".equals(user.getUsername());
+    }
+
+    private Long currentUserId() {
+        Object loginId = StpAdminUtil.getLoginIdDefaultNull();
+        return loginId == null ? null : Long.valueOf(String.valueOf(loginId));
     }
 
     private ErpFinanceBill buildBill(String type, ErpFinanceBillSaveBO bo) {

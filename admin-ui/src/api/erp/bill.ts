@@ -33,6 +33,9 @@ export interface ErpBill {
   warehouseName?: string
   accountId?: string
   accountName?: string
+  receiverName?: string
+  receiverPhone?: string
+  receiverAddress?: string
   totalQty?: number
   totalAmount?: number
   discountAmount?: number

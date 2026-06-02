@@ -61,6 +61,9 @@
           <span>日期：{{ printData.bill.billDate }}</span>
           <span>{{ partnerLabel }}：{{ printData.bill.partnerName }}</span>
           <span>仓库：{{ printData.bill.warehouseName }}</span>
+          <span v-if="showReceiver">收货人：{{ printData.bill.receiverName || '-' }}</span>
+          <span v-if="showReceiver">收货电话：{{ printData.bill.receiverPhone || '-' }}</span>
+          <span v-if="showReceiver">收货地址：{{ printData.bill.receiverAddress || '-' }}</span>
           <span>应收/应付：{{ printData.bill.payableAmount }}</span>
           <span>实收/实付：{{ printData.bill.paidAmount }}</span>
           <span>欠款：{{ printData.bill.debtAmount }}</span>
@@ -105,6 +108,7 @@ const module = computed<BillModule>(() => {
 const titleMap: Record<BillModule, string> = { sale: '销售单', 'sale-return': '销售退货单', purchase: '进货单', 'purchase-return': '进货退货单' }
 const title = computed(() => titleMap[module.value])
 const partnerLabel = computed(() => module.value.startsWith('sale') ? '客户' : '供应商')
+const showReceiver = computed(() => module.value.startsWith('sale'))
 const loading = ref(false)
 const total = ref(0)
 const list = ref<ErpBill[]>([])
