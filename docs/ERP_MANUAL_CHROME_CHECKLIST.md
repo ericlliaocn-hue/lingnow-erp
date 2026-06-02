@@ -7,7 +7,7 @@ Rules:
 - Use the user's external visible Chrome window only.
 - Do not use Codex in-app browser.
 - Do not use headless browser.
-- Confirm the visible URL is `http://localhost:8080` for Docker delivery validation.
+- Confirm the visible URL is `http://localhost:8090` for Docker delivery validation.
 - Login with `admin / 123456`.
 - Every page below must open without 404, blank screen, or console error.
 - Search/reset buttons must not break the page.
@@ -17,9 +17,9 @@ Rules:
 
 - Backend Admin: `http://localhost:6060`
 - Backend App: `http://localhost:6061`
-- Docker Web gateway: `http://localhost:8080`
-- Admin UI: `http://localhost:8080`
-- Uniapp H5: `http://localhost:8080/h5/`
+- Docker Web gateway: `http://localhost:8090`
+- Admin UI: `http://localhost:8090`
+- Uniapp H5: `http://localhost:8090/h5/`
 - Automated acceptance script:
 
 ```bash
@@ -158,22 +158,22 @@ For reports:
 
 ## Mobile H5 Already Verified
 
-- `http://localhost:8080/h5/#/pages/business/home/index`
-- `http://localhost:8080/h5/#/pages/business/category/index`
-- `http://localhost:8080/h5/#/pages/business/product/detail?id=1`
-- `http://localhost:8080/h5/#/pages/business/cart/index`
-- `http://localhost:8080/h5/#/pages/business/order/index`
-- `http://localhost:8080/h5/#/pages/business/checkout/index`
-- `http://localhost:8080/h5/#/pages/business/mine/index`
+- `http://localhost:8090/h5/#/pages/business/home/index`
+- `http://localhost:8090/h5/#/pages/business/category/index`
+- `http://localhost:8090/h5/#/pages/business/product/detail?id=1`
+- `http://localhost:8090/h5/#/pages/business/cart/index`
+- `http://localhost:8090/h5/#/pages/business/order/index`
+- `http://localhost:8090/h5/#/pages/business/checkout/index`
+- `http://localhost:8090/h5/#/pages/business/mine/index`
 
 ## Latest Docker Gateway Chrome Pass
 
 2026-06-02 external visible Chrome pass:
 
-- Admin login at `http://localhost:8080` succeeded with `admin / 123456`.
+- Admin login at `http://localhost:8090` succeeded with `admin / 123456`.
 - `73` Admin routes opened without 404, blank page, or console error.
 - Product list search/reset and add dialog opened and closed.
 - Sale add form opened and required-field validation blocked incomplete submit.
 - Receipt add dialog opened and required-field validation blocked incomplete submit.
 - Sale analysis report rendered with no console errors.
-- `7` H5 routes under `http://localhost:8080/h5/` opened with no console errors.
+- `7` H5 routes under `http://localhost:8090/h5/` opened with no console errors.

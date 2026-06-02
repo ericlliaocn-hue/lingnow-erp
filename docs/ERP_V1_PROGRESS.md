@@ -621,15 +621,15 @@ Evidence:
   - `lingnow-erp-admin`, `lingnow-erp-app`, and `lingnow-erp-web` were healthy.
   - `docker ps -a` and `docker images` showed no MySQL/Redis containers or images.
 - Gateway/API checks passed:
-  - `http://localhost:8080/healthz`
-  - `http://localhost:8080/admin-api/welcome`
-  - `http://localhost:8080/app-api/welcome`
+  - `http://localhost:8090/healthz`
+  - `http://localhost:8090/admin-api/welcome`
+  - `http://localhost:8090/app-api/welcome`
 - Restart checks passed:
   - Admin/App containers restarted successfully.
   - logs did not contain `GracefulShutdownCallback`, `NoClassDefFoundError`, `ClassNotFoundException`, database connection failure, or Redis connection failure.
   - Admin/App gateway endpoints remained `200` after restart.
 - Latest automated delivery acceptance passed:
-  - `ADMIN_BASE_URL=http://localhost:8080/admin-api APP_BASE_URL=http://localhost:8080/app-api MYSQL_PWD=... node scripts/acceptance-check.mjs`
+  - `ADMIN_BASE_URL=http://localhost:8090/admin-api APP_BASE_URL=http://localhost:8090/app-api MYSQL_PWD=... node scripts/acceptance-check.mjs`
   - verified `89` Admin/API/CSV endpoints.
   - verified App missing-token guard.
   - verified purchase, sale, and receipt Warm-Flow approval with real temporary `DELIVERY_%` data.
@@ -639,9 +639,9 @@ External Chrome evidence:
 
 - Used the user's external visible Chrome window only.
 - Did not use Codex in-app browser or headless browser.
-- Admin login at `http://localhost:8080` succeeded.
+- Admin login at `http://localhost:8090` succeeded.
 - `73` Admin routes opened without 404, blank page, or console error.
 - Product list search/reset and add dialog passed.
 - Sale add form and receipt add dialog required-field validation passed.
 - Sale analysis report rendered without console errors.
-- `7` H5 routes under `http://localhost:8080/h5/` opened without console errors.
+- `7` H5 routes under `http://localhost:8090/h5/` opened without console errors.

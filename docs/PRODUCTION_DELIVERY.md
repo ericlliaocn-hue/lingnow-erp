@@ -62,11 +62,11 @@ Keep `docker-compose.host.yml` and `.env` local because they contain machine-spe
 
 Expected default endpoints after Compose startup:
 
-- Web gateway: `http://localhost:8080/healthz`
-- Admin UI: `http://localhost:8080/admin/`
-- H5: `http://localhost:8080/h5/`
-- Admin API proxy: `http://localhost:8080/admin-api/welcome`
-- App API proxy: `http://localhost:8080/app-api/welcome`
+- Web gateway: `http://localhost:8090/healthz`
+- Admin UI: `http://localhost:8090/admin/`
+- H5: `http://localhost:8090/h5/`
+- Admin API proxy: `http://localhost:8090/admin-api/welcome`
+- App API proxy: `http://localhost:8090/app-api/welcome`
 
 Backend containers also expose internal health checks against `/welcome`.
 
@@ -81,8 +81,8 @@ node scripts/acceptance-check.mjs
 Docker host dependency acceptance:
 
 ```bash
-ADMIN_BASE_URL=http://localhost:8080/admin-api \
-APP_BASE_URL=http://localhost:8080/app-api \
+ADMIN_BASE_URL=http://localhost:8090/admin-api \
+APP_BASE_URL=http://localhost:8090/app-api \
 MYSQL_PWD=<host-db-password> \
 node scripts/acceptance-check.mjs
 ```
@@ -105,7 +105,7 @@ Latest local result on 2026-06-02:
   - Docker Desktop and Docker Compose are installed and usable.
   - Only `lingnow-erp-admin`, `lingnow-erp-app`, and `lingnow-erp-web` containers were started.
   - No MySQL or Redis containers or images were present after local validation.
-  - `http://localhost:8080/healthz`, `/admin-api/welcome`, and `/app-api/welcome` returned `200`.
+  - `http://localhost:8090/healthz`, `/admin-api/welcome`, and `/app-api/welcome` returned `200`.
   - Admin/App container restart completed without `GracefulShutdownCallback`, `NoClassDefFoundError`, or `ClassNotFoundException`.
   - Nginx proxy remained healthy after Admin/App restart.
 
@@ -130,9 +130,9 @@ Latest local result on 2026-06-02:
 - Do not use headless browser.
 - API acceptance may rotate the `admin` token, so do not run the same-account API login while a visible Chrome login session is being browser-tested.
 - Latest external Chrome visible-window pass on 2026-06-02:
-  - Admin login at `http://localhost:8080` passed.
+  - Admin login at `http://localhost:8090` passed.
   - `73` Admin routes opened without 404, blank page, or console error.
   - Product list search/reset and add dialog passed.
   - Sale add form and receipt add dialog required-field validation passed.
   - Sale analysis report rendered without console errors.
-  - `7` H5 routes under `http://localhost:8080/h5/` opened without console errors.
+  - `7` H5 routes under `http://localhost:8090/h5/` opened without console errors.
