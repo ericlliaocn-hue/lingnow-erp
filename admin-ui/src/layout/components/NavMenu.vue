@@ -53,7 +53,7 @@ const isDark = computed(() => settingsStore.settings.themeMode === 'dark')
 
 const textColor = computed(() => {
   // 根据主题模式调整文字颜色
-  return isDark.value ? '#919EAB' : '#637381'
+  return isDark.value ? '#DDE3EA' : '#334155'
 })
 
 const activeTextColor = computed(() => {
@@ -96,11 +96,11 @@ const activeMenu = computed(() => {
 
 .nav-section-title {
   padding: 0;
-  font-size: 18px !important; /* Increased from 16px */
-  font-weight: 700;
-  color: #919EAB;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 14px !important;
+  font-weight: 600;
+  color: #334155;
+  text-transform: none;
+  letter-spacing: 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -118,7 +118,7 @@ const activeMenu = computed(() => {
 /* 白天模式下的标题颜色 - 使用更淡的灰色 */
 :global(.nav-color-integrate:not(.dark)) .nav-section-title,
 :global(.nav-color-apparent:not(.dark)) .nav-section-title {
-  color: #919EAB;
+  color: #334155;
 }
 
 /* 子菜单标题样式 */
@@ -129,12 +129,12 @@ const activeMenu = computed(() => {
   margin-bottom: 4px !important;
   border-radius: 8px !important;
   transition: all 0.3s;
-  color: #637381;
+  color: #334155;
   display: flex !important;
   align-items: center;
   position: relative !important;
   font-size: 14px !important;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* Ensure padding exists for top-level items via other means if needed,
@@ -192,7 +192,7 @@ const activeMenu = computed(() => {
   transform: translateY(-50%) !important;
   margin: 0 !important;
   font-size: 12px;
-  color: #919EAB;
+  color: #64748b;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
@@ -251,8 +251,8 @@ const activeMenu = computed(() => {
   line-height: 44px;
   border-radius: 8px;
   margin-bottom: 4px;
-  color: #637381;
-  font-size: 13px;
+  color: #334155;
+  font-size: 14px;
   padding-right: 12px !important; /* Keep right padding */
   transition: all 0.2s;
 }
@@ -273,7 +273,7 @@ const activeMenu = computed(() => {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background-color: #919EAB;
+  background-color: #64748b;
   opacity: 0.5;
   transition: all 0.2s;
   z-index: 2;
@@ -349,7 +349,7 @@ const activeMenu = computed(() => {
 
 /* Active State Styles */
 :deep(.el-menu-item.is-active) {
-  background-color: var(--el-color-primary-light-9) !important;
+  background-color: rgba(0, 167, 111, 0.12) !important;
   color: var(--el-color-primary) !important;
   font-weight: 600;
 }
@@ -364,7 +364,7 @@ const activeMenu = computed(() => {
 
 /* Hover States */
 :deep(.el-menu-item:hover) {
-  background-color: rgba(145, 158, 171, 0.08) !important;
+  background-color: rgba(15, 23, 42, 0.06) !important;
 }
 
 /* 移除 NavMenu 中的 color 覆盖，交给全局 style.css 处理，避免冲突 */

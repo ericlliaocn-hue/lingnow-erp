@@ -15,7 +15,7 @@ export const useSettingsStore = defineStore('settings', () => {
         compactLayout: false,
         primaryColor: 'default',
         navLayout: 'vertical',
-        navColor: 'integrate',
+        navColor: 'apparent',
         layout: 'vertical',
         fontFamily: 'Public Sans',
         fontSize: 14,

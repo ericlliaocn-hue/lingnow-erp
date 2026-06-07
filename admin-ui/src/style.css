@@ -15,6 +15,10 @@
   --app-spacing: 13px;
   --card-padding: 13px;
   --base-font-size: 14px;
+  --app-page-bg: #f4f6f8;
+  --app-surface-bg: #ffffff;
+  --app-sidebar-text: #334155;
+  --app-muted-text: #64748b;
 
   /* 覆盖 Element Plus 默认字体大小 */
   --el-font-size-base: 14px;
@@ -34,7 +38,7 @@ body {
   width: 100vw;
   height: 100vh;
   overflow-x: hidden;
-  background-color: var(--el-bg-color);
+  background-color: var(--app-page-bg);
   transition: background-color 0.3s, font-size 0.3s;
   font-family: inherit;
   font-size: var(--base-font-size, 14px);
@@ -101,12 +105,14 @@ html.dark .el-aside {
 .el-menu .el-sub-menu__title span {
   height: 56px !important;
   line-height: 56px !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
+  color: var(--app-sidebar-text);
 }
 
 /* TagsView 全局背景色控制 */
 .tags-view-outer {
-  background-color: #F9FAFB;
+  background-color: var(--app-surface-bg);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   transition: background-color 0.3s;
 }
 

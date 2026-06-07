@@ -20,18 +20,6 @@ const enforceProductionHttps = () => {
 }
 enforceProductionHttps()
 
-// 强制初始化暗色模式
-const initDarkMode = () => {
-    const html = document.documentElement
-    html.classList.add('dark')
-    html.style.setProperty('--el-bg-color', '#181B21')
-    html.style.setProperty('--el-bg-color-overlay', '#212B36')
-    html.style.setProperty('--el-fill-color-blank', '#212B36')
-    html.style.setProperty('--el-text-color-primary', '#FFFFFF')
-    html.style.setProperty('--el-text-color-regular', '#919EAB')
-}
-initDarkMode()
-
 const app = createApp(App)
 
 // 注册 Pinia

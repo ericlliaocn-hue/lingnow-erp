@@ -50,7 +50,7 @@ const { t } = useI18n()
 /* 复用 NavMenu 中的样式，或者依赖全局样式 */
 /* 注意：这里需要确保样式能正确继承或应用 */
 .nav-section-title {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
 }
 </style>

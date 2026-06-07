@@ -252,8 +252,8 @@ const handleLogout = async () => {
 
 /* Sidebar Styles */
 .layout-aside {
-  background-color: #FFFFFF; /* Default light */
-  border-right: 1px dashed rgba(145, 158, 171, 0.24);
+  background-color: #ffffff;
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   transition: width 0.3s, background-color 0.3s;
@@ -283,14 +283,14 @@ const handleLogout = async () => {
 
 /* Nav Color Logic */
 :global(.nav-color-integrate) .layout-aside {
-    background-color: #F9FAFB !important; /* Blends with light bg */
+    background-color: #ffffff !important;
 }
 :global(.dark.nav-color-integrate) .layout-aside {
     background-color: #161C24 !important; /* Blends with dark bg */
 }
 :global(.nav-color-apparent) .layout-aside {
-    background-color: #FFFFFF !important; /* Stands out light */
-    box-shadow: 4px 0 10px -2px rgba(145, 158, 171, 0.12);
+    background-color: #ffffff !important;
+    box-shadow: 8px 0 24px -20px rgba(15, 23, 42, 0.35);
 }
 :global(.dark.nav-color-apparent) .layout-aside {
     background-color: #212B36 !important; /* Stands out dark */
@@ -406,8 +406,9 @@ const handleLogout = async () => {
 /* Header Styles */
 .layout-header {
   height: 60px;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -551,7 +552,7 @@ const handleLogout = async () => {
 .layout-main {
   padding: 0 !important; /* Remove padding to avoid double padding with app-container */
   margin-top: 0 !important; /* 强制去除上边距 */
-  background-color: #F9FAFB; /* Light bg */
+  background-color: #f4f6f8;
   overflow-x: hidden;
   transition: background-color 0.3s;
 }
