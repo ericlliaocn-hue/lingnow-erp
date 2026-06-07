@@ -13,6 +13,13 @@ import VueApexCharts from 'vue3-apexcharts'
 import 'apexcharts/dist/apexcharts.css'
 import Pagination from '@/components/Pagination'
 
+const enforceProductionHttps = () => {
+    if (import.meta.env.PROD && window.location.protocol === 'http:' && window.location.hostname.endsWith('.oioio.chat')) {
+        window.location.replace(`https://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}`)
+    }
+}
+enforceProductionHttps()
+
 // 强制初始化暗色模式
 const initDarkMode = () => {
     const html = document.documentElement
