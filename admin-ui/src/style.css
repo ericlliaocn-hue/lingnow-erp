@@ -322,20 +322,14 @@ html.dark .notification-popover {
 .notification-drawer .el-drawer__header {
   margin-bottom: 0;
   padding: 0;
-  background: #161C24;
+  background: var(--el-bg-color);
 }
 
 .notification-drawer .el-drawer__body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  background: #161C24;
-}
-
-.notification-drawer .el-overlay,
-.notification-modal {
-  background-color: rgba(22, 28, 36, 0.8) !important;
-  position: fixed !important;
+  background: var(--el-bg-color);
 }
 
 /* 关键：防止body被添加样式导致内容移动 */
@@ -346,7 +340,7 @@ body.el-popup-parent--hidden {
 
 :global(.dark) .notification-drawer .el-drawer__header,
 :global(.dark) .notification-drawer .el-drawer__body {
-  background: #161C24 !important;
+  background: var(--el-bg-color) !important;
 }
 
 * {

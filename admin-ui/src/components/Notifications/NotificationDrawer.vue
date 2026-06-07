@@ -5,11 +5,10 @@
     :size="420"
     :show-close="false"
     :append-to-body="true"
-    :modal="true"
+    :modal="false"
     :with-header="true"
     :lock-scroll="false"
     :destroy-on-close="false"
-    modal-class="notification-modal"
     class="notification-drawer"
     @open="handleOpen"
   >
@@ -249,8 +248,12 @@ watch(visible, (newVal) => {
 }
 
 .voice-settings {
-  padding: 0 20px 16px;
+  margin: 0 20px 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
   border-bottom: 1px dashed var(--el-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-fill-color-light);
 }
 
 .voice-row,
@@ -264,6 +267,7 @@ watch(visible, (newVal) => {
 .voice-row {
   margin-bottom: 12px;
   font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 .voice-options {
@@ -345,7 +349,7 @@ watch(visible, (newVal) => {
 }
 
 .notification-item.unread {
-  background-color: var(--el-color-primary-light-9);
+  background-color: color-mix(in srgb, var(--el-color-primary) 9%, var(--el-bg-color));
 }
 
 .item-avatar {
@@ -415,9 +419,11 @@ watch(visible, (newVal) => {
   margin-bottom: 0;
   padding: 20px;
   border-bottom: 1px dashed var(--el-border-color-lighter);
+  background: var(--el-bg-color) !important;
 }
 
 :global(.notification-drawer .el-drawer__body) {
   padding: 0;
+  background: var(--el-bg-color) !important;
 }
 </style>
