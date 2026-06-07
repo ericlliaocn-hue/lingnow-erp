@@ -1,19 +1,21 @@
 <template>
   <view :class="themeClass" class="login-container">
-    <!-- 头部 Logo/Slogan -->
     <view class="header-section">
       <view class="logo-box">
-        <view class="grapefruit">
-          <view class="g-inner"></view>
-          <view class="g-leaf"></view>
-        </view>
+        <text>LN</text>
       </view>
-      <text class="app-name">业务端</text>
+      <view class="brand-copy">
+        <text class="app-name">LingNow ERP</text>
+        <text class="app-slogan">移动业务工作台</text>
+      </view>
     </view>
 
-    <!-- 登录表单 -->
     <view class="form-card">
-      <!-- 登录方式切换 -->
+      <view class="form-title">
+        <text class="title">账号登录</text>
+        <text class="desc">请输入企业业务账号继续操作</text>
+      </view>
+
       <view class="login-tabs">
         <view
             class="tab-item"
@@ -35,6 +37,7 @@
 
       <view class="input-group">
         <view class="input-item">
+          <text class="field-label">账号</text>
           <input
               v-model="form.account"
               class="input"
@@ -44,6 +47,7 @@
         </view>
 
         <view v-if="loginType === 'password'" class="input-item">
+          <text class="field-label">密码</text>
           <input
               v-model="form.password"
               class="input"
@@ -54,13 +58,16 @@
         </view>
 
         <view v-if="loginType === 'code'" class="input-item row-between">
-          <input
-              v-model="form.code"
-              class="input"
-              type="number"
-              placeholder="请输入验证码"
-              placeholder-class="input-placeholder"
-          />
+          <view class="code-input">
+            <text class="field-label">验证码</text>
+            <input
+                v-model="form.code"
+                class="input"
+                type="number"
+                placeholder="请输入验证码"
+                placeholder-class="input-placeholder"
+            />
+          </view>
           <text :class="{ disabled: countdown > 0 }" class="code-text" @click="handleGetCode">
             {{ codeText }}
           </text>
@@ -68,7 +75,7 @@
       </view>
 
       <button class="submit-btn" hover-class="btn-hover" @click="handleLogin">
-        登 录
+        登录
       </button>
 
       <view class="footer-actions">
@@ -78,7 +85,6 @@
       </view>
     </view>
 
-    <!-- 底部装饰 -->
     <view class="bottom-decoration">
       <text class="copyright">LingNow Business Base</text>
     </view>
@@ -247,125 +253,127 @@ onUnmounted(() => {
 <style lang="scss">
 .login-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--bg-color) 0%, var(--card-bg) 100%);
-  background-color: var(--bg-color);
-  padding: 0 60rpx;
+  background: #f4f7f6;
+  padding: 72rpx 44rpx 56rpx;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
+  box-sizing: border-box;
 }
 
 .header-section {
-  margin-bottom: 80rpx;
+  margin-bottom: 52rpx;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  gap: 20rpx;
 
   .logo-box {
-    width: 160rpx;
-    height: 160rpx;
-    background: transparent;
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 18rpx;
+    background: #2f7d57;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 30rpx;
-    box-shadow: none;
 
-    .grapefruit {
-      width: 120rpx;
-      height: 120rpx;
-      border-radius: 50%;
-      background: var(--secondary-color);
-      padding: 8rpx;
-      box-sizing: border-box;
-      position: relative;
-      box-shadow: 0 10rpx 30rpx rgba(var(--primary-color-rgb), 0.3);
+    text {
+      color: #fff;
+      font-size: 28rpx;
+      font-weight: 700;
+      letter-spacing: 1rpx;
     }
+  }
 
-    .g-inner {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: repeating-conic-gradient(
-              from 0deg,
-              var(--primary-color) 0deg 50deg,
-              var(--card-bg) 50deg 60deg
-      );
-      border: 4rpx solid var(--card-bg);
-    }
-
-    .g-leaf {
-      position: absolute;
-      top: -10rpx;
-      right: 10rpx;
-      width: 36rpx;
-      height: 20rpx;
-      background: var(--success-color);
-      border-radius: 20rpx 0 20rpx 0;
-    }
+  .brand-copy {
+    display: flex;
+    flex-direction: column;
   }
 
   .app-name {
-    font-size: 48rpx;
-    font-weight: bold;
-    color: var(--text-color);
-    letter-spacing: 4rpx;
-    margin-bottom: 16rpx;
-    font-family: serif;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: #1f2d2a;
+    letter-spacing: 0;
   }
 
   .app-slogan {
-    font-size: 26rpx;
-    color: var(--sub-text);
-    letter-spacing: 8rpx;
-    text-transform: uppercase;
+    margin-top: 6rpx;
+    font-size: 24rpx;
+    color: #6b7a75;
+    letter-spacing: 0;
   }
 }
 
 .form-card {
   width: 100%;
+  background: #fff;
+  border: 1rpx solid #e2e8e5;
+  border-radius: 18rpx;
+  padding: 40rpx 32rpx 34rpx;
+  box-sizing: border-box;
+  box-shadow: 0 20rpx 48rpx rgba(24, 39, 33, 0.06);
+}
+
+.form-title {
+  margin-bottom: 34rpx;
+
+  .title {
+    display: block;
+    color: #1f2d2a;
+    font-size: 36rpx;
+    font-weight: 700;
+  }
+
+  .desc {
+    display: block;
+    margin-top: 12rpx;
+    color: #7a8580;
+    font-size: 24rpx;
+  }
 }
 
 .login-tabs {
   display: flex;
-  margin-bottom: 60rpx;
+  margin-bottom: 32rpx;
+  border-bottom: 1rpx solid #e6ece8;
 
   .tab-item {
-    margin-right: 40rpx;
-    font-size: 32rpx;
-    color: var(--sub-text);
+    margin-right: 44rpx;
+    font-size: 28rpx;
+    color: #8a9691;
     font-weight: 500;
     position: relative;
-    padding-bottom: 12rpx;
+    padding-bottom: 18rpx;
     transition: all 0.3s;
 
     &.active {
-      color: var(--text-color);
-      font-weight: bold;
-      font-size: 36rpx;
+      color: #1f2d2a;
+      font-weight: 700;
+      font-size: 28rpx;
     }
 
     .active-line {
       position: absolute;
-      bottom: 0;
+      bottom: -1rpx;
       left: 0;
-      width: 40rpx;
-      height: 6rpx;
-      background: var(--primary-color);
-      border-radius: 4rpx;
+      width: 100%;
+      height: 4rpx;
+      background: #2f7d57;
+      border-radius: 4rpx 4rpx 0 0;
     }
   }
 }
 
 .input-group {
-  margin-bottom: 60rpx;
+  margin-bottom: 36rpx;
 
   .input-item {
-    background: var(--input-bg);
-    border-radius: 12rpx;
-    padding: 24rpx 30rpx;
-    margin-bottom: 30rpx;
-    border: 2rpx solid transparent;
+    background: #f8faf9;
+    border-radius: 10rpx;
+    padding: 18rpx 22rpx;
+    margin-bottom: 22rpx;
+    border: 1rpx solid #dce5e0;
     transition: all 0.3s;
 
     &.row-between {
@@ -375,46 +383,61 @@ onUnmounted(() => {
     }
 
     &:focus-within {
-      background: var(--card-bg);
-      border-color: var(--primary-color);
-      box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+      background: #fff;
+      border-color: #2f7d57;
+      box-shadow: 0 0 0 4rpx rgba(47, 125, 87, 0.08);
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 10rpx;
+      color: #66736e;
+      font-size: 22rpx;
+      font-weight: 500;
     }
 
     .input {
-      font-size: 30rpx;
-      color: var(--text-color);
+      font-size: 28rpx;
+      color: #1f2d2a;
       width: 100%;
+      height: 42rpx;
+      line-height: 42rpx;
     }
 
     .input-placeholder {
-      color: var(--sub-text);
+      color: #a0aaa5;
+    }
+
+    .code-input {
+      flex: 1;
+      min-width: 0;
     }
 
     .code-text {
-      font-size: 28rpx;
-      color: var(--primary-color);
-      font-weight: 500;
-      padding-left: 20rpx;
+      font-size: 26rpx;
+      color: #2f7d57;
+      font-weight: 600;
+      padding-left: 24rpx;
       white-space: nowrap;
 
       &.disabled {
-        color: var(--sub-text);
+        color: #a0aaa5;
       }
     }
   }
 }
 
 .submit-btn {
-  background: var(--primary-color);
-  color: var(--text-color-inverse);
-  font-size: 32rpx;
+  background: #2f7d57;
+  color: #fff;
+  font-size: 30rpx;
   font-weight: 600;
-  height: 96rpx;
-  line-height: 96rpx;
-  border-radius: 12rpx;
-  letter-spacing: 4rpx;
-  box-shadow: 0 10rpx 20rpx rgba(var(--primary-color-rgb), 0.4);
-  margin-bottom: 40rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 10rpx;
+  letter-spacing: 0;
+  box-shadow: none;
+  margin-bottom: 26rpx;
 
   &::after {
     border: none;
@@ -432,28 +455,28 @@ onUnmounted(() => {
   align-items: center;
 
   .action-text {
-    font-size: 26rpx;
-    color: var(--sub-text);
+    font-size: 24rpx;
+    color: #6b7a75;
     padding: 10rpx;
   }
 
   .divider {
-    margin: 0 20rpx;
-    color: var(--sub-text);
+    margin: 0 18rpx;
+    color: #c3ccc7;
     font-size: 24rpx;
   }
 }
 
 .bottom-decoration {
-  position: absolute;
-  bottom: 40rpx;
+  margin-top: auto;
   width: 100%;
-  left: 0;
   text-align: center;
+  padding-top: 48rpx;
+  box-sizing: border-box;
 
   .copyright {
     font-size: 20rpx;
-    color: var(--sub-text);
+    color: #9aa4a0;
     letter-spacing: 2rpx;
     text-transform: uppercase;
   }
