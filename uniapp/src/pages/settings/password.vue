@@ -28,11 +28,13 @@ import {computed, reactive, ref} from 'vue'
 import {onShow} from '@dcloudio/uni-app'
 import {changePassword} from '@/api/user'
 import {useTheme} from '@/utils/theme'
+import {requireLogin} from '@/utils/auth'
 
 const {themeClass, updateNavigationBar} = useTheme()
 
 onShow(() => {
   updateNavigationBar()
+  requireLogin('/pages/settings/password')
 })
 
 const userInfo = uni.getStorageSync('userInfo') || {}
@@ -50,6 +52,7 @@ const desensitizedPhone = computed(() => {
 })
 
 const handleSubmit = async () => {
+  if (!requireLogin('/pages/settings/password')) return
   if (!form.oldPassword) return uni.showToast({title: '请输入旧密码', icon: 'none'})
   if (!form.newPassword) return uni.showToast({title: '请输入新密码', icon: 'none'})
   if (form.newPassword !== confirmPassword.value) return uni.showToast({title: '两次密码输入不一致', icon: 'none'})

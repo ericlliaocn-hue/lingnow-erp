@@ -19,11 +19,13 @@ import GlobalLoginPopup from '@/components/GlobalLoginPopup.vue'
 import {ref} from 'vue'
 import {onShow} from '@dcloudio/uni-app'
 import {useTheme} from '@/utils/theme'
+import {requireLogin} from '@/utils/auth'
 
 const {themeClass, updateNavigationBar} = useTheme()
 
 onShow(() => {
   updateNavigationBar()
+  requireLogin('/pages/settings/account-binding')
 })
 
 const socialAccounts = ref([
@@ -34,10 +36,12 @@ const socialAccounts = ref([
 ])
 
 const handleBind = (item: any) => {
+  if (!requireLogin('/pages/settings/account-binding')) return
   uni.showToast({ title: `绑定${item.name}暂未接入`, icon: 'none' })
 }
 
 const handleUnbind = (item: any) => {
+  if (!requireLogin('/pages/settings/account-binding')) return
   uni.showToast({ title: `解绑${item.name}暂未接入`, icon: 'none' })
 }
 </script>

@@ -23,7 +23,7 @@
       </view>
     </view>
 
-    <button class="logout-btn" @click="handleLogout">退出登录</button>
+    <button v-if="loggedIn" class="logout-btn" @click="handleLogout">退出登录</button>
 
     <ActionSheet
         v-model:visible="showThemeSheet"
@@ -38,10 +38,12 @@
 <script setup lang="ts">
 import GlobalLoginPopup from '@/components/GlobalLoginPopup.vue'
 import {computed, ref} from 'vue'
+import {onShow} from '@dcloudio/uni-app'
 import {request} from '@/utils/request'
 import NavBar from '@/components/NavBar.vue'
 import ActionSheet from '@/components/ActionSheet.vue'
 import {type Theme, useTheme} from '@/utils/theme'
+import {isLoggedIn, requireLogin} from '@/utils/auth'
 
 const {currentTheme, setTheme, themeClass} = useTheme()
 
@@ -55,8 +57,14 @@ const themeName = computed(() => {
 })
 
 const showThemeSheet = ref(false)
+const loggedIn = ref(isLoggedIn())
 const themeList = ['简约白', '暗黑模式']
 const themeValues: Theme[] = ['light', 'dark']
+
+onShow(() => {
+  loggedIn.value = isLoggedIn()
+  requireLogin('/pages/settings/index')
+})
 
 const handleThemeChange = () => {
   showThemeSheet.value = true
@@ -67,6 +75,7 @@ const onThemeSelect = (index: number) => {
 }
 
 const goToPage = (url: string) => {
+  if (!requireLogin(url)) return
   uni.navigateTo({ url })
 }
 

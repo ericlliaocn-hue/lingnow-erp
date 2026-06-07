@@ -37,7 +37,9 @@
 
 <script lang="ts" setup>
 import {computed, ref} from 'vue'
+import {onShow} from '@dcloudio/uni-app'
 import {parseMobileAddress} from '@/api/business'
+import {requireLogin} from '@/utils/auth'
 
 const billTypes = [
   {label: '销售单', value: 'SALE'},
@@ -52,7 +54,13 @@ const addressResult = ref<any>()
 const addressTip = ref('')
 const currentType = computed(() => billTypes[typeIndex.value])
 const changeType = (e: any) => { typeIndex.value = Number(e.detail.value || 0) }
+
+onShow(() => {
+  requireLogin('/pages/business/checkout/index')
+})
+
 const parseAddressText = async () => {
+  if (!requireLogin('/pages/business/checkout/index')) return
   addressTip.value = ''
   addressResult.value = undefined
   if (!rawAddress.value.trim()) {
@@ -71,7 +79,10 @@ const parseAddressText = async () => {
     parsing.value = false
   }
 }
-const goBills = () => uni.switchTab({url: '/pages/business/order/index'})
+const goBills = () => {
+  if (!requireLogin('/pages/business/order/index')) return
+  uni.switchTab({url: '/pages/business/order/index'})
+}
 </script>
 
 <style lang="scss" scoped>

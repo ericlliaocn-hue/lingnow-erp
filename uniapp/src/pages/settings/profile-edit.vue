@@ -27,6 +27,7 @@ import {onShow} from '@dcloudio/uni-app'
 import {getProfile, updateProfile} from '@/api/user'
 import UploadImage from '@/components/upload-image.vue'
 import {useTheme} from '@/utils/theme'
+import {requireLogin} from '@/utils/auth'
 
 const {themeClass, updateNavigationBar} = useTheme()
 
@@ -39,9 +40,11 @@ const form = reactive({
 
 onShow(() => {
   updateNavigationBar()
+  requireLogin('/pages/settings/profile-edit')
 })
 
 onMounted(async () => {
+  if (!requireLogin('/pages/settings/profile-edit')) return
   const cachedUser = uni.getStorageSync('userInfo')
   if (cachedUser) {
     Object.assign(form, cachedUser)
@@ -59,6 +62,7 @@ onMounted(async () => {
 })
 
 const handleSave = async () => {
+  if (!requireLogin('/pages/settings/profile-edit')) return
   try {
     const res = await updateProfile({
       avatar: form.avatar,

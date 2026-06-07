@@ -33,11 +33,13 @@ import {computed, reactive, ref} from 'vue'
 import {onShow} from '@dcloudio/uni-app'
 import {changePhone, sendCode, validateCode} from '@/api/user'
 import {useTheme} from '@/utils/theme'
+import {requireLogin} from '@/utils/auth'
 
 const {themeClass, updateNavigationBar} = useTheme()
 
 onShow(() => {
   updateNavigationBar()
+  requireLogin('/pages/settings/mobile')
 })
 
 const step = ref(1)
@@ -59,6 +61,7 @@ const desensitizedPhone = computed(() => {
 })
 
 const handleSendOldCode = async () => {
+  if (!requireLogin('/pages/settings/mobile')) return
   if (oldTimer.value > 0) return
   try {
     await sendCode(phone)
@@ -74,6 +77,7 @@ const handleSendOldCode = async () => {
 }
 
 const handleSendNewCode = async () => {
+  if (!requireLogin('/pages/settings/mobile')) return
   if (newTimer.value > 0) return
   if (!form.newPhone) return uni.showToast({title: '请输入新手机号', icon: 'none'})
   if (!/^1[3-9]\d{9}$/.test(form.newPhone)) return uni.showToast({title: '手机号格式错误', icon: 'none'})
@@ -92,6 +96,7 @@ const handleSendNewCode = async () => {
 }
 
 const handleSubmit = async () => {
+  if (!requireLogin('/pages/settings/mobile')) return
   if (step.value === 1) {
     if (!form.oldCode) return uni.showToast({title: '请输入验证码', icon: 'none'})
     try {

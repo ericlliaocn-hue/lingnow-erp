@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <view class="header">
+    <view class="header" @click="goUser">
       <view class="avatar"></view>
       <view class="info">
         <text class="name">{{ displayName }}</text>
@@ -18,6 +18,7 @@
 <script lang="ts" setup>
 import {computed, onMounted, ref} from 'vue'
 import {getProfile} from '@/api/user'
+import {goLogin, goProtectedPage} from '@/utils/auth'
 
 const user = ref<any>(null)
 const displayName = computed(() => user.value?.nickname || user.value?.username || '未登录')
@@ -37,9 +38,14 @@ const loadData = async () => {
   }
 }
 
-const goProfile = () => uni.navigateTo({url: '/pages/settings/profile-edit'})
-const goBills = () => uni.switchTab({url: '/pages/business/order/index'})
-const goSettings = () => uni.navigateTo({url: '/pages/settings/index'})
+const goProfile = () => goProtectedPage('/pages/settings/profile-edit')
+const goBills = () => goProtectedPage('/pages/business/order/index')
+const goSettings = () => goProtectedPage('/pages/settings/index')
+const goUser = () => {
+  if (!uni.getStorageSync('token')) {
+    goLogin('/pages/business/mine/index')
+  }
+}
 
 onMounted(() => loadData())
 </script>

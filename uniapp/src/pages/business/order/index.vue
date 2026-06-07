@@ -24,11 +24,15 @@
 <script lang="ts" setup>
 import {onMounted, ref} from 'vue'
 import {getMobileBills} from '@/api/business'
+import {requireLogin} from '@/utils/auth'
 
 const bills = ref<any[]>([])
 const loadError = ref('')
 
 const loadData = async () => {
+  if (!requireLogin('/pages/business/order/index')) {
+    return
+  }
   loadError.value = ''
   try {
     const res = await getMobileBills()
@@ -38,7 +42,10 @@ const loadData = async () => {
   }
 }
 
-const goCreate = () => uni.navigateTo({url: '/pages/business/checkout/index'})
+const goCreate = () => {
+  if (!requireLogin('/pages/business/checkout/index')) return
+  uni.navigateTo({url: '/pages/business/checkout/index'})
+}
 
 onMounted(loadData)
 </script>
