@@ -75,9 +75,54 @@
           <el-col :span="12"><el-form-item label="名称" prop="name"><el-input v-model="form.name" placeholder="请输入商品名称" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="规格"><el-input v-model="form.spec" placeholder="请输入规格" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="条码"><el-input v-model="form.barcode" placeholder="请输入条码" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="分类"><el-select v-model="form.categoryId" clearable filterable style="width: 100%"><el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="品牌"><el-select v-model="form.brandId" clearable filterable style="width: 100%"><el-option v-for="item in brands" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="单位"><el-select v-model="form.unitId" clearable filterable style="width: 100%"><el-option v-for="item in units" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item></el-col>
+          <el-col :span="8">
+            <el-form-item label="分类">
+              <el-select v-model="form.categoryId" clearable filterable style="width: 100%" placeholder="请选择分类">
+                <el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
+                <template #empty>
+                  <div class="select-empty-action">
+                    <span>暂无分类</span>
+                    <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('product-category')">新增分类</el-button>
+                  </div>
+                </template>
+                <template #footer>
+                  <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('product-category')">新增分类</el-button>
+                </template>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="品牌">
+              <el-select v-model="form.brandId" clearable filterable style="width: 100%" placeholder="请选择品牌">
+                <el-option v-for="item in brands" :key="item.id" :label="item.name" :value="item.id" />
+                <template #empty>
+                  <div class="select-empty-action">
+                    <span>暂无品牌</span>
+                    <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('product-brand')">新增品牌</el-button>
+                  </div>
+                </template>
+                <template #footer>
+                  <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('product-brand')">新增品牌</el-button>
+                </template>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="单位">
+              <el-select v-model="form.unitId" clearable filterable style="width: 100%" placeholder="请选择单位">
+                <el-option v-for="item in units" :key="item.id" :label="item.name" :value="item.id" />
+                <template #empty>
+                  <div class="select-empty-action">
+                    <span>暂无单位</span>
+                    <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('unit')">新增单位</el-button>
+                  </div>
+                </template>
+                <template #footer>
+                  <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('unit')">新增单位</el-button>
+                </template>
+              </el-select>
+            </el-form-item>
+          </el-col>
           <el-col :span="12"><el-form-item label="辅助属性"><el-input v-model="form.attributeText" placeholder="如颜色、尺码" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="货位"><el-input v-model="form.location" placeholder="请输入货位" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="采购价"><el-input-number v-model="form.purchasePrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
@@ -87,13 +132,58 @@
           <el-col :span="8"><el-form-item label="最高库存"><el-input-number v-model="form.maxStock" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="排序"><el-input-number v-model="form.sortOrder" :min="0" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio :value="1">启用</el-radio><el-radio :value="0">停用</el-radio></el-radio-group></el-form-item></el-col>
-          <el-col :span="24"><el-form-item label="图片地址"><el-input v-model="form.imageUrl" placeholder="可粘贴已上传文件地址" /></el-form-item></el-col>
+          <el-col :span="24">
+            <el-form-item label="商品图片">
+              <div class="product-image-field">
+                <el-upload
+                  class="product-image-uploader"
+                  accept="image/*"
+                  :show-file-list="false"
+                  :http-request="uploadProductImage"
+                >
+                  <img v-if="form.imageUrl" :src="form.imageUrl" class="product-image-preview" />
+                  <div v-else class="product-image-placeholder">
+                    <el-icon><UploadFilled /></el-icon>
+                    <span>上传图片</span>
+                  </div>
+                </el-upload>
+                <div class="product-image-input">
+                  <el-input v-model="form.imageUrl" placeholder="上传后自动回填，也可粘贴图片地址" clearable />
+                  <div class="image-actions">
+                    <el-button v-if="form.imageUrl" link type="primary" @click="previewImage">预览</el-button>
+                    <el-button v-if="form.imageUrl" link type="danger" @click="form.imageUrl = ''">清空</el-button>
+                  </div>
+                </div>
+              </div>
+            </el-form-item>
+          </el-col>
           <el-col :span="24"><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" placeholder="请输入备注" /></el-form-item></el-col>
         </el-row>
       </el-form>
       <template #footer>
         <el-button @click="cancel">取消</el-button>
         <el-button type="primary" @click="submitForm" v-permission="form.id ? 'erp:product:edit' : 'erp:product:add'">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="quickMasterOpen" :title="`新增${quickMasterMeta.name}`" width="420px" append-to-body destroy-on-close>
+      <el-form ref="quickMasterFormRef" :model="quickMasterForm" :rules="quickMasterRules" label-width="76px">
+        <el-form-item label="编号" prop="code">
+          <el-input v-model="quickMasterForm.code" placeholder="请输入编号" />
+        </el-form-item>
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="quickMasterForm.name" :placeholder="`请输入${quickMasterMeta.name}名称`" @input="syncQuickMasterCode" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="quickMasterForm.status">
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="quickMasterOpen = false">取消</el-button>
+        <el-button type="primary" :loading="quickMasterSaving" @click="submitQuickMaster">确定</el-button>
       </template>
     </el-dialog>
 
@@ -116,12 +206,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, toRefs } from 'vue'
+import { computed, onMounted, reactive, ref, toRefs } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, Plus, Refresh, Search, UploadFilled } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { addProduct, deleteProduct, downloadProductTemplate, exportProduct, getProduct, importProduct, listProduct, updateProduct, type ErpProduct, type ErpProductQuery } from '@/api/erp/product'
-import { listMaster, type ErpMasterVO } from '@/api/erp/master'
+import { addMaster, listMaster, type ErpMasterForm, type ErpMasterVO, type MasterType } from '@/api/erp/master'
+import { uploadFile } from '@/api/sys/file'
 import { downloadBlob } from '@/utils/download'
 
 const queryFormRef = ref()
@@ -140,6 +231,21 @@ const units = ref<ErpMasterVO[]>([])
 const importOpen = ref(false)
 const importFile = ref<File | null>(null)
 const importResult = ref<{ success: number; fail: number; errors: string[] } | null>(null)
+const quickMasterOpen = ref(false)
+const quickMasterSaving = ref(false)
+const quickMasterType = ref<MasterType>('product-category')
+const quickMasterFormRef = ref()
+const quickMasterForm = reactive<ErpMasterForm>({ code: '', name: '', sortOrder: 0, status: 1 })
+const quickMasterRules = {
+  code: [{ required: true, message: '编号不能为空', trigger: 'blur' }],
+  name: [{ required: true, message: '名称不能为空', trigger: 'blur' }]
+}
+const quickMasterConfig = {
+  'product-category': { name: '分类', prefix: 'CAT', target: 'categoryId', list: categories },
+  'product-brand': { name: '品牌', prefix: 'BRAND', target: 'brandId', list: brands },
+  unit: { name: '单位', prefix: 'UNIT', target: 'unitId', list: units }
+} as const
+const quickMasterMeta = computed(() => quickMasterConfig[quickMasterType.value as keyof typeof quickMasterConfig])
 
 const state = reactive({
   queryParams: { current: 1, size: 10 } as ErpProductQuery,
@@ -160,9 +266,11 @@ function getList() {
 }
 
 function loadOptions() {
-  listMaster('product-category', { current: 1, size: 200 }).then(res => categories.value = res.records)
-  listMaster('product-brand', { current: 1, size: 200 }).then(res => brands.value = res.records)
-  listMaster('unit', { current: 1, size: 200 }).then(res => units.value = res.records)
+  return Promise.all([
+    listMaster('product-category', { current: 1, size: 200 }).then(res => categories.value = res.records),
+    listMaster('product-brand', { current: 1, size: 200 }).then(res => brands.value = res.records),
+    listMaster('unit', { current: 1, size: 200 }).then(res => units.value = res.records)
+  ])
 }
 
 function reset() {
@@ -212,6 +320,62 @@ function submitForm() {
       getList()
     })
   })
+}
+
+async function uploadProductImage(options: any) {
+  const file = options.file as File
+  if (!file.type?.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    options.onError?.(new Error('请选择图片文件'))
+    return
+  }
+  const data = new FormData()
+  data.append('file', file)
+  try {
+    const url = await uploadFile(data) as string
+    form.value.imageUrl = url
+    ElMessage.success('图片上传成功')
+    options.onSuccess?.(url)
+  } catch (error) {
+    options.onError?.(error)
+  }
+}
+
+function previewImage() {
+  if (!form.value.imageUrl) return
+  window.open(form.value.imageUrl, '_blank')
+}
+
+function openQuickMaster(type: 'product-category' | 'product-brand' | 'unit') {
+  quickMasterType.value = type
+  quickMasterForm.code = `${quickMasterConfig[type].prefix}_${Date.now().toString().slice(-8)}`
+  quickMasterForm.name = ''
+  quickMasterForm.sortOrder = 0
+  quickMasterForm.status = 1
+  quickMasterOpen.value = true
+}
+
+function syncQuickMasterCode() {
+  if (quickMasterForm.code) return
+  quickMasterForm.code = `${quickMasterMeta.value.prefix}_${Date.now().toString().slice(-8)}`
+}
+
+async function submitQuickMaster() {
+  const valid = await quickMasterFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  quickMasterSaving.value = true
+  try {
+    await addMaster(quickMasterType.value, quickMasterForm)
+    await loadOptions()
+    const created = quickMasterMeta.value.list.value.find(item => item.code === quickMasterForm.code || item.name === quickMasterForm.name)
+    if (created) {
+      ;(form.value as any)[quickMasterMeta.value.target] = created.id
+    }
+    ElMessage.success(`${quickMasterMeta.value.name}新增成功`)
+    quickMasterOpen.value = false
+  } finally {
+    quickMasterSaving.value = false
+  }
 }
 
 function handleDelete(row?: ErpProduct) {
@@ -272,6 +436,50 @@ onMounted(() => {
 .search-wrapper { margin-bottom: 16px; }
 .table-wrapper { height: calc(100vh - 230px); }
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.product-image-field { display: flex; align-items: flex-start; gap: 14px; width: 100%; }
+.product-image-uploader { flex: 0 0 auto; }
+.product-image-uploader :deep(.el-upload) {
+  width: 86px;
+  height: 86px;
+  border: 1px dashed var(--el-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--el-fill-color-lighter);
+}
+.product-image-uploader :deep(.el-upload:hover) {
+  border-color: var(--el-color-primary);
+}
+.product-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.product-image-placeholder .el-icon {
+  font-size: 22px;
+}
+.product-image-preview {
+  display: block;
+  width: 86px;
+  height: 86px;
+  object-fit: cover;
+}
+.product-image-input { flex: 1; min-width: 0; }
+.image-actions { margin-top: 6px; display: flex; gap: 12px; }
+.select-empty-action {
+  min-height: 42px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--el-text-color-secondary);
+}
 .import-result { margin-top: 16px; }
 .import-errors { margin: 12px 0 0; padding-left: 18px; color: var(--el-color-danger); max-height: 180px; overflow: auto; }
 </style>
