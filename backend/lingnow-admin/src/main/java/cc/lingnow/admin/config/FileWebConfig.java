@@ -21,6 +21,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class FileWebConfig implements WebMvcConfigurer {
 
     private static final String DEFAULT_FILE_BASE_PATH = "/data/lingnow/files/";
+    private static final String DEFAULT_FILE_DOMAIN = "/files/";
 
     private final SysFileConfigMapper fileConfigMapper;
 
@@ -43,17 +44,7 @@ public class FileWebConfig implements WebMvcConfigurer {
 
                 if (basePath != null && domain != null) {
                     // 提取映射路径
-                    String pathPattern = "/files/**";
-                    try {
-                        java.net.URL url = new java.net.URL(domain);
-                        pathPattern = url.getPath();
-                        if (!pathPattern.endsWith("/")) {
-                            pathPattern += "/";
-                        }
-                        pathPattern += "**";
-                    } catch (Exception e) {
-                        log.warn("解析域名失败，使用默认 /files/**: {}", domain);
-                    }
+                    String pathPattern = normalizeDomainPath(domain);
 
                     // 确保basePath以/结尾
                     if (!basePath.endsWith("/")) {
@@ -80,7 +71,7 @@ public class FileWebConfig implements WebMvcConfigurer {
         } catch (Exception e) {
             log.error("加载文件资源映射失败", e);
             // Fallback
-            registry.addResourceHandler("/files/**")
+                registry.addResourceHandler(DEFAULT_FILE_DOMAIN + "**")
                     .addResourceLocations("file:" + defaultBasePath());
         }
     }
@@ -88,5 +79,32 @@ public class FileWebConfig implements WebMvcConfigurer {
     private String defaultBasePath() {
         String path = System.getenv().getOrDefault("LINGNOW_FILE_BASE_PATH", DEFAULT_FILE_BASE_PATH);
         return path.endsWith("/") ? path : path + "/";
+    }
+
+    private String normalizeDomainPath(String domain) {
+        if (domain == null || domain.isBlank()) {
+            return DEFAULT_FILE_DOMAIN + "**";
+        }
+        if (domain.startsWith("http")) {
+            try {
+                java.net.URL url = new java.net.URL(domain);
+                String pathPattern = url.getPath();
+                if (!pathPattern.endsWith("/")) {
+                    pathPattern += "/";
+                }
+                return pathPattern + "**";
+            } catch (Exception e) {
+                log.warn("解析域名失败，使用默认 /files/**: {}", domain);
+                return DEFAULT_FILE_DOMAIN + "**";
+            }
+        }
+        String pathPattern = domain;
+        if (!pathPattern.endsWith("/")) {
+            pathPattern += "/";
+        }
+        if (!pathPattern.startsWith("/")) {
+            pathPattern = "/" + pathPattern;
+        }
+        return pathPattern + "**";
     }
 }

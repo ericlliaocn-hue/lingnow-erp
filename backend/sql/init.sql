@@ -159,10 +159,17 @@ CREATE TABLE IF NOT EXISTS `sys_file_config`
 
 INSERT INTO `sys_file_config`
     (`id`, `platform`, `config_json`, `is_active`, `remark`, `create_time`, `update_time`, `create_by`, `update_by`, `del_flag`)
-SELECT 6001, 'LOCAL', '{"basePath":"/data/lingnow/files/","domain":"http://localhost:8090/files/"}', 1, '本地文件存储默认配置', NOW(), NOW(), 'system', 'system', 0
+SELECT 6001, 'LOCAL', '{"basePath":"/data/lingnow/files/","domain":"/files/"}', 1, '本地文件存储默认配置', NOW(), NOW(), 'system', 'system', 0
 WHERE NOT EXISTS (
     SELECT 1 FROM `sys_file_config` WHERE `platform` = 'LOCAL' AND `del_flag` = 0
 );
+
+UPDATE `sys_file_config`
+SET `config_json` = '{"basePath":"/data/lingnow/files/","domain":"/files/"}',
+    `is_active` = 1,
+    `remark` = '本地文件存储默认配置',
+    `update_time` = NOW()
+WHERE `platform` = 'LOCAL' AND `del_flag` = 0;
 
 -- System File
 CREATE TABLE IF NOT EXISTS `sys_file`

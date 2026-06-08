@@ -27,7 +27,7 @@ import java.io.InputStream;
 public class LocalFileStorageStrategy implements FileStorageStrategy {
 
     private static final String DEFAULT_BASE_PATH = "/data/lingnow/files/";
-    private static final String DEFAULT_DOMAIN = "http://localhost:8090/files/";
+    private static final String DEFAULT_DOMAIN = "/files/";
 
     private final SysFileConfigMapper fileConfigMapper;
 
@@ -45,7 +45,7 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
     public String upload(InputStream inputStream, String path, String fileName) {
         JSONObject configJson = loadConfig();
         String basePath = normalizePath(configJson.getString("basePath"), DEFAULT_BASE_PATH);
-        String domain = normalizePath(configJson.getString("domain"), DEFAULT_DOMAIN);
+        String domain = normalizeDomain(configJson.getString("domain"), DEFAULT_DOMAIN);
 
         // 构建完整路径
         // path如果是相对路径，如 20231010/uuid.jpg
@@ -74,7 +74,7 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
         // 如果是URL，需要解析出相对路径
         String relativePath = path;
         if (path.startsWith("http")) {
-            String domain = normalizePath(configJson.getString("domain"), DEFAULT_DOMAIN);
+            String domain = normalizeDomain(configJson.getString("domain"), DEFAULT_DOMAIN);
             if (path.startsWith(domain)) {
                 relativePath = path.substring(domain.length());
             }
@@ -113,6 +113,11 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
     }
 
     private String normalizePath(String value, String fallback) {
+        String result = (value == null || value.isBlank()) ? fallback : value;
+        return result.endsWith("/") ? result : result + "/";
+    }
+
+    private String normalizeDomain(String value, String fallback) {
         String result = (value == null || value.isBlank()) ? fallback : value;
         return result.endsWith("/") ? result : result + "/";
     }

@@ -136,24 +136,31 @@
             <el-form-item label="商品图片">
               <div class="product-image-field">
                 <el-upload
+                  ref="productUploadRef"
                   class="product-image-uploader"
                   accept="image/*"
                   :show-file-list="false"
                   :http-request="uploadProductImage"
                 >
-                  <img v-if="form.imageUrl" :src="form.imageUrl" class="product-image-preview" />
-                  <div v-else class="product-image-placeholder">
-                    <el-icon><UploadFilled /></el-icon>
-                    <span>上传图片</span>
+                  <div class="product-image-box" :class="{ 'has-image': !!form.imageUrl }">
+                    <img v-if="form.imageUrl" :src="form.imageUrl" class="product-image-preview" />
+                    <div v-else class="product-image-placeholder">
+                      <el-icon><UploadFilled /></el-icon>
+                      <span>上传图片</span>
+                    </div>
+                    <div v-if="form.imageUrl" class="product-image-overlay">
+                      <el-tooltip content="预览" placement="top">
+                        <el-button circle size="small" :icon="View" @click.stop="previewImage" />
+                      </el-tooltip>
+                      <el-tooltip content="替换" placement="top">
+                        <el-button circle size="small" :icon="RefreshRight" @click.stop="triggerProductImageUpload" />
+                      </el-tooltip>
+                    </div>
                   </div>
                 </el-upload>
-                <div class="product-image-input">
-                  <el-input v-model="form.imageUrl" placeholder="上传后自动回填，也可粘贴图片地址" clearable />
-                  <div class="image-actions">
-                    <el-button v-if="form.imageUrl" link type="primary" @click="previewImage">预览</el-button>
-                    <el-button v-if="form.imageUrl" link type="danger" @click="form.imageUrl = ''">清空</el-button>
-                  </div>
-                </div>
+                <el-tooltip content="添加图片" placement="top">
+                  <el-button class="product-image-add" circle :icon="Plus" @click="triggerProductImageUpload" />
+                </el-tooltip>
               </div>
             </el-form-item>
           </el-col>
@@ -202,13 +209,19 @@
         <el-button type="primary" :disabled="!importFile" @click="submitImport">开始导入</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="imagePreviewOpen" title="图片预览" width="720px" append-to-body destroy-on-close>
+      <div class="product-image-preview-dialog">
+        <img v-if="imagePreviewUrl" :src="imagePreviewUrl" alt="商品图片预览" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, toRefs } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Refresh, Search, UploadFilled } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, Refresh, RefreshRight, Search, UploadFilled, View } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { addProduct, deleteProduct, downloadProductTemplate, exportProduct, getProduct, importProduct, listProduct, updateProduct, type ErpProduct, type ErpProductQuery } from '@/api/erp/product'
 import { addMaster, listMaster, type ErpMasterForm, type ErpMasterVO, type MasterType } from '@/api/erp/master'
@@ -246,6 +259,9 @@ const quickMasterConfig = {
   unit: { name: '单位', prefix: 'UNIT', target: 'unitId', list: units }
 } as const
 const quickMasterMeta = computed(() => quickMasterConfig[quickMasterType.value as keyof typeof quickMasterConfig])
+const productUploadRef = ref<any>()
+const imagePreviewOpen = ref(false)
+const imagePreviewUrl = ref('')
 
 const state = reactive({
   queryParams: { current: 1, size: 10 } as ErpProductQuery,
@@ -343,7 +359,13 @@ async function uploadProductImage(options: any) {
 
 function previewImage() {
   if (!form.value.imageUrl) return
-  window.open(form.value.imageUrl, '_blank')
+  imagePreviewUrl.value = form.value.imageUrl
+  imagePreviewOpen.value = true
+}
+
+function triggerProductImageUpload() {
+  const input = productUploadRef.value?.$el?.querySelector('input[type="file"]') as HTMLInputElement | null
+  input?.click()
 }
 
 function openQuickMaster(type: 'product-category' | 'product-brand' | 'unit') {
@@ -438,6 +460,7 @@ onMounted(() => {
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .product-image-field { display: flex; align-items: flex-start; gap: 14px; width: 100%; }
 .product-image-uploader { flex: 0 0 auto; }
+.product-image-uploader :deep(.el-upload) { display: block; }
 .product-image-uploader :deep(.el-upload) {
   width: 86px;
   height: 86px;
@@ -448,6 +471,11 @@ onMounted(() => {
 }
 .product-image-uploader :deep(.el-upload:hover) {
   border-color: var(--el-color-primary);
+}
+.product-image-box {
+  position: relative;
+  width: 86px;
+  height: 86px;
 }
 .product-image-placeholder {
   width: 100%;
@@ -469,8 +497,40 @@ onMounted(() => {
   height: 86px;
   object-fit: cover;
 }
-.product-image-input { flex: 1; min-width: 0; }
-.image-actions { margin-top: 6px; display: flex; gap: 12px; }
+.product-image-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.product-image-box.has-image:hover .product-image-overlay {
+  opacity: 1;
+}
+.product-image-add {
+  margin-top: 26px;
+}
+.product-image-preview-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  max-height: 70vh;
+  overflow: auto;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
+  padding: 12px;
+}
+.product-image-preview-dialog img {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
 .select-empty-action {
   min-height: 42px;
   padding: 8px 12px;
