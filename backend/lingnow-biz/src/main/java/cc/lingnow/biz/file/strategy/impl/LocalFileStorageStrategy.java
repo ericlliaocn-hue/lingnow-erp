@@ -26,6 +26,9 @@ import java.io.InputStream;
 @RequiredArgsConstructor
 public class LocalFileStorageStrategy implements FileStorageStrategy {
 
+    private static final String DEFAULT_BASE_PATH = "/data/lingnow/files/";
+    private static final String DEFAULT_DOMAIN = "http://localhost:8090/files/";
+
     private final SysFileConfigMapper fileConfigMapper;
 
     @Override
@@ -40,28 +43,9 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
 
     @Override
     public String upload(InputStream inputStream, String path, String fileName) {
-        // 获取配置
-        SysFileConfig config = fileConfigMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysFileConfig>()
-                        .eq(SysFileConfig::getPlatform, "LOCAL")
-        );
-
-        if (config == null) {
-            throw new BusinessException("本地存储配置未初始化");
-        }
-
-        JSONObject configJson = JSON.parseObject(config.getConfigJson());
-        String basePath = configJson.getString("basePath");
-        String domain = configJson.getString("domain");
-
-        // 确保basePath以/结尾
-        if (!basePath.endsWith("/")) {
-            basePath += "/";
-        }
-        // 确保domain以/结尾
-        if (!domain.endsWith("/")) {
-            domain += "/";
-        }
+        JSONObject configJson = loadConfig();
+        String basePath = normalizePath(configJson.getString("basePath"), DEFAULT_BASE_PATH);
+        String domain = normalizePath(configJson.getString("domain"), DEFAULT_DOMAIN);
 
         // 构建完整路径
         // path如果是相对路径，如 20231010/uuid.jpg
@@ -82,26 +66,15 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
 
     @Override
     public boolean delete(String path) {
-        // 获取配置
-        SysFileConfig config = fileConfigMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysFileConfig>()
-                        .eq(SysFileConfig::getPlatform, "LOCAL")
-        );
-        if (config == null) {
-            return false;
-        }
-        JSONObject configJson = JSON.parseObject(config.getConfigJson());
-        String basePath = configJson.getString("basePath");
-        if (!basePath.endsWith("/")) {
-            basePath += "/";
-        }
+        JSONObject configJson = loadConfig();
+        String basePath = normalizePath(configJson.getString("basePath"), DEFAULT_BASE_PATH);
 
         // path可能是完整URL，也可能是相对路径
         // 假设这里传入的是相对路径
         // 如果是URL，需要解析出相对路径
         String relativePath = path;
         if (path.startsWith("http")) {
-            String domain = configJson.getString("domain");
+            String domain = normalizePath(configJson.getString("domain"), DEFAULT_DOMAIN);
             if (path.startsWith(domain)) {
                 relativePath = path.substring(domain.length());
             }
@@ -113,5 +86,34 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
     @Override
     public String getPlatform() {
         return "LOCAL";
+    }
+
+    private JSONObject loadConfig() {
+        SysFileConfig config = fileConfigMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysFileConfig>()
+                        .eq(SysFileConfig::getPlatform, "LOCAL")
+                        .eq(SysFileConfig::getDelFlag, 0)
+                        .last("LIMIT 1")
+        );
+        if (config == null || config.getConfigJson() == null || config.getConfigJson().isBlank()) {
+            JSONObject defaultConfig = new JSONObject();
+            defaultConfig.put("basePath", DEFAULT_BASE_PATH);
+            defaultConfig.put("domain", DEFAULT_DOMAIN);
+            return defaultConfig;
+        }
+        try {
+            return JSON.parseObject(config.getConfigJson());
+        } catch (Exception e) {
+            log.warn("本地存储配置解析失败，使用默认配置", e);
+            JSONObject defaultConfig = new JSONObject();
+            defaultConfig.put("basePath", DEFAULT_BASE_PATH);
+            defaultConfig.put("domain", DEFAULT_DOMAIN);
+            return defaultConfig;
+        }
+    }
+
+    private String normalizePath(String value, String fallback) {
+        String result = (value == null || value.isBlank()) ? fallback : value;
+        return result.endsWith("/") ? result : result + "/";
     }
 }

@@ -144,12 +144,33 @@
             </el-col>
           </el-row>
 
-          <el-form-item label="头像地址">
-            <el-input v-model="editForm.avatar" placeholder="请输入头像 URL">
-              <template #append>
-                <el-button v-if="editForm.avatar" @click="previewAvatar">预览</el-button>
-              </template>
-            </el-input>
+          <el-form-item label="头像">
+            <div class="avatar-upload-field">
+              <el-upload
+                class="avatar-uploader"
+                accept="image/*"
+                :show-file-list="false"
+                :http-request="uploadAvatar"
+              >
+                <el-avatar :size="72" :src="editForm.avatar">
+                  {{ (editForm.nickname || editForm.username || '').charAt(0).toUpperCase() }}
+                </el-avatar>
+                <div class="avatar-upload-tip">
+                  <el-icon><UploadFilled /></el-icon>
+                  <span>上传头像</span>
+                </div>
+              </el-upload>
+              <div class="avatar-upload-actions">
+                <el-input v-model="editForm.avatar" placeholder="上传后自动回填，也可粘贴图片地址" clearable>
+                  <template #append>
+                    <el-button v-if="editForm.avatar" @click="previewAvatar">预览</el-button>
+                  </template>
+                </el-input>
+                <div class="avatar-upload-extra">
+                  <el-button v-if="editForm.avatar" link type="danger" @click="editForm.avatar = ''">清空</el-button>
+                </div>
+              </div>
+            </div>
           </el-form-item>
 
           <el-form-item label="所在地区">
@@ -258,8 +279,9 @@ import { ref, onMounted, reactive, nextTick } from 'vue'
 import { getUserList, updateUserStatus, getUserDetail, updateUser, deleteUser, resetUserPassword, assignUserRoles } from '@/api/sys/user.ts'
 import { getActiveRoles, assignRoles } from '@/api/sys/role.ts'
 import type { User } from '@/api/sys/user.ts'
+import { uploadFile } from '@/api/sys/file'
 import { ElMessage, ElMessageBox, ElTable } from 'element-plus'
-import { View, Search, Refresh, Edit, Delete, Key, UserFilled } from '@element-plus/icons-vue'
+import { View, Search, Refresh, Edit, Delete, Key, UserFilled, UploadFilled } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { useDict } from '@/hooks/web/useDict'
 import { useClipboard } from '@vueuse/core'
@@ -304,6 +326,25 @@ const editForm = reactive({
 const avatarPreviewVisible = ref(false)
 const previewAvatar = () => {
   avatarPreviewVisible.value = true
+}
+
+async function uploadAvatar(options: any) {
+  const file = options.file as File
+  if (!file.type?.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    options.onError?.(new Error('请选择图片文件'))
+    return
+  }
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    const url = await uploadFile(formData) as string
+    editForm.avatar = url
+    ElMessage.success('头像上传成功')
+    options.onSuccess?.(url)
+  } catch (error) {
+    options.onError?.(error)
+  }
 }
 
 // 获取角色列表供选择
@@ -559,6 +600,55 @@ const handleCopy = (text: string | number | undefined) => {
   ElMessage.success('复制成功')
 }
 </script>
+
+<style scoped>
+.avatar-upload-field {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.avatar-uploader {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border: 1px dashed var(--el-border-color);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--el-fill-color-lighter);
+  overflow: hidden;
+}
+
+.avatar-uploader:hover {
+  border-color: var(--el-color-primary);
+}
+
+.avatar-upload-tip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--el-text-color-secondary);
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.avatar-upload-actions {
+  flex: 1;
+  min-width: 280px;
+}
+
+.avatar-upload-extra {
+  margin-top: 6px;
+}
+</style>
 
 <style scoped>
 .app-container {
