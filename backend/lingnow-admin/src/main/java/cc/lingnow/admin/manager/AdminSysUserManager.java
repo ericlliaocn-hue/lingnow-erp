@@ -84,7 +84,9 @@ public class AdminSysUserManager {
         vo.setPermissions(StpAdminUtil.stpLogic.getPermissionList());
 
         log.info("管理员登录成功: username={}, adminId={}", sysUser.getUsername(), sysUser.getUserId());
-        notificationService.sendNotification(sysUser.getUserId(), "系统消息", "您已成功登录管理端", "info", sysUser.getUserId(), "login");
+        if (!userService.isInternalAccount(sysUser)) {
+            notificationService.sendNotification(sysUser.getUserId(), "系统消息", "您已成功登录管理端", "info", sysUser.getUserId(), "login");
+        }
         return vo;
     }
 
@@ -124,6 +126,9 @@ public class AdminSysUserManager {
      */
     public UserDetailVO getUserDetail(Long userId) {
         SysUser sysUser = userService.getById(userId);
+        if (sysUser == null || userService.isInternalAccount(sysUser)) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
+        }
 
         // Entity → VO 转换
         UserDetailVO vo = BeanUtil.toBean(sysUser, UserDetailVO.class);
@@ -147,6 +152,7 @@ public class AdminSysUserManager {
      * @return 是否成功
      */
     public boolean updateUser(Long userId, AdminUserUpdateBO updateBO) {
+        ensureBusinessVisibleUser(userId);
         SysUser sysUser = new SysUser();
         sysUser.setUserId(userId);
 
@@ -165,11 +171,12 @@ public class AdminSysUserManager {
      */
     public UserStatsVO getUserStats() {
         // 总用户数
-        long totalUsers = userService.count();
+        long totalUsers = userService.count(userService.businessVisibleQuery());
 
         // 禁用用户数
         long disabledUsers = userService.count(
                 Wrappers.<SysUser>lambdaQuery()
+                        .eq(SysUser::getInternalAccount, 0)
                         .eq(SysUser::getStatus, CommonConstants.STATUS_DISABLED)
         );
 
@@ -177,6 +184,7 @@ public class AdminSysUserManager {
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         long todayNewUsers = userService.count(
                 Wrappers.<SysUser>lambdaQuery()
+                        .eq(SysUser::getInternalAccount, 0)
                         .ge(SysUser::getCreateTime, todayStart)
         );
 
@@ -200,6 +208,7 @@ public class AdminSysUserManager {
      * @return 是否成功
      */
     public boolean disableUser(Long userId, String reason) {
+        ensureBusinessVisibleUser(userId);
         SysUser sysUser = new SysUser();
         sysUser.setUserId(userId);
         sysUser.setStatus(CommonConstants.STATUS_DISABLED);
@@ -223,6 +232,7 @@ public class AdminSysUserManager {
      * @return 是否成功
      */
     public boolean enableUser(Long userId) {
+        ensureBusinessVisibleUser(userId);
         SysUser sysUser = new SysUser();
         sysUser.setUserId(userId);
         sysUser.setStatus(CommonConstants.STATUS_NORMAL);
@@ -246,6 +256,7 @@ public class AdminSysUserManager {
      * @return 是否成功
      */
     public boolean updateUserStatus(Long userId, Integer status) {
+        ensureBusinessVisibleUser(userId);
         SysUser sysUser = new SysUser();
         sysUser.setUserId(userId);
         sysUser.setStatus(status);
@@ -256,6 +267,13 @@ public class AdminSysUserManager {
         return success;
     }
 
+    private void ensureBusinessVisibleUser(Long userId) {
+        SysUser user = userService.getById(userId);
+        if (user == null || userService.isInternalAccount(user)) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
+        }
+    }
+
     /**
      * 构建查询条件
      *
@@ -263,7 +281,7 @@ public class AdminSysUserManager {
      * @return 查询条件
      */
     private LambdaQueryWrapper<SysUser> buildQueryWrapper(UserQueryBO query) {
-        LambdaQueryWrapper<SysUser> lqw = Wrappers.lambdaQuery();
+        LambdaQueryWrapper<SysUser> lqw = userService.businessVisibleQuery();
         lqw.like(ObjUtil.isNotEmpty(query.getUsername()), SysUser::getUsername, query.getUsername())
                 .like(ObjUtil.isNotEmpty(query.getPhone()), SysUser::getPhone, query.getPhone())
                 .eq(ObjUtil.isNotEmpty(query.getStatus()), SysUser::getStatus, query.getStatus())

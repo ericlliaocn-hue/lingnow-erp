@@ -12,6 +12,7 @@ export interface ErpProduct {
   brandName?: string
   unitId?: string
   unitName?: string
+  attributeIds?: string
   attributeText?: string
   barcode?: string
   location?: string
@@ -34,6 +35,8 @@ export interface ErpProductQuery {
   barcode?: string
   categoryId?: string
   brandId?: string
+  attributeIds?: string
+  keyword?: string
   status?: number
 }
 

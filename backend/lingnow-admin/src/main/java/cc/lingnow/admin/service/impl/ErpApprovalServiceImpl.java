@@ -206,7 +206,8 @@ public class ErpApprovalServiceImpl implements ErpApprovalService {
     public void transfer(ErpApprovalHandleBO bo) {
         Task task = requireTask(bo.getTaskId());
         ensureTaskOwner(task);
-        if (bo.getTransferUserId() == null || userService.getById(bo.getTransferUserId()) == null) {
+        SysUser transferUser = bo.getTransferUserId() == null ? null : userService.getById(bo.getTransferUserId());
+        if (transferUser == null || userService.isInternalAccount(transferUser)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "转交用户不存在");
         }
         FlowFactory.userService().deleteByTaskIds(List.of(task.getId()));
@@ -291,8 +292,8 @@ public class ErpApprovalServiceImpl implements ErpApprovalService {
     }
 
     private List<Long> approvalUsers() {
-        return userService.list(new QueryWrapper<SysUser>().eq("status", 1)).stream()
-                .filter(user -> "admin".equals(user.getUsername()) || StpAdminUtil.stpLogic.hasPermission(user.getUserId(), "erp:approval:approve"))
+        return userService.list(new QueryWrapper<SysUser>().eq("status", 1).eq("internal_account", 0)).stream()
+                .filter(user -> userService.isSuperAdmin(user) || StpAdminUtil.stpLogic.hasPermission(user.getUserId(), "erp:approval:approve"))
                 .map(SysUser::getUserId)
                 .distinct()
                 .toList();

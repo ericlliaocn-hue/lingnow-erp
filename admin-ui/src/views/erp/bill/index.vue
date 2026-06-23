@@ -33,8 +33,10 @@
         <el-table-column prop="partnerName" :label="partnerLabel" min-width="160" />
         <el-table-column prop="warehouseName" label="仓库" min-width="120" />
         <el-table-column prop="payableAmount" label="应收/应付" min-width="110" align="right" />
-        <el-table-column prop="paidAmount" label="实收/实付" min-width="110" align="right" />
-        <el-table-column prop="debtAmount" label="欠款" min-width="110" align="right" />
+        <el-table-column prop="paymentMethod" label="付款方式" min-width="110">
+          <template #default="{ row }">{{ row.paymentMethod || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="paidAmount" label="付款金额" min-width="110" align="right" />
         <el-table-column prop="auditStatus" label="审核" width="90" align="center">
           <template #default="{ row }"><el-tag :type="row.auditStatus === 1 ? 'success' : 'info'">{{ row.auditStatus === 1 ? '已审核' : '未审核' }}</el-tag></template>
         </el-table-column>
@@ -65,15 +67,21 @@
           <span v-if="showReceiver">收货电话：{{ printData.bill.receiverPhone || '-' }}</span>
           <span v-if="showReceiver">收货地址：{{ printData.bill.receiverAddress || '-' }}</span>
           <span>应收/应付：{{ printData.bill.payableAmount }}</span>
-          <span>实收/实付：{{ printData.bill.paidAmount }}</span>
-          <span>欠款：{{ printData.bill.debtAmount }}</span>
+          <span>付款方式：{{ printData.bill.paymentMethod || '-' }}</span>
+          <span>付款金额：{{ printData.bill.paidAmount }}</span>
           <span>审核：{{ printData.bill.auditStatus === 1 ? '已审核' : '未审核' }}</span>
         </div>
         <el-table :data="printData.items || []" border>
           <el-table-column prop="productCode" label="商品编号" />
           <el-table-column prop="productName" label="商品名称" />
+          <el-table-column label="商品图片" width="92" align="center">
+            <template #default="{ row }">
+              <img v-if="row.productImageUrl" :src="row.productImageUrl" class="print-product-image" />
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="spec" label="规格" />
-          <el-table-column prop="unitName" label="单位" />
+          <el-table-column prop="attributeText" label="类目选项" min-width="160" />
           <el-table-column prop="qty" label="数量" align="right" />
           <el-table-column prop="price" label="单价" align="right" />
           <el-table-column prop="finalAmount" label="折后金额" align="right" />
@@ -200,4 +208,11 @@ onMounted(getList)
 .print-preview h2 { text-align: center; margin: 0 0 18px; }
 .print-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 16px; margin-bottom: 16px; }
 .print-remark { margin-top: 14px; }
+.print-product-image {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+}
 </style>

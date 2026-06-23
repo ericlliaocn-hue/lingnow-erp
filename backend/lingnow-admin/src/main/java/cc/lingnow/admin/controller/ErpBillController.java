@@ -51,6 +51,7 @@ import java.util.Set;
 public class ErpBillController {
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
+    private static final Set<String> PAYMENT_METHODS = Set.of("淘宝", "1688", "小红书", "微信", "支付宝");
 
     private final ErpBillService billService;
     private final ErpBillItemService billItemService;
@@ -111,15 +112,15 @@ public class ErpBillController {
                     money(vo.getDiscountAmount()),
                     money(vo.getOtherAmount()),
                     money(vo.getPayableAmount()),
+                    text(vo.getPaymentMethod()),
                     money(vo.getPaidAmount()),
-                    money(vo.getDebtAmount()),
                     Integer.valueOf(1).equals(vo.getAuditStatus()) ? "已审核" : "未审核",
                     text(vo.getPaymentStatus()),
                     text(vo.getRemark())
             );
         }).toList();
         CsvExportUtil.write(response, titleName(module) + ".csv",
-                List.of("单号", "日期", partnerTitle(type), "仓库", "合计金额", "优惠金额", "其他费用", "应收应付", "实收实付", "欠款", "审核状态", "收付状态", "备注"),
+                List.of("单号", "日期", partnerTitle(type), "仓库", "合计金额", "优惠金额", "其他费用", "应收应付", "付款方式", "付款金额", "审核状态", "收付状态", "备注"),
                 rows);
     }
 
@@ -133,7 +134,7 @@ public class ErpBillController {
         data.put("bill", bill);
         data.put("items", bill.getItems());
         data.put("fields", printFields(bill.getBillType()));
-        data.put("itemFields", List.of("商品编号", "商品名称", "规格", "单位", "仓库", "数量", "单价", "金额", "优惠", "折后金额", "备注"));
+        data.put("itemFields", List.of("商品编号", "商品名称", "商品图片", "规格", "类目选项", "单位", "仓库", "数量", "单价", "金额", "优惠", "折后金额", "备注"));
         return Result.success(data);
     }
 
@@ -332,7 +333,7 @@ public class ErpBillController {
             return false;
         }
         SysUser user = userService.getById(userId);
-        return user != null && "admin".equals(user.getUsername());
+        return userService.isSuperAdmin(user);
     }
 
     private Long currentUserId() {
@@ -481,15 +482,16 @@ public class ErpBillController {
         BigDecimal otherAmount = nvl(bo.getOtherAmount());
         BigDecimal paidAmount = nvl(bo.getPaidAmount());
         if (discountAmount.compareTo(BigDecimal.ZERO) < 0 || otherAmount.compareTo(BigDecimal.ZERO) < 0 || paidAmount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "优惠、其他费用和实收实付金额不能小于0");
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "优惠、其他费用和付款金额不能小于0");
         }
         BigDecimal payable = finalAmount.subtract(discountAmount).add(otherAmount);
         if (payable.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "应收应付金额不能小于0");
         }
         if (paidAmount.compareTo(payable) > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "实收实付金额不能大于应收应付金额");
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "付款金额不能大于应收应付金额");
         }
+        validatePaymentMethod(bo.getPaymentMethod(), paidAmount);
         ErpBill bill = BeanUtil.copyProperties(bo, ErpBill.class);
         bill.setBillType(type);
         bill.setPartnerType(type.startsWith("SALE") ? "CUSTOMER" : "SUPPLIER");
@@ -540,7 +542,15 @@ public class ErpBillController {
             item.setProductId(product.getId());
             item.setProductCode(product.getCode());
             item.setProductName(product.getName());
+            item.setProductImageUrl(product.getImageUrl());
             item.setSpec(product.getSpec());
+            item.setAttributeText(StrUtil.isNotBlank(source.getAttributeText()) ? source.getAttributeText() : product.getAttributeText());
+            item.setCategoryLevel1Id(source.getCategoryLevel1Id());
+            item.setCategoryLevel1Name(source.getCategoryLevel1Name());
+            item.setCategoryLevel2Id(source.getCategoryLevel2Id());
+            item.setCategoryLevel2Name(source.getCategoryLevel2Name());
+            item.setOptionAttributeIds(source.getOptionAttributeIds());
+            item.setOptionAttributeText(source.getOptionAttributeText());
             item.setUnitId(product.getUnitId());
             item.setWarehouseId(source.getWarehouseId() == null ? defaultWarehouseId : source.getWarehouseId());
             item.setQty(qty);
@@ -581,7 +591,7 @@ public class ErpBillController {
         }
         String content = bill.getBillNo() + " 已创建，请及时处理";
         String actionUrl = "/erp/sale/list?billNo=" + bill.getBillNo();
-        for (SysUser user : userService.list(new QueryWrapper<SysUser>().eq("status", 1).eq("del_flag", 0))) {
+        for (SysUser user : userService.list(new QueryWrapper<SysUser>().eq("status", 1).eq("del_flag", 0).eq("internal_account", 0))) {
             if (canReceiveSaleNotification(user)) {
                 notificationService.sendNotification(user.getUserId(), "新销售单", content, "warning", bill.getId(), "SALE", "ORDER", "OPEN", actionUrl);
             }
@@ -589,7 +599,7 @@ public class ErpBillController {
     }
 
     private boolean canReceiveSaleNotification(SysUser user) {
-        if ("admin".equals(user.getUsername())) {
+        if (userService.isSuperAdmin(user)) {
             return true;
         }
         Set<String> permissions = roleService.selectPermissionsByUserId(user.getUserId());
@@ -640,6 +650,15 @@ public class ErpBillController {
         }
         if (positive(bill.getPaidAmount()) && bill.getAccountId() == null) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "存在收付款金额时必须选择账户");
+        }
+    }
+
+    private void validatePaymentMethod(String paymentMethod, BigDecimal paidAmount) {
+        if (positive(paidAmount) && StrUtil.isBlank(paymentMethod)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "存在付款金额时必须选择付款方式");
+        }
+        if (StrUtil.isNotBlank(paymentMethod) && !PAYMENT_METHODS.contains(paymentMethod)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "付款方式不正确");
         }
     }
 
@@ -705,7 +724,7 @@ public class ErpBillController {
         if (billType != null && billType.startsWith("SALE")) {
             fields.addAll(List.of("收货人", "收货电话", "收货地址"));
         }
-        fields.addAll(List.of("应收应付", "实收实付", "欠款", "审核状态", "备注"));
+        fields.addAll(List.of("应收应付", "付款方式", "付款金额", "审核状态", "备注"));
         return fields;
     }
 

@@ -44,9 +44,23 @@
         <el-table-column prop="code" label="编号" min-width="120" />
         <el-table-column prop="name" label="名称" min-width="160" />
         <el-table-column prop="spec" label="规格" min-width="120" />
+        <el-table-column label="商品图片" width="110" align="center">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.imageUrl"
+              class="table-product-image"
+              :src="row.imageUrl"
+              :preview-src-list="[row.imageUrl]"
+              preview-teleported
+              fit="cover"
+            />
+            <span v-else class="image-empty">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="categoryName" label="分类" min-width="120" />
         <el-table-column prop="brandName" label="品牌" min-width="120" />
         <el-table-column prop="unitName" label="单位" min-width="90" />
+        <el-table-column prop="attributeText" label="商品属性" min-width="180" show-overflow-tooltip />
         <el-table-column prop="barcode" label="条码" min-width="130" />
         <el-table-column prop="purchasePrice" label="采购价" min-width="100" align="right" />
         <el-table-column prop="salePrice" label="销售价" min-width="100" align="right" />
@@ -77,18 +91,18 @@
           <el-col :span="12"><el-form-item label="条码"><el-input v-model="form.barcode" placeholder="请输入条码" /></el-form-item></el-col>
           <el-col :span="8">
             <el-form-item label="分类">
-              <el-select v-model="form.categoryId" clearable filterable style="width: 100%" placeholder="请选择分类">
-                <el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
-                <template #empty>
-                  <div class="select-empty-action">
-                    <span>暂无分类</span>
-                    <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('product-category')">新增分类</el-button>
-                  </div>
-                </template>
-                <template #footer>
-                  <el-button link type="primary" :icon="Plus" @click.stop="openQuickMaster('product-category')">新增分类</el-button>
-                </template>
-              </el-select>
+              <el-tree-select
+                v-model="form.categoryId"
+                :data="categoryTree"
+                clearable
+                filterable
+                check-strictly
+                node-key="id"
+                :props="{ label: 'name', value: 'id', children: 'children' }"
+                style="width: 100%"
+                placeholder="请选择分类"
+                @change="categoryChanged"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -123,14 +137,31 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12"><el-form-item label="辅助属性"><el-input v-model="form.attributeText" placeholder="如颜色、尺码" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label="属性节点">
+              <div class="tree-field">
+                <el-tree-select
+                  v-model="selectedAttributeIds"
+                  :data="availableAttributeTree"
+                  multiple
+                  check-strictly
+                  clearable
+                  filterable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  node-key="id"
+                  :props="{ label: 'name', value: 'id', children: 'children' }"
+                  placeholder="请选择商品属性"
+                  @change="syncAttributeText"
+                />
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12"><el-form-item label="辅助属性"><el-input v-model="form.attributeText" placeholder="可补充刻字、颜色等说明" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="货位"><el-input v-model="form.location" placeholder="请输入货位" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="采购价"><el-input-number v-model="form.purchasePrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="销售价"><el-input-number v-model="form.salePrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="零售价"><el-input-number v-model="form.retailPrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="最低库存"><el-input-number v-model="form.minStock" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="最高库存"><el-input-number v-model="form.maxStock" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="排序"><el-input-number v-model="form.sortOrder" :min="0" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio :value="1">启用</el-radio><el-radio :value="0">停用</el-radio></el-radio-group></el-form-item></el-col>
           <el-col :span="24">
             <el-form-item label="商品图片">
@@ -173,7 +204,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="quickMasterOpen" :title="`新增${quickMasterMeta.name}`" width="420px" append-to-body destroy-on-close>
+    <el-dialog v-model="quickMasterOpen" :title="quickMasterTitle" width="420px" append-to-body destroy-on-close>
       <el-form ref="quickMasterFormRef" :model="quickMasterForm" :rules="quickMasterRules" label-width="76px">
         <el-form-item label="编号" prop="code">
           <el-input v-model="quickMasterForm.code" placeholder="请输入编号" />
@@ -224,7 +255,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, Plus, Refresh, RefreshRight, Search, UploadFilled, View } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { addProduct, deleteProduct, downloadProductTemplate, exportProduct, getProduct, importProduct, listProduct, updateProduct, type ErpProduct, type ErpProductQuery } from '@/api/erp/product'
-import { addMaster, listMaster, type ErpMasterForm, type ErpMasterVO, type MasterType } from '@/api/erp/master'
+import { addMaster, listMaster, type ErpMasterForm, type ErpMasterVO } from '@/api/erp/master'
 import { uploadFile } from '@/api/sys/file'
 import { downloadBlob } from '@/utils/download'
 
@@ -241,12 +272,16 @@ const multiple = ref(true)
 const categories = ref<ErpMasterVO[]>([])
 const brands = ref<ErpMasterVO[]>([])
 const units = ref<ErpMasterVO[]>([])
+const attributes = ref<ErpMasterVO[]>([])
+const selectedAttributeIds = ref<string[]>([])
 const importOpen = ref(false)
 const importFile = ref<File | null>(null)
 const importResult = ref<{ success: number; fail: number; errors: string[] } | null>(null)
 const quickMasterOpen = ref(false)
 const quickMasterSaving = ref(false)
-const quickMasterType = ref<MasterType>('product-category')
+type QuickMasterType = 'product-brand' | 'unit'
+
+const quickMasterType = ref<QuickMasterType>('product-brand')
 const quickMasterFormRef = ref()
 const quickMasterForm = reactive<ErpMasterForm>({ code: '', name: '', sortOrder: 0, status: 1 })
 const quickMasterRules = {
@@ -254,11 +289,11 @@ const quickMasterRules = {
   name: [{ required: true, message: '名称不能为空', trigger: 'blur' }]
 }
 const quickMasterConfig = {
-  'product-category': { name: '分类', prefix: 'CAT', target: 'categoryId', list: categories },
   'product-brand': { name: '品牌', prefix: 'BRAND', target: 'brandId', list: brands },
   unit: { name: '单位', prefix: 'UNIT', target: 'unitId', list: units }
 } as const
-const quickMasterMeta = computed(() => quickMasterConfig[quickMasterType.value as keyof typeof quickMasterConfig])
+const quickMasterMeta = computed(() => quickMasterConfig[quickMasterType.value])
+const quickMasterTitle = computed(() => `新增${quickMasterMeta.value.name}`)
 const productUploadRef = ref<any>()
 const imagePreviewOpen = ref(false)
 const imagePreviewUrl = ref('')
@@ -283,14 +318,24 @@ function getList() {
 
 function loadOptions() {
   return Promise.all([
-    listMaster('product-category', { current: 1, size: 200 }).then(res => categories.value = res.records),
+    listMaster('product-category', { current: 1, size: 1000 }).then(res => categories.value = res.records),
     listMaster('product-brand', { current: 1, size: 200 }).then(res => brands.value = res.records),
-    listMaster('unit', { current: 1, size: 200 }).then(res => units.value = res.records)
+    listMaster('unit', { current: 1, size: 200 }).then(res => units.value = res.records),
+    listMaster('product-attribute', { current: 1, size: 500 }).then(res => attributes.value = res.records)
   ])
 }
 
+const categoryTree = computed(() => buildTree(categories.value))
+const attributeTree = computed(() => buildTree(attributes.value))
+const availableAttributeTree = computed(() => {
+  const category = categories.value.find(item => item.id === form.value.categoryId)
+  const allowedIds = splitIds(category?.attributeIds)
+  return buildPathTree(allowedIds.length ? buildAllowedTree(attributes.value, allowedIds) : attributeTree.value)
+})
+
 function reset() {
   form.value = { code: '', name: '', purchasePrice: 0, salePrice: 0, retailPrice: 0, minStock: 0, maxStock: 0, sortOrder: 0, status: 1 }
+  selectedAttributeIds.value = []
   formRef.value?.resetFields()
 }
 
@@ -321,6 +366,7 @@ function handleUpdate(row?: ErpProduct) {
   const id = row?.id || ids.value[0]
   getProduct(id!).then(res => {
     form.value = res
+    selectedAttributeIds.value = splitIds(res.attributeIds)
     dialogTitle.value = '修改商品'
     open.value = true
   })
@@ -329,6 +375,10 @@ function handleUpdate(row?: ErpProduct) {
 function submitForm() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
+    form.value.attributeIds = selectedAttributeIds.value.join(',')
+    if (selectedAttributeIds.value.length) {
+      syncAttributeText()
+    }
     const action = form.value.id ? updateProduct(form.value) : addProduct(form.value)
     action.then(() => {
       ElMessage.success('保存成功')
@@ -336,6 +386,87 @@ function submitForm() {
       getList()
     })
   })
+}
+
+function buildTree(records: ErpMasterVO[]) {
+  const map = new Map<string, ErpMasterVO & { children: ErpMasterVO[] }>()
+  records.forEach(item => map.set(item.id, { ...item, children: [] }))
+  const roots: (ErpMasterVO & { children: ErpMasterVO[] })[] = []
+  map.forEach(item => {
+    const parentId = String(item.parentId || '0')
+    const parent = map.get(parentId)
+    if (parent && parent.id !== item.id) {
+      parent.children.push(item)
+    } else {
+      roots.push(item)
+    }
+  })
+  const sort = (items: (ErpMasterVO & { children: ErpMasterVO[] })[]) => {
+    items.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    items.forEach(item => sort(item.children as (ErpMasterVO & { children: ErpMasterVO[] })[]))
+  }
+  sort(roots)
+  return roots
+}
+
+function buildAllowedTree(records: ErpMasterVO[], allowedIds: string[]) {
+  const allowed = new Set(allowedIds)
+  const childrenMap = new Map<string, ErpMasterVO[]>()
+  records.forEach(item => {
+    const parentId = String(item.parentId || '0')
+    childrenMap.set(parentId, [...(childrenMap.get(parentId) || []), item])
+  })
+  const includeWithParents = new Set<string>()
+  const byId = new Map(records.map(item => [item.id, item]))
+  allowed.forEach(id => {
+    let current = byId.get(id)
+    while (current) {
+      includeWithParents.add(current.id)
+      current = byId.get(String(current.parentId || '0'))
+    }
+  })
+  return buildTree(records.filter(item => includeWithParents.has(item.id) || childrenMap.get(item.id)?.some(child => allowed.has(child.id))))
+}
+function buildPathTree(tree: ErpMasterVO[], parentPath = ''): ErpMasterVO[] {
+  return tree.map(item => {
+    const path = parentPath ? `${parentPath} / ${item.name}` : item.name
+    return {
+      ...item,
+      name: path,
+      children: item.children?.length ? buildPathTree(item.children, path) : []
+    }
+  })
+}
+
+function splitIds(value?: string) {
+  return value ? value.split(',').map(item => item.trim()).filter(Boolean) : []
+}
+
+function syncAttributeText() {
+  const names = selectedAttributeIds.value
+    .map(attributePathName)
+    .filter(Boolean) as string[]
+  form.value.attributeIds = selectedAttributeIds.value.join(',')
+  form.value.attributeText = names.length ? names.join(' / ') : ''
+}
+
+function attributePathName(attributeId: string) {
+  const byId = new Map(attributes.value.map(item => [item.id, item]))
+  const names: string[] = []
+  let current = byId.get(attributeId)
+  while (current) {
+    names.unshift(current.name)
+    current = byId.get(String(current.parentId || '0'))
+  }
+  return names.join(' / ')
+}
+
+function categoryChanged() {
+  const category = categories.value.find(item => item.id === form.value.categoryId)
+  const allowedIds = splitIds(category?.attributeIds)
+  if (!allowedIds.length) return
+  selectedAttributeIds.value = selectedAttributeIds.value.filter(id => allowedIds.includes(id))
+  syncAttributeText()
 }
 
 async function uploadProductImage(options: any) {
@@ -368,12 +499,19 @@ function triggerProductImageUpload() {
   input?.click()
 }
 
-function openQuickMaster(type: 'product-category' | 'product-brand' | 'unit') {
+function resetQuickMasterForm(type: QuickMasterType) {
   quickMasterType.value = type
+  quickMasterForm.id = undefined
   quickMasterForm.code = `${quickMasterConfig[type].prefix}_${Date.now().toString().slice(-8)}`
   quickMasterForm.name = ''
+  quickMasterForm.parentId = undefined
+  quickMasterForm.attributeIds = ''
   quickMasterForm.sortOrder = 0
   quickMasterForm.status = 1
+}
+
+function openQuickMaster(type: QuickMasterType) {
+  resetQuickMasterForm(type)
   quickMasterOpen.value = true
 }
 
@@ -387,6 +525,8 @@ async function submitQuickMaster() {
   if (!valid) return
   quickMasterSaving.value = true
   try {
+    quickMasterForm.parentId = undefined
+    quickMasterForm.attributeIds = ''
     await addMaster(quickMasterType.value, quickMasterForm)
     await loadOptions()
     const created = quickMasterMeta.value.list.value.find(item => item.code === quickMasterForm.code || item.name === quickMasterForm.name)
@@ -458,6 +598,16 @@ onMounted(() => {
 .search-wrapper { margin-bottom: 16px; }
 .table-wrapper { height: calc(100vh - 230px); }
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.table-product-image {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-lighter);
+}
+.image-empty {
+  color: var(--el-text-color-placeholder);
+}
 .product-image-field { display: flex; align-items: flex-start; gap: 14px; width: 100%; }
 .product-image-uploader { flex: 0 0 auto; }
 .product-image-uploader :deep(.el-upload) { display: block; }
@@ -539,6 +689,37 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   color: var(--el-text-color-secondary);
+}
+.master-tree-node {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.master-tree-node__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.master-tree-node__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.master-tree-node:hover .master-tree-node__actions,
+:deep(.el-tree-node__content:hover) .master-tree-node__actions {
+  opacity: 1;
+}
+.master-tree-node__action {
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .import-result { margin-top: 16px; }
 .import-errors { margin: 12px 0 0; padding-left: 18px; color: var(--el-color-danger); max-height: 180px; overflow: auto; }

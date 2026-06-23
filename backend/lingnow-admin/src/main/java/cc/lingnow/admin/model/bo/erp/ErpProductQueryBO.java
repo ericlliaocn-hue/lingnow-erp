@@ -9,6 +9,8 @@ public class ErpProductQueryBO {
     private String code;
     private String name;
     private String barcode;
+    private String keyword;
+    private String attributeIds;
     private Long categoryId;
     private Long brandId;
     private Integer status;

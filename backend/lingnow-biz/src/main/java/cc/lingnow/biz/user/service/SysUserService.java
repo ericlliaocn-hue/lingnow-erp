@@ -1,5 +1,6 @@
 package cc.lingnow.biz.user.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import cc.lingnow.biz.user.entity.SysUser;
 
@@ -35,5 +36,20 @@ public interface SysUserService extends IService<SysUser> {
      * @return 注册的用户
      */
     SysUser register(String username, String password, String phone);
+
+    /**
+     * 判断是否内部开发账号。
+     */
+    boolean isInternalAccount(SysUser user);
+
+    /**
+     * 判断是否拥有超级管理员权限。
+     */
+    boolean isSuperAdmin(SysUser user);
+
+    /**
+     * 业务可见用户查询条件，排除内部开发账号。
+     */
+    LambdaQueryWrapper<SysUser> businessVisibleQuery();
 
 }

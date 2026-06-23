@@ -30,9 +30,9 @@ public class StpInterfaceImpl implements StpInterface {
         // 仅处理 admin 端的权限
         if (StpAdminUtil.TYPE.equals(loginType)) {
             Long userId = Long.valueOf(loginId.toString());
-            // 超级管理员/admin账号直接返回所有权限
+            // 超级管理员账号直接返回所有权限
             SysUser user = userService.getById(userId);
-            if (user != null && "admin".equals(user.getUsername())) {
+            if (userService.isSuperAdmin(user)) {
                 return List.of("*:*:*");
             }
 
@@ -50,9 +50,9 @@ public class StpInterfaceImpl implements StpInterface {
         // 仅处理 admin 端的角色
         if (StpAdminUtil.TYPE.equals(loginType)) {
             Long userId = Long.valueOf(loginId.toString());
-            // 超级管理员/admin账号直接返回 admin 角色
+            // 超级管理员账号直接返回 admin 角色
             SysUser user = userService.getById(userId);
-            if (user != null && "admin".equals(user.getUsername())) {
+            if (userService.isSuperAdmin(user)) {
                 return List.of("admin");
             }
 

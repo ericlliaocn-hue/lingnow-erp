@@ -2,6 +2,7 @@ package cc.lingnow.biz.user.service.impl;
 
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import cc.lingnow.biz.user.entity.SysUser;
 import cc.lingnow.biz.user.mapper.SysUserMapper;
@@ -20,6 +21,9 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
+
+    private static final Integer INTERNAL_ACCOUNT_YES = 1;
+    private static final Integer INTERNAL_ACCOUNT_NO = 0;
 
     @Override
     public SysUser getByUsername(String username) {
@@ -57,6 +61,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         log.info("用户注册成功: username={}, phone={}", username, phone);
 
         return sysUser;
+    }
+
+    @Override
+    public boolean isInternalAccount(SysUser user) {
+        return user != null && INTERNAL_ACCOUNT_YES.equals(user.getInternalAccount());
+    }
+
+    @Override
+    public boolean isSuperAdmin(SysUser user) {
+        return user != null && ("admin".equals(user.getUsername()) || isInternalAccount(user));
+    }
+
+    @Override
+    public LambdaQueryWrapper<SysUser> businessVisibleQuery() {
+        return Wrappers.<SysUser>lambdaQuery().eq(SysUser::getInternalAccount, INTERNAL_ACCOUNT_NO);
     }
 
 }

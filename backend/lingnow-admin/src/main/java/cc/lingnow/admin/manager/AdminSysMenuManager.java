@@ -32,8 +32,8 @@ public class AdminSysMenuManager {
         SysUser user = userService.getById(userId);
 
         List<SysMenu> menus;
-        // 超级管理员/admin账号直接返回所有菜单
-        if (user != null && "admin".equals(user.getUsername())) {
+        // 超级管理员账号直接返回所有菜单
+        if (userService.isInternalAccount(user)) {
             menus = menuService.getAllMenuTree();
         } else {
             menus = menuService.getMenuTreeByUserId(userId);

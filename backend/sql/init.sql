@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS `sys_user`
     `birthday`        date         DEFAULT NULL COMMENT '生日',
     `region`          varchar(128) DEFAULT NULL COMMENT '所在地区',
     `status`          tinyint(1)   DEFAULT '1' COMMENT '状态 (1-正常 0-禁用)',
+    `internal_account` tinyint(1)  NOT NULL DEFAULT '0' COMMENT '内部开发账号 (1是 0否)',
     `dept_id`         varchar(64)  DEFAULT NULL COMMENT '部门ID',
     `create_time`     datetime     DEFAULT NULL,
     `update_time`     datetime     DEFAULT NULL,
@@ -721,6 +722,7 @@ CREATE TABLE IF NOT EXISTS `erp_product_category`
     `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
     `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
     `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `attribute_ids` varchar(500)         DEFAULT NULL COMMENT '关联属性节点ID集合',
     `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
     `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
     `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
@@ -734,6 +736,17 @@ CREATE TABLE IF NOT EXISTS `erp_product_category`
     KEY `idx_category_parent` (`parent_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP商品分类';
+
+INSERT INTO `erp_product_category` (`id`, `code`, `name`, `parent_id`, `attribute_ids`, `sort_order`, `status`, `del_flag`) VALUES
+(880000000101, 'PRODUCT_FINISHED_HANGER', '成品衣架', 0, '880000100001,880000100002,880000100003,880000100004', 10, 1, 0),
+(880000000102, 'PRODUCT_PARTS', '配件', 0, '880000100001,880000100002,880000100003,880000100004', 20, 1, 0)
+ON DUPLICATE KEY UPDATE
+`name` = VALUES(`name`),
+`parent_id` = VALUES(`parent_id`),
+`attribute_ids` = VALUES(`attribute_ids`),
+`sort_order` = VALUES(`sort_order`),
+`status` = VALUES(`status`),
+`del_flag` = VALUES(`del_flag`);
 
 CREATE TABLE IF NOT EXISTS `erp_unit`
 (
@@ -812,6 +825,18 @@ CREATE TABLE IF NOT EXISTS `erp_product_attribute`
     UNIQUE KEY `uk_attribute_code` (`code`, `del_flag`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP商品属性';
+
+INSERT INTO `erp_product_attribute` (`id`, `code`, `name`, `parent_id`, `sort_order`, `status`, `del_flag`) VALUES
+(880000100001, 'ATTR_PRODUCT_STYLE', '商品款式', 0, 10, 1, 0),
+(880000100002, 'ATTR_CLOTHES_HOOK', '商品衣钩', 0, 20, 1, 0),
+(880000100003, 'ATTR_PRODUCT_ACCESSORY', '商品配件', 0, 30, 1, 0),
+(880000100004, 'ATTR_PRODUCT_CUSTOM', '商品定制', 0, 40, 1, 0)
+ON DUPLICATE KEY UPDATE
+`name` = VALUES(`name`),
+`parent_id` = VALUES(`parent_id`),
+`sort_order` = VALUES(`sort_order`),
+`status` = VALUES(`status`),
+`del_flag` = VALUES(`del_flag`);
 
 CREATE TABLE IF NOT EXISTS `erp_customer`
 (
@@ -953,6 +978,7 @@ CREATE TABLE IF NOT EXISTS `erp_product`
     `category_id`    bigint(20)              DEFAULT NULL COMMENT '商品分类ID',
     `brand_id`       bigint(20)              DEFAULT NULL COMMENT '品牌ID',
     `unit_id`        bigint(20)              DEFAULT NULL COMMENT '单位ID',
+    `attribute_ids`  varchar(500)            DEFAULT NULL COMMENT '属性节点ID集合',
     `attribute_text` varchar(255)            DEFAULT NULL COMMENT '辅助属性',
     `barcode`        varchar(128)            DEFAULT NULL COMMENT '条码',
     `location`       varchar(128)            DEFAULT NULL COMMENT '货位',
@@ -998,7 +1024,8 @@ CREATE TABLE IF NOT EXISTS `erp_bill`
     `discount_amount` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '优惠金额',
     `other_amount`   decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '其他费用',
     `payable_amount` decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '应收/应付金额',
-    `paid_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '实收/实付金额',
+    `paid_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '付款金额',
+    `payment_method` varchar(32)      DEFAULT NULL COMMENT '付款方式',
     `debt_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '欠款金额',
     `audit_status`   tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态 0未审核 1已审核',
     `payment_status` varchar(32)     NOT NULL DEFAULT 'UNPAID' COMMENT '收付款状态',
@@ -1032,7 +1059,15 @@ CREATE TABLE IF NOT EXISTS `erp_bill_item`
     `product_id`      bigint(20)      NOT NULL COMMENT '商品ID',
     `product_code`    varchar(64)     NOT NULL COMMENT '商品编号',
     `product_name`    varchar(128)    NOT NULL COMMENT '商品名称',
+    `product_image_url` varchar(500)            DEFAULT NULL COMMENT '商品图片快照',
     `spec`            varchar(128)             DEFAULT NULL COMMENT '规格型号',
+    `attribute_text`  varchar(500)             DEFAULT NULL COMMENT '商品属性快照',
+    `category_level1_id` bigint(20)            DEFAULT NULL COMMENT '一级类目ID',
+    `category_level1_name` varchar(128)        DEFAULT NULL COMMENT '一级类目快照',
+    `category_level2_id` bigint(20)            DEFAULT NULL COMMENT '二级类目ID',
+    `category_level2_name` varchar(128)        DEFAULT NULL COMMENT '二级类目快照',
+    `option_attribute_ids` varchar(500)        DEFAULT NULL COMMENT '选项属性ID集合',
+    `option_attribute_text` varchar(500)       DEFAULT NULL COMMENT '选项属性快照',
     `unit_id`         bigint(20)               DEFAULT NULL COMMENT '单位ID',
     `warehouse_id`    bigint(20)      NOT NULL COMMENT '仓库ID',
     `qty`             decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '数量',
@@ -1334,6 +1369,11 @@ INSERT IGNORE INTO `sys_user`
 (`user_id`, `username`, `password`, `nickname`, `status`, `create_time`, `del_flag`)
 VALUES (1, 'admin', '$2a$10$a2pcS0rGCTLO.tR9UbvlnuXmHH5O/d/iXmSOENmr90Gvcd.plM9Au', '超级管理员', 1, NOW(), 0);
 
+-- Development-only Super Admin User
+INSERT IGNORE INTO `sys_user`
+(`user_id`, `username`, `password`, `nickname`, `status`, `internal_account`, `create_time`, `del_flag`)
+VALUES (900000000001, 'superadmin', '$2a$10$9oRdYxve8Vo2WRWRjO860OrdiCh.xt.uV0sQdu4tueHa0Oo6PUGGq', '开发专用账号', 1, 1, NOW(), 0);
+
 -- Default Super Admin Role
 INSERT IGNORE INTO `sys_role`
 (`role_id`, `role_name`, `role_key`, `sort_order`, `status`, `create_time`, `del_flag`)
@@ -1405,10 +1445,10 @@ VALUES
 (1530, 1500, '已办审批', 1, 'Finished', '/erp/approval/done', 'erp/approval/done', 'erp:approval:task', 53, 1, 1, 'N', NOW(), 0),
 (1540, 1500, '流程设计器', 1, 'Share', '/erp/workflow/designer', 'erp/approval/designer', 'erp:workflow:designer', 54, 1, 1, 'N', NOW(), 0),
 (2000, 0, '商品', 0, 'Goods', '/erp/product', 'Layout', NULL, 100, 1, 1, 'N', NOW(), 0),
-(2010, 2000, '商品分类', 1, 'FolderOpened', '/erp/product/category', 'erp/master/index', 'erp:product-category:list', 101, 1, 1, 'N', NOW(), 0),
-(2020, 2000, '单位管理', 1, 'CollectionTag', '/erp/product/unit', 'erp/master/index', 'erp:unit:list', 102, 1, 1, 'N', NOW(), 0),
-(2030, 2000, '商品品牌', 1, 'PriceTag', '/erp/product/brand', 'erp/master/index', 'erp:product-brand:list', 103, 1, 1, 'N', NOW(), 0),
-(2040, 2000, '属性设置', 1, 'Operation', '/erp/product/attribute', 'erp/master/index', 'erp:product-attribute:list', 104, 1, 1, 'N', NOW(), 0),
+(2010, 2000, '商品分类', 1, 'FolderOpened', '/erp/product/category', 'erp/master/index', 'erp:product-category:list', 101, 0, 1, 'N', NOW(), 0),
+(2020, 2000, '单位管理', 1, 'CollectionTag', '/erp/product/unit', 'erp/master/index', 'erp:unit:list', 102, 0, 1, 'N', NOW(), 0),
+(2030, 2000, '商品品牌', 1, 'PriceTag', '/erp/product/brand', 'erp/master/index', 'erp:product-brand:list', 103, 0, 1, 'N', NOW(), 0),
+(2040, 2000, '商品属性', 1, 'Operation', '/erp/product/attribute', 'erp/master/index', 'erp:product-attribute:list', 104, 1, 1, 'N', NOW(), 0),
 (2050, 2000, '商品管理', 1, 'Goods', '/erp/product/list', 'erp/product/index', 'erp:product:list', 100, 1, 1, 'N', NOW(), 0),
 (2100, 0, 'ERP设置', 0, 'Tools', '/erp/setting', 'Layout', NULL, 110, 1, 1, 'N', NOW(), 0),
 (2110, 2100, '客户管理', 1, 'User', '/erp/setting/customer', 'erp/master/index', 'erp:customer:list', 111, 1, 1, 'N', NOW(), 0),
@@ -1613,7 +1653,7 @@ VALUES
 
 -- Assign Super Admin Role to All Menus
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
-SELECT 1, menu_id FROM `sys_menu`;
+SELECT 1, menu_id FROM `sys_menu` WHERE menu_id NOT IN (1100, 1200, 1300, 1400, 1500);
 
 -- Default Dictionaries
 INSERT IGNORE INTO `sys_dict_type`

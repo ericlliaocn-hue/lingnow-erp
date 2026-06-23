@@ -243,7 +243,7 @@ public class MonitorController {
             }
 
             SysUser sysUser = sysUserService.getById(userId);
-            if (sysUser == null) {
+            if (sysUser == null || sysUserService.isInternalAccount(sysUser)) {
                 continue;
             }
 

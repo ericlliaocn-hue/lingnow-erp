@@ -43,7 +43,7 @@ public class SysStaffManager {
      */
     public PageResult<SysStaffVO> listStaff(SysStaffQueryBO query) {
         Page<SysUser> page = new Page<>(query.getCurrent(), query.getSize());
-        LambdaQueryWrapper<SysUser> lqw = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<SysUser> lqw = userService.businessVisibleQuery();
         lqw.eq(SysUser::getDelFlag, false)
                 .eq(ObjectUtil.isNotNull(query.getDeptId()), SysUser::getDeptId, query.getDeptId())
                 .like(ObjectUtil.isNotEmpty(query.getUsername()), SysUser::getUsername, query.getUsername())
@@ -73,6 +73,9 @@ public class SysStaffManager {
         SysUser user = userService.getById(userId);
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_EXIST);
+        }
+        if (userService.isInternalAccount(user)) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
         }
         SysStaffVO vo = BeanUtil.copyProperties(user, SysStaffVO.class);
         if (user.getDeptId() != null) {
@@ -140,7 +143,7 @@ public class SysStaffManager {
      * 删除员工
      */
     public void removeStaff(List<Long> userIds) {
-        if (CollUtil.contains(userIds, 1L)) {
+        if (CollUtil.contains(userIds, 1L) || userService.listByIds(userIds).stream().anyMatch(userService::isInternalAccount)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR); // Cannot delete admin
         }
         userService.removeByIds(userIds);
@@ -150,7 +153,8 @@ public class SysStaffManager {
      * 重置密码
      */
     public void resetPassword(Long userId, String password) {
-        if (userId == 1L) {
+        SysUser current = userService.getById(userId);
+        if (userId == 1L || userService.isInternalAccount(current)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Cannot reset admin password");
         }
         SysUser user = new SysUser();
@@ -164,7 +168,8 @@ public class SysStaffManager {
      */
     @Transactional(rollbackFor = Exception.class)
     public void assignRoles(Long userId, List<Long> roleIds) {
-        if (userId == 1L) {
+        SysUser current = userService.getById(userId);
+        if (userId == 1L || userService.isInternalAccount(current)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Cannot assign roles to admin");
         }
         roleService.assignRoles(userId, roleIds.toArray(new Long[0]));

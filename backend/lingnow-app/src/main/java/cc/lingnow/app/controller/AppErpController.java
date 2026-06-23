@@ -177,6 +177,8 @@ public class AppErpController {
         row.put("spec", product.getSpec());
         row.put("unitId", product.getUnitId());
         row.put("unitName", unit == null ? null : unit.getName());
+        row.put("attributeIds", product.getAttributeIds());
+        row.put("attributeText", product.getAttributeText());
         row.put("barcode", product.getBarcode());
         row.put("imageUrl", product.getImageUrl());
         row.put("salePrice", product.getSalePrice());
@@ -203,6 +205,7 @@ public class AppErpController {
         row.put("totalQty", bill.getTotalQty());
         row.put("payableAmount", bill.getPayableAmount());
         row.put("paidAmount", bill.getPaidAmount());
+        row.put("paymentMethod", bill.getPaymentMethod());
         row.put("debtAmount", bill.getDebtAmount());
         row.put("auditStatus", bill.getAuditStatus());
         row.put("paymentStatus", bill.getPaymentStatus());

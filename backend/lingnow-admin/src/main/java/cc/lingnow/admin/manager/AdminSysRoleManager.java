@@ -5,6 +5,9 @@ import cc.lingnow.biz.role.entity.SysRole;
 import cc.lingnow.biz.role.entity.SysUserRole;
 import cc.lingnow.biz.role.service.SysRoleService;
 import cc.lingnow.biz.user.entity.SysUser;
+import cc.lingnow.biz.user.service.SysUserService;
+import cc.lingnow.common.enums.ErrorCode;
+import cc.lingnow.common.exception.BusinessException;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -23,6 +26,7 @@ import java.util.List;
 public class AdminSysRoleManager {
 
     private final SysRoleService roleService;
+    private final SysUserService userService;
 
     /**
      * 分页查询角色列表
@@ -85,6 +89,7 @@ public class AdminSysRoleManager {
      * 分配角色给用户
      */
     public void assignRoles(Long userId, Long[] roleIds) {
+        ensureBusinessVisibleUser(userId);
         roleService.assignRoles(userId, roleIds);
     }
 
@@ -106,6 +111,7 @@ public class AdminSysRoleManager {
      * 取消授权用户
      */
     public void deleteAuthUser(SysUserRole userRole) {
+        ensureBusinessVisibleUser(userRole.getUserId());
         roleService.deleteAuthUser(userRole);
     }
 
@@ -114,6 +120,7 @@ public class AdminSysRoleManager {
      */
     public void deleteAuthUsers(Long roleId, String userIds) {
         Long[] ids = Arrays.stream(userIds.split(",")).map(Long::valueOf).toArray(Long[]::new);
+        ensureBusinessVisibleUsers(ids);
         roleService.deleteAuthUsers(roleId, ids);
     }
 
@@ -122,6 +129,20 @@ public class AdminSysRoleManager {
      */
     public void insertAuthUsers(Long roleId, String userIds) {
         Long[] ids = Arrays.stream(userIds.split(",")).map(Long::valueOf).toArray(Long[]::new);
+        ensureBusinessVisibleUsers(ids);
         roleService.insertAuthUsers(roleId, ids);
+    }
+
+    private void ensureBusinessVisibleUser(Long userId) {
+        SysUser user = userService.getById(userId);
+        if (user == null || userService.isInternalAccount(user)) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
+        }
+    }
+
+    private void ensureBusinessVisibleUsers(Long[] userIds) {
+        for (Long userId : userIds) {
+            ensureBusinessVisibleUser(userId);
+        }
     }
 }

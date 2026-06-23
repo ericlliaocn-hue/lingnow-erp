@@ -30,6 +30,7 @@ public class ErpBillVO {
     private BigDecimal otherAmount;
     private BigDecimal payableAmount;
     private BigDecimal paidAmount;
+    private String paymentMethod;
     private BigDecimal debtAmount;
     private Integer auditStatus;
     private String paymentStatus;
@@ -51,7 +52,15 @@ public class ErpBillVO {
         private Long productId;
         private String productCode;
         private String productName;
+        private String productImageUrl;
         private String spec;
+        private String attributeText;
+        private Long categoryLevel1Id;
+        private String categoryLevel1Name;
+        private Long categoryLevel2Id;
+        private String categoryLevel2Name;
+        private String optionAttributeIds;
+        private String optionAttributeText;
         private Long unitId;
         private String unitName;
         private Long warehouseId;

@@ -204,7 +204,7 @@ public class ErpFinanceController {
             return false;
         }
         SysUser user = userService.getById(userId);
-        return user != null && "admin".equals(user.getUsername());
+        return userService.isSuperAdmin(user);
     }
 
     private Long currentUserId() {

@@ -24,10 +24,12 @@ export interface ErpMasterVO {
   accountType?: string
   openingBalance?: number
   discountRate?: number
+  attributeIds?: string
   sortOrder: number
   status: number
   remark?: string
   createTime?: string
+  children?: ErpMasterVO[]
 }
 
 export interface ErpMasterQuery {
@@ -52,6 +54,7 @@ export interface ErpMasterForm {
   accountType?: string
   openingBalance?: number
   discountRate?: number
+  attributeIds?: string
   sortOrder: number
   status: number
   remark?: string

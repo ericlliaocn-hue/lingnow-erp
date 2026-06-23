@@ -105,12 +105,19 @@ public class LogAspect {
                     // 1. 尝试从Session获取
                     Object userObj = StpAdminUtil.stpLogic.getSession().get("loginUser");
                     if (userObj instanceof SysUser) {
-                        username = ((SysUser) userObj).getUsername();
+                        SysUser user = (SysUser) userObj;
+                        if (userService.isInternalAccount(user)) {
+                            return;
+                        }
+                        username = user.getUsername();
                     } else {
                         // 2. 如果Session没有，查询数据库
                         Long userId = StpAdminUtil.getLoginIdAsLong();
                         SysUser user = userService.getById(userId);
                         if (user != null) {
+                            if (userService.isInternalAccount(user)) {
+                                return;
+                            }
                             username = user.getUsername();
                         } else {
                             username = "Admin-" + userId;

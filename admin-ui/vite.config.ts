@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
     proxy['/files'] = {
       target: adminApiTarget,
       changeOrigin: true,
-      rewrite: (requestPath) => '/admin-api' + requestPath
+      rewrite: (requestPath) => requestPath
     }
   }
 

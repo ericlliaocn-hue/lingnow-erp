@@ -45,6 +45,9 @@ public class ErpMasterDataSaveBO {
     @Schema(description = "折扣率")
     private BigDecimal discountRate;
 
+    @Schema(description = "关联属性节点ID集合")
+    private String attributeIds;
+
     @Schema(description = "排序")
     private Integer sortOrder = 0;
 

@@ -27,6 +27,7 @@ public class ErpBillSaveBO {
     private BigDecimal discountAmount;
     private BigDecimal otherAmount;
     private BigDecimal paidAmount;
+    private String paymentMethod;
     private String remark;
     private String attachmentUrl;
     @Valid
@@ -39,6 +40,13 @@ public class ErpBillSaveBO {
         @NotNull(message = "商品不能为空")
         private Long productId;
         private Long warehouseId;
+        private String attributeText;
+        private Long categoryLevel1Id;
+        private String categoryLevel1Name;
+        private Long categoryLevel2Id;
+        private String categoryLevel2Name;
+        private String optionAttributeIds;
+        private String optionAttributeText;
         @NotNull(message = "数量不能为空")
         private BigDecimal qty;
         @NotNull(message = "单价不能为空")

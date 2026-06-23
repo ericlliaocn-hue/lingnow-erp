@@ -30,8 +30,10 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Tag(name = "ERP商品")
 @RestController
@@ -43,6 +45,7 @@ public class ErpProductController {
     private final ErpProductCategoryService categoryService;
     private final ErpProductBrandService brandService;
     private final ErpUnitService unitService;
+    private final ErpProductAttributeService attributeService;
     private final ErpBillItemService billItemService;
     private final ErpStockBalanceService stockBalanceService;
 
@@ -127,6 +130,7 @@ public class ErpProductController {
                         text(item.getBrandName()),
                         text(item.getUnitName()),
                         text(item.getAttributeText()),
+                        text(item.getImageUrl()),
                         text(item.getBarcode()),
                         text(item.getLocation()),
                         money(item.getPurchasePrice()),
@@ -138,7 +142,7 @@ public class ErpProductController {
                         text(item.getRemark())
                 )).toList();
         CsvExportUtil.write(response, "商品管理.csv",
-                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "条码", "货位", "采购价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
+                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "商品图片", "条码", "货位", "采购价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
                 rows);
     }
 
@@ -146,7 +150,7 @@ public class ErpProductController {
     public void importTemplate(HttpServletResponse response) throws Exception {
         StpAdminUtil.stpLogic.checkPermission("erp:product:import");
         CsvExportUtil.write(response, "商品导入模板.csv",
-                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "条码", "货位", "采购价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
+                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "商品图片", "条码", "货位", "采购价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
                 List.of());
     }
 
@@ -192,6 +196,17 @@ public class ErpProductController {
                 .eq(query.getCategoryId() != null, "category_id", query.getCategoryId())
                 .eq(query.getBrandId() != null, "brand_id", query.getBrandId())
                 .eq(query.getStatus() != null, "status", query.getStatus());
+        if (StrUtil.isNotBlank(query.getKeyword())) {
+            wrapper.and(item -> item
+                    .like("code", query.getKeyword())
+                    .or()
+                    .like("name", query.getKeyword())
+                    .or()
+                    .like("barcode", query.getKeyword()));
+        }
+        for (String attributeId : splitIds(query.getAttributeIds())) {
+            wrapper.apply("FIND_IN_SET({0}, attribute_ids)", attributeId);
+        }
         return wrapper;
     }
 
@@ -211,6 +226,7 @@ public class ErpProductController {
         product.setRetailPrice(nvl(product.getRetailPrice()));
         product.setMinStock(nvl(product.getMinStock()));
         product.setMaxStock(nvl(product.getMaxStock()));
+        product.setAttributeText(attributeText(product.getAttributeIds(), product.getAttributeText()));
         return product;
     }
 
@@ -219,6 +235,7 @@ public class ErpProductController {
         vo.setCategoryName(masterName(categoryService.getById(product.getCategoryId())));
         vo.setBrandName(masterName(brandService.getById(product.getBrandId())));
         vo.setUnitName(masterName(unitService.getById(product.getUnitId())));
+        vo.setAttributeText(attributeText(product.getAttributeIds(), product.getAttributeText()));
         return vo;
     }
 
@@ -240,16 +257,54 @@ public class ErpProductController {
         bo.setBrandId(brandId(value(values, 4)));
         bo.setUnitId(unitId(value(values, 5)));
         bo.setAttributeText(value(values, 6));
-        bo.setBarcode(value(values, 7));
-        bo.setLocation(value(values, 8));
-        bo.setPurchasePrice(decimal(value(values, 9), "采购价"));
-        bo.setSalePrice(decimal(value(values, 10), "销售价"));
-        bo.setRetailPrice(decimal(value(values, 11), "零售价"));
-        bo.setMinStock(decimal(value(values, 12), "最低库存"));
-        bo.setMaxStock(decimal(value(values, 13), "最高库存"));
-        bo.setStatus(status(value(values, 14)));
-        bo.setRemark(value(values, 15));
+        bo.setImageUrl(value(values, 7));
+        bo.setBarcode(value(values, 8));
+        bo.setLocation(value(values, 9));
+        bo.setPurchasePrice(decimal(value(values, 10), "采购价"));
+        bo.setSalePrice(decimal(value(values, 11), "销售价"));
+        bo.setRetailPrice(decimal(value(values, 12), "零售价"));
+        bo.setMinStock(decimal(value(values, 13), "最低库存"));
+        bo.setMaxStock(decimal(value(values, 14), "最高库存"));
+        bo.setStatus(status(value(values, 15)));
+        bo.setRemark(value(values, 16));
         return bo;
+    }
+
+    private String attributeText(String attributeIds, String fallback) {
+        if (StrUtil.isBlank(attributeIds)) {
+            return fallback;
+        }
+        List<Long> ids = Arrays.stream(attributeIds.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .map(value -> {
+                    try {
+                        return Long.valueOf(value);
+                    } catch (NumberFormatException ex) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+        if (ids.isEmpty()) {
+            return fallback;
+        }
+        List<String> names = attributeService.listByIds(ids).stream()
+                .filter(item -> Integer.valueOf(1).equals(item.getStatus()))
+                .map(ErpProductAttribute::getName)
+                .filter(StrUtil::isNotBlank)
+                .toList();
+        return names.isEmpty() ? fallback : String.join(" / ", names);
+    }
+
+    private List<String> splitIds(String value) {
+        if (StrUtil.isBlank(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .toList();
     }
 
     private List<String> parseCsvLine(String line) {

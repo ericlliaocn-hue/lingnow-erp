@@ -33,13 +33,23 @@
           </div>
           <div>
             <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
+            <el-button v-if="isTreeMaster" type="primary" plain :icon="Plus" :disabled="single" @click="handleAddChild()">新增下级</el-button>
             <el-button type="success" :icon="Edit" :disabled="single" @click="handleUpdate()">修改</el-button>
             <el-button type="danger" :icon="Delete" :disabled="multiple" @click="handleDelete()">删除</el-button>
           </div>
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange" border height="100%">
+      <el-table
+        v-loading="loading"
+        :data="tableData"
+        @selection-change="handleSelectionChange"
+        border
+        height="100%"
+        row-key="id"
+        default-expand-all
+        :tree-props="{ children: 'children' }"
+      >
         <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="code" label="编码" min-width="140" />
         <el-table-column prop="name" label="名称" min-width="160" />
@@ -59,13 +69,14 @@
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" :icon="Edit" @click="handleUpdate(row)">修改</el-button>
+            <el-button v-if="isTreeMaster" link type="primary" :icon="Plus" @click="handleAddChild(row)">下级</el-button>
             <el-button link type="primary" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <pagination
-        v-show="total > 0"
+        v-show="total > 0 && !isTreeMaster"
         :total="total"
         v-model:page="queryParams.current"
         v-model:limit="queryParams.size"
@@ -80,6 +91,19 @@
         </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" :placeholder="`请输入${config.name}名称`" />
+        </el-form-item>
+        <el-form-item v-if="isTreeMaster" :label="isProductCategory ? '上级分类' : '上级节点'" prop="parentId">
+          <el-tree-select
+            v-model="form.parentId"
+            :data="treeParentOptions"
+            check-strictly
+            clearable
+            filterable
+            node-key="id"
+            :props="{ label: 'name', value: 'id', children: 'children' }"
+            style="width: 100%"
+            :placeholder="isProductCategory ? '不选则作为顶级分类' : '不选则为根节点'"
+          />
         </el-form-item>
         <el-form-item v-if="config.hasContact" label="联系人" prop="contact">
           <el-input v-model="form.contact" placeholder="请输入联系人" />
@@ -177,7 +201,7 @@ const configs: Record<MasterType, { title: string; name: string; hasContact?: bo
   'product-category': { title: '商品分类', name: '分类' },
   unit: { title: '单位管理', name: '单位' },
   'product-brand': { title: '商品品牌', name: '品牌' },
-  'product-attribute': { title: '属性设置', name: '属性' },
+  'product-attribute': { title: '商品属性', name: '属性' },
   customer: { title: '客户管理', name: '客户', hasContact: true, hasAddress: true },
   supplier: { title: '供应商管理', name: '供应商', hasContact: true, hasAddress: true },
   warehouse: { title: '仓库管理', name: '仓库', hasContact: true, hasAddress: true },
@@ -185,6 +209,7 @@ const configs: Record<MasterType, { title: string; name: string; hasContact?: bo
   'agent-level': { title: '代理等级', name: '代理等级' }
 }
 const config = computed(() => configs[type.value] || configs.unit)
+const isAttributeTree = computed(() => type.value === 'product-attribute')
 
 const queryFormRef = ref()
 const formRef = ref()
@@ -218,10 +243,15 @@ const state = reactive({
   }
 })
 const { queryParams, form, rules } = toRefs(state)
+const isProductCategory = computed(() => type.value === 'product-category')
+const isTreeMaster = computed(() => isAttributeTree.value || isProductCategory.value)
+const tableData = computed(() => isTreeMaster.value ? buildTree(list.value) : list.value)
+const treeParentOptions = computed(() => [{ id: '0', code: 'ROOT', name: isProductCategory.value ? '商品' : '根节点', sortOrder: 0, status: 1, children: buildTree(list.value) } as ErpMasterVO])
 
 function getList() {
   loading.value = true
-  listMaster(type.value, queryParams.value).then(res => {
+  const params = isTreeMaster.value ? { ...queryParams.value, current: 1, size: 1000 } : queryParams.value
+  listMaster(type.value, params).then(res => {
     list.value = res.records
     total.value = Number(res.total)
   }).finally(() => {
@@ -271,6 +301,14 @@ function handleAdd() {
   open.value = true
 }
 
+function handleAddChild(row?: ErpMasterVO) {
+  const parent = row || list.value.find(item => item.id === ids.value[0])
+  reset()
+  form.value.parentId = parent?.id || '0'
+  dialogTitle.value = `新增${config.value.name}`
+  open.value = true
+}
+
 function openAddressParse() {
   addressRawText.value = [form.value.contact, form.value.phone, form.value.address].filter(Boolean).join(' ')
   addressResult.value = undefined
@@ -309,6 +347,13 @@ function handleUpdate(row?: ErpMasterVO) {
 function submitForm() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
+    if (!form.value.parentId) {
+      form.value.parentId = '0'
+    }
+    if (form.value.id && form.value.parentId === form.value.id) {
+      ElMessage.warning('上级节点不能选择自己')
+      return
+    }
     const action = form.value.id ? updateMaster(type.value, form.value) : addMaster(type.value, form.value)
     action.then(() => {
       ElMessage.success('保存成功')
@@ -342,6 +387,27 @@ watch(() => route.path, () => {
 })
 
 onMounted(getList)
+
+function buildTree(records: ErpMasterVO[]) {
+  const map = new Map<string, ErpMasterVO & { children: ErpMasterVO[] }>()
+  records.forEach(item => map.set(item.id, { ...item, children: [] }))
+  const roots: (ErpMasterVO & { children: ErpMasterVO[] })[] = []
+  map.forEach(item => {
+    const parentId = String(item.parentId || '0')
+    const parent = map.get(parentId)
+    if (parent && parent.id !== item.id) {
+      parent.children.push(item)
+    } else {
+      roots.push(item)
+    }
+  })
+  const sort = (items: (ErpMasterVO & { children: ErpMasterVO[] })[]) => {
+    items.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    items.forEach(item => sort(item.children as (ErpMasterVO & { children: ErpMasterVO[] })[]))
+  }
+  sort(roots)
+  return roots
+}
 </script>
 
 <style scoped>

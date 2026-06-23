@@ -58,6 +58,7 @@ public class AdminSysLogManager {
                 .eq(ObjUtil.isNotEmpty(query.getStatus()), SysOperLog::getStatus, query.getStatus())
                 .ge(ObjUtil.isNotEmpty(query.getStartTime()), SysOperLog::getOperTime, query.getStartTime())
                 .le(ObjUtil.isNotEmpty(query.getEndTime()), SysOperLog::getOperTime, query.getEndTime())
+                .notInSql(SysOperLog::getOperName, "SELECT username FROM sys_user WHERE internal_account = 1")
                 .orderByDesc(SysOperLog::getOperId);
 
         IPage<SysOperLog> result = operLogService.page(page, wrapper);
@@ -81,6 +82,7 @@ public class AdminSysLogManager {
                 .eq(ObjUtil.isNotEmpty(query.getStatus()), SysLoginLog::getStatus, query.getStatus())
                 .ge(ObjUtil.isNotEmpty(query.getStartTime()), SysLoginLog::getLoginTime, query.getStartTime())
                 .le(ObjUtil.isNotEmpty(query.getEndTime()), SysLoginLog::getLoginTime, query.getEndTime())
+                .notInSql(SysLoginLog::getUserName, "SELECT username FROM sys_user WHERE internal_account = 1")
                 .orderByDesc(SysLoginLog::getInfoId);
 
         IPage<SysLoginLog> result = loginLogService.page(page, wrapper);
@@ -102,6 +104,7 @@ public class AdminSysLogManager {
         wrapper.like(ObjUtil.isNotEmpty(query.getTraceId()), SysErrorLog::getTraceId, query.getTraceId())
                 .like(ObjUtil.isNotEmpty(query.getUserName()), SysErrorLog::getUserName, query.getUserName())
                 .like(ObjUtil.isNotEmpty(query.getRequestUrl()), SysErrorLog::getRequestUrl, query.getRequestUrl())
+                .notInSql(SysErrorLog::getUserName, "SELECT username FROM sys_user WHERE internal_account = 1")
                 .orderByDesc(SysErrorLog::getCreateTime);
 
         IPage<SysErrorLog> result = errorLogService.page(page, wrapper);
@@ -123,6 +126,7 @@ public class AdminSysLogManager {
         wrapper.like(ObjUtil.isNotEmpty(query.getTraceId()), SysSlowSqlLog::getTraceId, query.getTraceId())
                 .like(ObjUtil.isNotEmpty(query.getUserName()), SysSlowSqlLog::getUserName, query.getUserName())
                 .ge(ObjUtil.isNotEmpty(query.getMinExecutionTime()), SysSlowSqlLog::getExecutionTime, query.getMinExecutionTime())
+                .notInSql(SysSlowSqlLog::getUserName, "SELECT username FROM sys_user WHERE internal_account = 1")
                 .orderByDesc(SysSlowSqlLog::getCreateTime);
 
         IPage<SysSlowSqlLog> result = slowSqlLogService.page(page, wrapper);

@@ -93,6 +93,12 @@ public class SysUser extends BaseEntity implements Serializable {
     private Integer status;
 
     /**
+     * 内部开发账号 (1-是 0-否)
+     */
+    @Schema(description = "内部开发账号")
+    private Integer internalAccount;
+
+    /**
      * 部门ID
      */
     @Schema(description = "部门ID")

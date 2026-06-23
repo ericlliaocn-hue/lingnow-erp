@@ -82,6 +82,7 @@ public class ErpMasterDataController {
         StpAdminUtil.stpLogic.checkPermission(permission(type, "add"));
         IService service = service(type);
         ensureCodeUnique(service, bo.getCode(), null);
+        ensureValidParent(bo.getParentId(), null);
         service.save(toEntity(type, bo));
         return Result.success();
     }
@@ -96,6 +97,7 @@ public class ErpMasterDataController {
         StpAdminUtil.stpLogic.checkPermission(permission(type, "edit"));
         IService service = service(type);
         ensureCodeUnique(service, bo.getCode(), bo.getId());
+        ensureValidParent(bo.getParentId(), bo.getId());
         service.updateById(toEntity(type, bo));
         return Result.success();
     }
@@ -148,7 +150,7 @@ public class ErpMasterDataController {
                 }
                 case "product-brand" -> ensureNoProductRef("brand_id", id, "商品品牌已被商品引用，不能删除，请停用");
                 case "product-attribute" -> {
-                    // 当前商品只保存辅助属性文本，没有属性ID外键；未产生真实引用时允许删除。
+                    ensureNoMasterChild(productAttributeService, id, "属性存在下级节点，不能删除");
                 }
                 case "customer" -> ensureNoPartnerRef(id, "CUSTOMER", "客户已被单据、财务单据或往来流水引用，不能删除，请停用");
                 case "supplier" -> ensureNoPartnerRef(id, "SUPPLIER", "供应商已被单据、财务单据或往来流水引用，不能删除，请停用");
@@ -243,6 +245,12 @@ public class ErpMasterDataController {
             entity.setParentId(0L);
         }
         return entity;
+    }
+
+    private void ensureValidParent(Long parentId, Long id) {
+        if (id != null && parentId != null && id.equals(parentId)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "上级节点不能选择自己");
+        }
     }
 
     private IService<? extends ErpMasterData> service(String type) {

@@ -54,8 +54,9 @@ public class DashboardController {
         LocalDateTime weekStart = LocalDate.now().minusDays(6).atStartOfDay();
         LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
 
-        long totalUsers = sysUserService.count();
+        long totalUsers = sysUserService.count(sysUserService.businessVisibleQuery());
         long disabledUsers = sysUserService.count(Wrappers.<SysUser>lambdaQuery()
+                .eq(SysUser::getInternalAccount, 0)
                 .eq(SysUser::getStatus, CommonConstants.STATUS_DISABLED));
         long activeUsers = Math.max(totalUsers - disabledUsers, 0);
         List<Map<String, Object>> onlineUsers = getOnlineUsers();
@@ -140,14 +141,15 @@ public class DashboardController {
 
     private List<Map<String, Object>> buildGenderStats() {
         return List.of(
-                item("女", sysUserService.count(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getGender, 0))),
-                item("男", sysUserService.count(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getGender, 1))),
-                item("其他", sysUserService.count(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getGender, 2)))
+                item("女", sysUserService.count(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getInternalAccount, 0).eq(SysUser::getGender, 0))),
+                item("男", sysUserService.count(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getInternalAccount, 0).eq(SysUser::getGender, 1))),
+                item("其他", sysUserService.count(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getInternalAccount, 0).eq(SysUser::getGender, 2)))
         );
     }
 
     private long countCreatedUsers(LocalDateTime start, LocalDateTime end) {
         return sysUserService.count(Wrappers.<SysUser>lambdaQuery()
+                .eq(SysUser::getInternalAccount, 0)
                 .ge(SysUser::getCreateTime, start)
                 .lt(SysUser::getCreateTime, end));
     }
@@ -171,7 +173,7 @@ public class DashboardController {
                 continue;
             }
             SysUser sysUser = sysUserService.getById(userId);
-            if (sysUser == null) {
+            if (sysUser == null || sysUserService.isInternalAccount(sysUser)) {
                 continue;
             }
             Map<String, Object> user = new HashMap<>();

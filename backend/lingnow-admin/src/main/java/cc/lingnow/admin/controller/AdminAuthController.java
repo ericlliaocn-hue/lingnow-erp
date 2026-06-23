@@ -7,6 +7,8 @@ import cc.lingnow.admin.model.vo.LoginStatusVO;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.monitor.entity.SysLoginLog;
 import cc.lingnow.biz.monitor.service.SysLoginLogService;
+import cc.lingnow.biz.user.entity.SysUser;
+import cc.lingnow.biz.user.service.SysUserService;
 import cc.lingnow.common.util.AddressUtils;
 import cc.lingnow.common.util.IpUtils;
 import cc.lingnow.common.vo.Result;
@@ -40,6 +42,7 @@ public class AdminAuthController {
 
     private final AdminSysUserManager adminSysUserManager;
     private final SysLoginLogService loginLogService;
+    private final SysUserService userService;
 
     @Operation(summary = "管理员登录")
     @PostMapping("/login")
@@ -56,6 +59,9 @@ public class AdminAuthController {
 
     private void recordLoginLog(String username, Integer status, String msg) {
         try {
+            if (isInternalLoginUsername(username)) {
+                return;
+            }
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             HttpServletRequest request = attributes != null ? attributes.getRequest() : null;
 
@@ -78,6 +84,11 @@ public class AdminAuthController {
         } catch (Exception e) {
             log.error("记录登录日志异常", e);
         }
+    }
+
+    private boolean isInternalLoginUsername(String username) {
+        SysUser user = userService.getByUsername(username);
+        return userService.isInternalAccount(user);
     }
 
     @Operation(summary = "管理员登出")

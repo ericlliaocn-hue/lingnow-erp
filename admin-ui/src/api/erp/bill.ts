@@ -9,7 +9,16 @@ export interface BillItem {
   productId: string
   productCode?: string
   productName?: string
+  productImageUrl?: string
   spec?: string
+  attributeText?: string
+  categoryLevel1Id?: string
+  categoryLevel1Name?: string
+  categoryLevel2Id?: string
+  categoryLevel2Name?: string
+  optionAttributeIds?: string
+  optionAttributeText?: string
+  categoryPickerId?: string
   unitId?: string
   unitName?: string
   warehouseId?: string
@@ -20,6 +29,7 @@ export interface BillItem {
   discountAmount?: number
   finalAmount?: number
   remark?: string
+  optionProducts?: any[]
 }
 
 export interface ErpBill {
@@ -42,6 +52,7 @@ export interface ErpBill {
   otherAmount?: number
   payableAmount?: number
   paidAmount?: number
+  paymentMethod?: string
   debtAmount?: number
   auditStatus?: number
   approvalStatus?: ApprovalStatus
