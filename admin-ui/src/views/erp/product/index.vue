@@ -46,14 +46,25 @@
         <el-table-column prop="spec" label="规格" min-width="120" />
         <el-table-column label="商品图片" width="110" align="center">
           <template #default="{ row }">
-            <el-image
+            <el-popover
               v-if="row.imageUrl"
-              class="table-product-image"
-              :src="row.imageUrl"
-              :preview-src-list="[row.imageUrl]"
-              preview-teleported
-              fit="cover"
-            />
+              placement="right"
+              trigger="hover"
+              :width="244"
+              :show-after="120"
+              :hide-after="0"
+              popper-class="product-image-hover-popover"
+              teleported
+            >
+              <template #reference>
+                <img
+                  class="table-product-image"
+                  :src="row.imageUrl"
+                  alt="商品图片"
+                />
+              </template>
+              <img :src="row.imageUrl" class="table-product-image-large" alt="商品图片预览" />
+            </el-popover>
             <span v-else class="image-empty">-</span>
           </template>
         </el-table-column>
@@ -62,7 +73,7 @@
         <el-table-column prop="unitName" label="单位" min-width="90" />
         <el-table-column prop="attributeText" label="商品属性" min-width="180" show-overflow-tooltip />
         <el-table-column prop="barcode" label="条码" min-width="130" />
-        <el-table-column prop="purchasePrice" label="采购价" min-width="100" align="right" />
+        <el-table-column prop="purchasePrice" label="成本价" min-width="100" align="right" />
         <el-table-column prop="salePrice" label="销售价" min-width="100" align="right" />
         <el-table-column prop="minStock" label="最低库存" min-width="100" align="right" />
         <el-table-column prop="maxStock" label="最高库存" min-width="100" align="right" />
@@ -85,26 +96,9 @@
     <el-dialog v-model="open" :title="dialogTitle" width="840px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
         <el-row :gutter="16">
-          <el-col :span="12"><el-form-item label="编号" prop="code"><el-input v-model="form.code" placeholder="请输入商品编号" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="名称" prop="name"><el-input v-model="form.name" placeholder="请输入商品名称" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="规格"><el-input v-model="form.spec" placeholder="请输入规格" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="条码"><el-input v-model="form.barcode" placeholder="请输入条码" /></el-form-item></el-col>
-          <el-col :span="8">
-            <el-form-item label="分类">
-              <el-tree-select
-                v-model="form.categoryId"
-                :data="categoryTree"
-                clearable
-                filterable
-                check-strictly
-                node-key="id"
-                :props="{ label: 'name', value: 'id', children: 'children' }"
-                style="width: 100%"
-                placeholder="请选择分类"
-                @change="categoryChanged"
-              />
-            </el-form-item>
-          </el-col>
           <el-col :span="8">
             <el-form-item label="品牌">
               <el-select v-model="form.brandId" clearable filterable style="width: 100%" placeholder="请选择品牌">
@@ -137,29 +131,30 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="属性节点">
-              <div class="tree-field">
-                <el-tree-select
+          <el-col :span="24">
+            <el-form-item label="可选规格组">
+              <div class="attribute-group-picker">
+                <el-select
                   v-model="selectedAttributeIds"
-                  :data="availableAttributeTree"
                   multiple
-                  check-strictly
                   clearable
                   filterable
-                  collapse-tags
-                  collapse-tags-tooltip
-                  node-key="id"
-                  :props="{ label: 'name', value: 'id', children: 'children' }"
-                  placeholder="请选择商品属性"
-                  @change="syncAttributeText"
-                />
+                  placeholder="请选择该商品可选规格组"
+                  style="width: 100%"
+                  @change="attributeGroupsChanged"
+                >
+                  <el-option v-for="item in availableAttributeGroups" :key="item.id" :label="item.name" :value="String(item.id)" />
+                </el-select>
+                <div v-if="selectedAttributeGroups.length" class="selected-attribute-tags">
+                  <el-tag v-for="item in selectedAttributeGroups" :key="item.id" type="success" closable @close="removeSelectedAttribute(String(item.id))">
+                    已选 {{ item.name }}
+                  </el-tag>
+                </div>
               </div>
             </el-form-item>
           </el-col>
-          <el-col :span="12"><el-form-item label="辅助属性"><el-input v-model="form.attributeText" placeholder="可补充刻字、颜色等说明" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="货位"><el-input v-model="form.location" placeholder="请输入货位" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="采购价"><el-input-number v-model="form.purchasePrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="成本价"><el-input-number v-model="form.purchasePrice" :min="0" :precision="2" :disabled="!canEditCostPrice" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="销售价"><el-input-number v-model="form.salePrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="零售价"><el-input-number v-model="form.retailPrice" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio :value="1">启用</el-radio><el-radio :value="0">停用</el-radio></el-radio-group></el-form-item></el-col>
@@ -274,6 +269,7 @@ const brands = ref<ErpMasterVO[]>([])
 const units = ref<ErpMasterVO[]>([])
 const attributes = ref<ErpMasterVO[]>([])
 const selectedAttributeIds = ref<string[]>([])
+const pendingDefaultAttributeSelection = ref(false)
 const importOpen = ref(false)
 const importFile = ref<File | null>(null)
 const importResult = ref<{ success: number; fail: number; errors: string[] } | null>(null)
@@ -284,6 +280,7 @@ type QuickMasterType = 'product-brand' | 'unit'
 const quickMasterType = ref<QuickMasterType>('product-brand')
 const quickMasterFormRef = ref()
 const quickMasterForm = reactive<ErpMasterForm>({ code: '', name: '', sortOrder: 0, status: 1 })
+const COST_PRICE_EDIT_PERMISSION = 'erp:product:cost:edit'
 const quickMasterRules = {
   code: [{ required: true, message: '编号不能为空', trigger: 'blur' }],
   name: [{ required: true, message: '名称不能为空', trigger: 'blur' }]
@@ -302,7 +299,6 @@ const state = reactive({
   queryParams: { current: 1, size: 10 } as ErpProductQuery,
   form: {} as ErpProduct,
   rules: {
-    code: [{ required: true, message: '商品编号不能为空', trigger: 'blur' }],
     name: [{ required: true, message: '商品名称不能为空', trigger: 'blur' }]
   }
 })
@@ -322,15 +318,26 @@ function loadOptions() {
     listMaster('product-brand', { current: 1, size: 200 }).then(res => brands.value = res.records),
     listMaster('unit', { current: 1, size: 200 }).then(res => units.value = res.records),
     listMaster('product-attribute', { current: 1, size: 500 }).then(res => attributes.value = res.records)
-  ])
+  ]).then(() => {
+    if (pendingDefaultAttributeSelection.value && open.value && !form.value.id) {
+      selectAllAttributeGroups()
+    }
+  })
 }
 
-const categoryTree = computed(() => buildTree(categories.value))
-const attributeTree = computed(() => buildTree(attributes.value))
-const availableAttributeTree = computed(() => {
-  const category = categories.value.find(item => item.id === form.value.categoryId)
-  const allowedIds = splitIds(category?.attributeIds)
-  return buildPathTree(allowedIds.length ? buildAllowedTree(attributes.value, allowedIds) : attributeTree.value)
+const attributeGroups = computed(() => uniqueById(attributes.value.filter(item => String(item.parentId || '0') === '0' && item.status === 1)))
+const availableAttributeGroups = computed(() => attributeGroups.value)
+const selectedAttributeGroups = computed(() => {
+  const selected = new Set(selectedAttributeIds.value.map(String))
+  return attributeGroups.value.filter(item => selected.has(String(item.id)))
+})
+const canEditCostPrice = computed(() => {
+  try {
+    const permissions = JSON.parse(localStorage.getItem('permissions') || '[]') as string[]
+    return permissions.includes('*:*:*') || permissions.includes(COST_PRICE_EDIT_PERMISSION)
+  } catch {
+    return false
+  }
 })
 
 function reset() {
@@ -357,6 +364,8 @@ function handleSelectionChange(selection: ErpProduct[]) {
 
 function handleAdd() {
   reset()
+  pendingDefaultAttributeSelection.value = true
+  selectAllAttributeGroups()
   dialogTitle.value = '新增商品'
   open.value = true
 }
@@ -366,7 +375,8 @@ function handleUpdate(row?: ErpProduct) {
   const id = row?.id || ids.value[0]
   getProduct(id!).then(res => {
     form.value = res
-    selectedAttributeIds.value = splitIds(res.attributeIds)
+    selectedAttributeIds.value = uniqueIds(splitIds(res.attributeIds))
+    syncAttributeText()
     dialogTitle.value = '修改商品'
     open.value = true
   })
@@ -375,11 +385,14 @@ function handleUpdate(row?: ErpProduct) {
 function submitForm() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
+    selectedAttributeIds.value = uniqueIds(selectedAttributeIds.value)
     form.value.attributeIds = selectedAttributeIds.value.join(',')
-    if (selectedAttributeIds.value.length) {
-      syncAttributeText()
+    syncAttributeText()
+    const payload: ErpProduct = { ...form.value }
+    if (!canEditCostPrice.value) {
+      delete payload.purchasePrice
     }
-    const action = form.value.id ? updateProduct(form.value) : addProduct(form.value)
+    const action = payload.id ? updateProduct(payload) : addProduct(payload)
     action.then(() => {
       ElMessage.success('保存成功')
       open.value = false
@@ -388,61 +401,26 @@ function submitForm() {
   })
 }
 
-function buildTree(records: ErpMasterVO[]) {
-  const map = new Map<string, ErpMasterVO & { children: ErpMasterVO[] }>()
-  records.forEach(item => map.set(item.id, { ...item, children: [] }))
-  const roots: (ErpMasterVO & { children: ErpMasterVO[] })[] = []
-  map.forEach(item => {
-    const parentId = String(item.parentId || '0')
-    const parent = map.get(parentId)
-    if (parent && parent.id !== item.id) {
-      parent.children.push(item)
-    } else {
-      roots.push(item)
-    }
-  })
-  const sort = (items: (ErpMasterVO & { children: ErpMasterVO[] })[]) => {
-    items.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
-    items.forEach(item => sort(item.children as (ErpMasterVO & { children: ErpMasterVO[] })[]))
-  }
-  sort(roots)
-  return roots
-}
-
-function buildAllowedTree(records: ErpMasterVO[], allowedIds: string[]) {
-  const allowed = new Set(allowedIds)
-  const childrenMap = new Map<string, ErpMasterVO[]>()
-  records.forEach(item => {
-    const parentId = String(item.parentId || '0')
-    childrenMap.set(parentId, [...(childrenMap.get(parentId) || []), item])
-  })
-  const includeWithParents = new Set<string>()
-  const byId = new Map(records.map(item => [item.id, item]))
-  allowed.forEach(id => {
-    let current = byId.get(id)
-    while (current) {
-      includeWithParents.add(current.id)
-      current = byId.get(String(current.parentId || '0'))
-    }
-  })
-  return buildTree(records.filter(item => includeWithParents.has(item.id) || childrenMap.get(item.id)?.some(child => allowed.has(child.id))))
-}
-function buildPathTree(tree: ErpMasterVO[], parentPath = ''): ErpMasterVO[] {
-  return tree.map(item => {
-    const path = parentPath ? `${parentPath} / ${item.name}` : item.name
-    return {
-      ...item,
-      name: path,
-      children: item.children?.length ? buildPathTree(item.children, path) : []
-    }
-  })
-}
-
 function splitIds(value?: string) {
-  return value ? value.split(',').map(item => item.trim()).filter(Boolean) : []
+  return uniqueIds(value ? value.split(',').map(item => item.trim()).filter(Boolean) : [])
+}
+
+function uniqueIds(values: Array<string | number | undefined>) {
+  return Array.from(new Set(values.map(item => String(item || '').trim()).filter(Boolean)))
+}
+
+function uniqueById(records: ErpMasterVO[]) {
+  const seen = new Set<string>()
+  return records.filter(item => {
+    const id = String(item.id)
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
 }
 
 function syncAttributeText() {
+  selectedAttributeIds.value = uniqueIds(selectedAttributeIds.value)
   const names = selectedAttributeIds.value
     .map(attributePathName)
     .filter(Boolean) as string[]
@@ -450,22 +428,26 @@ function syncAttributeText() {
   form.value.attributeText = names.length ? names.join(' / ') : ''
 }
 
-function attributePathName(attributeId: string) {
-  const byId = new Map(attributes.value.map(item => [item.id, item]))
-  const names: string[] = []
-  let current = byId.get(attributeId)
-  while (current) {
-    names.unshift(current.name)
-    current = byId.get(String(current.parentId || '0'))
-  }
-  return names.join(' / ')
+function selectAllAttributeGroups() {
+  selectedAttributeIds.value = availableAttributeGroups.value.map(item => String(item.id))
+  syncAttributeText()
+  pendingDefaultAttributeSelection.value = availableAttributeGroups.value.length === 0
 }
 
-function categoryChanged() {
-  const category = categories.value.find(item => item.id === form.value.categoryId)
-  const allowedIds = splitIds(category?.attributeIds)
-  if (!allowedIds.length) return
-  selectedAttributeIds.value = selectedAttributeIds.value.filter(id => allowedIds.includes(id))
+function attributePathName(attributeId: string) {
+  const byId = new Map(attributes.value.map(item => [String(item.id), item]))
+  return byId.get(String(attributeId))?.name || ''
+}
+
+function attributeGroupsChanged() {
+  pendingDefaultAttributeSelection.value = false
+  selectedAttributeIds.value = uniqueIds(selectedAttributeIds.value)
+  syncAttributeText()
+}
+
+function removeSelectedAttribute(id: string) {
+  pendingDefaultAttributeSelection.value = false
+  selectedAttributeIds.value = selectedAttributeIds.value.filter(item => String(item) !== String(id))
   syncAttributeText()
 }
 
@@ -584,6 +566,7 @@ function submitImport() {
 }
 
 function cancel() {
+  pendingDefaultAttributeSelection.value = false
   open.value = false
   reset()
 }
@@ -599,11 +582,26 @@ onMounted(() => {
 .table-wrapper { height: calc(100vh - 230px); }
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .table-product-image {
+  display: block;
   width: 48px;
   height: 48px;
+  object-fit: cover;
   border-radius: 4px;
   border: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
+  cursor: zoom-in;
+}
+.table-product-image-large {
+  display: block;
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: var(--el-fill-color-lighter);
+}
+:global(.product-image-hover-popover.el-popper) {
+  padding: 10px;
+  min-width: auto;
 }
 .image-empty {
   color: var(--el-text-color-placeholder);
@@ -720,6 +718,15 @@ onMounted(() => {
   width: 22px;
   height: 22px;
   padding: 0;
+}
+.attribute-group-picker {
+  width: 100%;
+}
+.selected-attribute-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 .import-result { margin-top: 16px; }
 .import-errors { margin: 12px 0 0; padding-left: 18px; color: var(--el-color-danger); max-height: 180px; overflow: auto; }

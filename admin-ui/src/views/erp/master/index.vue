@@ -1,6 +1,6 @@
 <template>
   <div class="app-container erp-master-page">
-    <el-card shadow="never" class="search-wrapper">
+    <el-card v-if="!isAccountMaster" shadow="never" class="search-wrapper">
       <el-form :inline="true" :model="queryParams" ref="queryFormRef">
         <el-form-item label="编码" prop="code">
           <el-input v-model="queryParams.code" :placeholder="`请输入${config.name}编码`" clearable @keyup.enter="handleQuery" />
@@ -24,21 +24,25 @@
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="table-wrapper">
+    <el-card shadow="never" class="table-wrapper" :class="{ 'account-table-wrapper': isAccountMaster }">
       <template #header>
-        <div class="card-header">
-          <div>
+        <div class="card-header" :class="{ 'account-card-header': isAccountMaster }">
+          <div v-if="!isAccountMaster">
             <strong>{{ config.title }}</strong>
-            <span class="muted">真实数据库资料维护</span>
+            <span class="muted">{{ isAttributeMaster ? '按规格组维护平铺选项' : '真实数据库资料维护' }}</span>
           </div>
           <div>
-            <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
+            <el-button type="primary" :icon="Plus" :disabled="isAttributeMaster && !activeAttributeGroupId" @click="handleAdd">{{ isAttributeMaster ? '新增选项' : '新增' }}</el-button>
             <el-button v-if="isTreeMaster" type="primary" plain :icon="Plus" :disabled="single" @click="handleAddChild()">新增下级</el-button>
             <el-button type="success" :icon="Edit" :disabled="single" @click="handleUpdate()">修改</el-button>
             <el-button type="danger" :icon="Delete" :disabled="multiple" @click="handleDelete()">删除</el-button>
           </div>
         </div>
       </template>
+
+      <el-tabs v-if="isAttributeMaster" v-model="activeAttributeGroupId" class="attribute-tabs">
+        <el-tab-pane v-for="group in attributeGroups" :key="group.id" :label="group.name" :name="String(group.id)" />
+      </el-tabs>
 
       <el-table
         v-loading="loading"
@@ -51,8 +55,14 @@
         :tree-props="{ children: 'children' }"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column prop="code" label="编码" min-width="140" />
-        <el-table-column prop="name" label="名称" min-width="160" />
+        <el-table-column v-if="!isAccountMaster" prop="code" label="编码" min-width="140" />
+        <el-table-column v-if="isAttributeMaster" label="属性组" min-width="120">
+          <template #default="{ row }">{{ attributeGroupName(row.parentId) }}</template>
+        </el-table-column>
+        <el-table-column v-if="!isAccountMaster" prop="name" label="名称" min-width="160" />
+        <el-table-column v-if="isAttributeMaster" label="额外加钱" width="120" align="right">
+          <template #default="{ row }">{{ Number(row.extraAmount || 0).toFixed(2) }}</template>
+        </el-table-column>
         <el-table-column v-if="config.hasContact" prop="contact" label="联系人" min-width="120" />
         <el-table-column v-if="config.hasContact" prop="phone" label="联系电话" min-width="140" />
         <el-table-column v-if="config.hasAddress" prop="address" label="地址" min-width="200" show-overflow-tooltip />
@@ -76,7 +86,7 @@
       </el-table>
 
       <pagination
-        v-show="total > 0 && !isTreeMaster"
+        v-show="total > 0 && !isTreeMaster && !isAttributeMaster"
         :total="total"
         v-model:page="queryParams.current"
         v-model:limit="queryParams.size"
@@ -92,7 +102,15 @@
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" :placeholder="`请输入${config.name}名称`" />
         </el-form-item>
-        <el-form-item v-if="isTreeMaster" :label="isProductCategory ? '上级分类' : '上级节点'" prop="parentId">
+        <el-form-item v-if="isAttributeMaster" label="属性组" prop="parentId">
+          <el-select v-model="form.parentId" placeholder="请选择属性组" style="width: 100%">
+            <el-option v-for="group in attributeGroups" :key="group.id" :label="group.name" :value="String(group.id)" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="isAttributeMaster" label="额外加钱" prop="extraAmount">
+          <el-input-number v-model="form.extraAmount" :min="0" :precision="2" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item v-else-if="isTreeMaster" label="上级分类" prop="parentId">
           <el-tree-select
             v-model="form.parentId"
             :data="treeParentOptions"
@@ -102,7 +120,7 @@
             node-key="id"
             :props="{ label: 'name', value: 'id', children: 'children' }"
             style="width: 100%"
-            :placeholder="isProductCategory ? '不选则作为顶级分类' : '不选则为根节点'"
+            placeholder="不选则作为顶级分类"
           />
         </el-form-item>
         <el-form-item v-if="config.hasContact" label="联系人" prop="contact">
@@ -209,7 +227,8 @@ const configs: Record<MasterType, { title: string; name: string; hasContact?: bo
   'agent-level': { title: '代理等级', name: '代理等级' }
 }
 const config = computed(() => configs[type.value] || configs.unit)
-const isAttributeTree = computed(() => type.value === 'product-attribute')
+const isAccountMaster = computed(() => type.value === 'account')
+const isAttributeMaster = computed(() => type.value === 'product-attribute')
 
 const queryFormRef = ref()
 const formRef = ref()
@@ -225,6 +244,7 @@ const addressOpen = ref(false)
 const addressRawText = ref('')
 const addressResult = ref<AddressParseResult>()
 const addressLoading = ref(false)
+const activeAttributeGroupId = ref('')
 
 const state = reactive({
   queryParams: {
@@ -244,16 +264,29 @@ const state = reactive({
 })
 const { queryParams, form, rules } = toRefs(state)
 const isProductCategory = computed(() => type.value === 'product-category')
-const isTreeMaster = computed(() => isAttributeTree.value || isProductCategory.value)
-const tableData = computed(() => isTreeMaster.value ? buildTree(list.value) : list.value)
+const isTreeMaster = computed(() => isProductCategory.value)
+const attributeGroups = computed(() => list.value.filter(item => String(item.parentId || '0') === '0'))
+const attributeOptions = computed(() => {
+  const groupId = String(activeAttributeGroupId.value || '')
+  if (!groupId) return list.value.filter(item => String(item.parentId || '0') !== '0')
+  return list.value.filter(item => String(item.parentId || '0') === groupId)
+})
+const tableData = computed(() => {
+  if (isAttributeMaster.value) return attributeOptions.value
+  return isTreeMaster.value ? buildTree(list.value) : list.value
+})
 const treeParentOptions = computed(() => [{ id: '0', code: 'ROOT', name: isProductCategory.value ? '商品' : '根节点', sortOrder: 0, status: 1, children: buildTree(list.value) } as ErpMasterVO])
 
 function getList() {
   loading.value = true
-  const params = isTreeMaster.value ? { ...queryParams.value, current: 1, size: 1000 } : queryParams.value
+  const params = (isTreeMaster.value || isAttributeMaster.value) ? { ...queryParams.value, current: 1, size: 1000 } : queryParams.value
   listMaster(type.value, params).then(res => {
     list.value = res.records
     total.value = Number(res.total)
+    const groupId = String(activeAttributeGroupId.value || '')
+    if (isAttributeMaster.value && !attributeGroups.value.some(item => String(item.id) === groupId)) {
+      activeAttributeGroupId.value = String(attributeGroups.value[0]?.id || '')
+    }
   }).finally(() => {
     loading.value = false
   })
@@ -272,6 +305,7 @@ function reset() {
     accountType: type.value === 'account' ? 'cash' : undefined,
     openingBalance: type.value === 'account' ? 0 : undefined,
     discountRate: type.value === 'agent-level' ? 100 : undefined,
+    extraAmount: isAttributeMaster.value ? 0 : undefined,
     sortOrder: 0,
     status: 1,
     remark: ''
@@ -297,6 +331,9 @@ function handleSelectionChange(selection: ErpMasterVO[]) {
 
 function handleAdd() {
   reset()
+  if (isAttributeMaster.value) {
+    form.value.parentId = activeAttributeGroupId.value
+  }
   dialogTitle.value = `新增${config.value.name}`
   open.value = true
 }
@@ -338,7 +375,7 @@ function handleUpdate(row?: ErpMasterVO) {
   reset()
   const id = row?.id || ids.value[0]
   getMaster(type.value, id).then(res => {
-    form.value = { ...res, parentId: res.parentId || '0' }
+    form.value = { ...res, parentId: res.parentId || '0', extraAmount: isAttributeMaster.value ? Number(res.extraAmount || 0) : res.extraAmount }
     dialogTitle.value = `修改${config.value.name}`
     open.value = true
   })
@@ -347,6 +384,10 @@ function handleUpdate(row?: ErpMasterVO) {
 function submitForm() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
+    if (isAttributeMaster.value && !form.value.parentId) {
+      ElMessage.warning('请选择属性组')
+      return
+    }
     if (!form.value.parentId) {
       form.value.parentId = '0'
     }
@@ -383,7 +424,14 @@ watch(() => route.path, () => {
   ids.value = []
   single.value = true
   multiple.value = true
+  activeAttributeGroupId.value = ''
   getList()
+})
+
+watch(activeAttributeGroupId, () => {
+  ids.value = []
+  single.value = true
+  multiple.value = true
 })
 
 onMounted(getList)
@@ -408,6 +456,11 @@ function buildTree(records: ErpMasterVO[]) {
   sort(roots)
   return roots
 }
+
+function attributeGroupName(parentId?: string) {
+  const groupId = String(parentId || '0')
+  return attributeGroups.value.find(item => String(item.id) === groupId)?.name || '-'
+}
 </script>
 
 <style scoped>
@@ -423,6 +476,10 @@ function buildTree(records: ErpMasterVO[]) {
   height: calc(100vh - 230px);
 }
 
+.account-table-wrapper {
+  height: calc(100vh - 150px);
+}
+
 .card-header {
   display: flex;
   align-items: center;
@@ -430,10 +487,18 @@ function buildTree(records: ErpMasterVO[]) {
   gap: 16px;
 }
 
+.account-card-header {
+  justify-content: flex-end;
+}
+
 .muted {
   margin-left: 10px;
   color: var(--el-text-color-secondary);
   font-size: 13px;
   font-weight: 400;
+}
+
+.attribute-tabs {
+  margin-bottom: 12px;
 }
 </style>

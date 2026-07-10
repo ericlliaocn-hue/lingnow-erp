@@ -24,6 +24,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Tag(name = "ERP基础资料")
@@ -82,7 +83,7 @@ public class ErpMasterDataController {
         StpAdminUtil.stpLogic.checkPermission(permission(type, "add"));
         IService service = service(type);
         ensureCodeUnique(service, bo.getCode(), null);
-        ensureValidParent(bo.getParentId(), null);
+        ensureValidParent(type, bo.getParentId(), null);
         service.save(toEntity(type, bo));
         return Result.success();
     }
@@ -97,7 +98,7 @@ public class ErpMasterDataController {
         StpAdminUtil.stpLogic.checkPermission(permission(type, "edit"));
         IService service = service(type);
         ensureCodeUnique(service, bo.getCode(), bo.getId());
-        ensureValidParent(bo.getParentId(), bo.getId());
+        ensureValidParent(type, bo.getParentId(), bo.getId());
         service.updateById(toEntity(type, bo));
         return Result.success();
     }
@@ -151,6 +152,9 @@ public class ErpMasterDataController {
                 case "product-brand" -> ensureNoProductRef("brand_id", id, "商品品牌已被商品引用，不能删除，请停用");
                 case "product-attribute" -> {
                     ensureNoMasterChild(productAttributeService, id, "属性存在下级节点，不能删除");
+                    ensureNoFindSetProductRef("attribute_ids", id, "属性已被商品引用，不能删除，请停用");
+                    ensureNoFindSetCategoryRef("attribute_ids", id, "属性已被商品分类引用，不能删除，请停用");
+                    ensureNoFindSetBillItemRef("option_attribute_ids", id, "属性已被单据明细引用，不能删除，请停用");
                 }
                 case "customer" -> ensureNoPartnerRef(id, "CUSTOMER", "客户已被单据、财务单据或往来流水引用，不能删除，请停用");
                 case "supplier" -> ensureNoPartnerRef(id, "SUPPLIER", "供应商已被单据、财务单据或往来流水引用，不能删除，请停用");
@@ -170,6 +174,24 @@ public class ErpMasterDataController {
 
     private void ensureNoBillItemRef(String column, Long id, String message) {
         if (billItemService.count(new QueryWrapper<ErpBillItem>().eq(column, id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoFindSetProductRef(String column, Long id, String message) {
+        if (productService.count(new QueryWrapper<ErpProduct>().apply("FIND_IN_SET({0}, " + column + ")", id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoFindSetCategoryRef(String column, Long id, String message) {
+        if (productCategoryService.count(new QueryWrapper<ErpProductCategory>().apply("FIND_IN_SET({0}, " + column + ")", id)) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
+        }
+    }
+
+    private void ensureNoFindSetBillItemRef(String column, Long id, String message) {
+        if (billItemService.count(new QueryWrapper<ErpBillItem>().apply("FIND_IN_SET({0}, " + column + ")", id)) > 0) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, message);
         }
     }
@@ -244,12 +266,28 @@ public class ErpMasterDataController {
         if (entity.getParentId() == null) {
             entity.setParentId(0L);
         }
+        if (entity instanceof ErpProductAttribute attribute) {
+            BigDecimal extraAmount = bo.getExtraAmount() == null ? BigDecimal.ZERO : bo.getExtraAmount();
+            if (extraAmount.compareTo(BigDecimal.ZERO) < 0) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "额外加钱不能小于0");
+            }
+            attribute.setExtraAmount(extraAmount);
+        }
         return entity;
     }
 
-    private void ensureValidParent(Long parentId, Long id) {
+    private void ensureValidParent(String type, Long parentId, Long id) {
         if (id != null && parentId != null && id.equals(parentId)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "上级节点不能选择自己");
+        }
+        if ("product-attribute".equals(type)) {
+            if (parentId == null || parentId == 0L) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "请选择属性组");
+            }
+            ErpProductAttribute parent = productAttributeService.getById(parentId);
+            if (parent == null || !Long.valueOf(0L).equals(parent.getParentId())) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "商品属性只允许维护属性组下的平铺选项");
+            }
         }
     }
 

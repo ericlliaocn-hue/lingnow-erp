@@ -2,6 +2,7 @@ package cc.lingnow.admin.controller;
 
 import cc.lingnow.admin.model.bo.erp.ErpBillQueryBO;
 import cc.lingnow.admin.model.bo.erp.ErpBillSaveBO;
+import cc.lingnow.admin.model.bo.erp.ErpProductionUpdateBO;
 import cc.lingnow.admin.model.bo.erp.ErpApprovalSubmitBO;
 import cc.lingnow.admin.model.enums.ErpApprovalStatus;
 import cc.lingnow.admin.model.vo.erp.ErpBillVO;
@@ -24,6 +25,7 @@ import cc.lingnow.common.vo.Result;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -73,11 +75,11 @@ public class ErpBillController {
     private final SysRoleService roleService;
     private final SysUserNotificationService notificationService;
 
-    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/list")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return|production}/list")
     public Result<PageResult<ErpBillVO>> list(@PathVariable String module, ErpBillQueryBO query) {
         String type = billType(module);
         check(module, "list");
-        QueryWrapper<ErpBill> wrapper = billListWrapper(type, query);
+        QueryWrapper<ErpBill> wrapper = billListWrapper(type, query, "production".equals(module));
         IPage<ErpBill> page = billService.page(new Page<>(query.getCurrent(), query.getSize()), wrapper);
         List<ErpBillVO> records = page.getRecords().stream().map(item -> toVO(item, false)).toList();
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), records));
@@ -89,10 +91,13 @@ public class ErpBillController {
         return Result.success(nextBillNo(billType(module)));
     }
 
-    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/{id}")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return|production}/{id}")
     public Result<ErpBillVO> getInfo(@PathVariable String module, @PathVariable Long id) {
         check(module, "list");
         ErpBill bill = requireBill(id, billType(module));
+        if ("production".equals(module)) {
+            checkProductionVisible(bill);
+        }
         return Result.success(toVO(bill, true));
     }
 
@@ -114,27 +119,30 @@ public class ErpBillController {
                     money(vo.getPayableAmount()),
                     text(vo.getPaymentMethod()),
                     money(vo.getPaidAmount()),
-                    Integer.valueOf(1).equals(vo.getAuditStatus()) ? "已审核" : "未审核",
                     text(vo.getPaymentStatus()),
                     text(vo.getRemark())
             );
         }).toList();
         CsvExportUtil.write(response, titleName(module) + ".csv",
-                List.of("单号", "日期", partnerTitle(type), "仓库", "合计金额", "优惠金额", "其他费用", "应收应付", "付款方式", "付款金额", "审核状态", "收付状态", "备注"),
+                List.of("单号", "日期", partnerTitle(type), "仓库", "合计金额", "优惠金额", "其他费用", "应收应付", "付款方式", "付款金额", "收付状态", "备注"),
                 rows);
     }
 
-    @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/print/{id}")
+    @GetMapping("/{module:sale|sale-return|purchase|purchase-return|production}/print/{id}")
     @Log(title = "ERP业务单据", businessType = BusinessType.OTHER)
     public Result<Map<String, Object>> printPreview(@PathVariable String module, @PathVariable Long id) {
         check(module, "print");
-        ErpBillVO bill = toVO(requireBill(id, billType(module)), true);
+        ErpBill source = requireBill(id, billType(module));
+        if ("production".equals(module)) {
+            checkProductionVisible(source);
+        }
+        ErpBillVO bill = toVO(source, true);
         Map<String, Object> data = new HashMap<>();
         data.put("title", titleName(module));
         data.put("bill", bill);
         data.put("items", bill.getItems());
-        data.put("fields", printFields(bill.getBillType()));
-        data.put("itemFields", List.of("商品编号", "商品名称", "商品图片", "规格", "类目选项", "单位", "仓库", "数量", "单价", "金额", "优惠", "折后金额", "备注"));
+        data.put("fields", printFields(module, bill.getBillType()));
+        data.put("itemFields", List.of("商品编号", "商品名称", "商品图片", "LOGO图片", "规格", "类目选项", "单位", "仓库", "数量", "单价", "金额", "优惠", "折后金额", "备注"));
         return Result.success(data);
     }
 
@@ -145,10 +153,15 @@ public class ErpBillController {
         check(module, "add");
         String type = billType(module);
         ErpBill bill = buildBill(type, bo);
+        if (bill.getEmployeeId() == null && type.startsWith("SALE")) {
+            bill.setEmployeeId(currentUserId());
+        }
+        normalizeSaleEmployeeName(bill, null);
         bill.setBillNo(StrUtil.isBlank(bo.getBillNo()) ? nextBillNo(type) : bo.getBillNo());
         ensureBillNoUnique(bill.getBillNo(), null);
         billService.save(bill);
         saveItems(bill, bo.getItems());
+        auditService.auditBill(bill.getId());
         notifyNewSaleBill(bill);
         return Result.success();
     }
@@ -163,14 +176,19 @@ public class ErpBillController {
         check(module, "edit");
         String type = billType(module);
         ErpBill old = requireBill(bo.getId(), type);
-        ensureUnaudited(old);
+        rollbackBillIfAudited(old);
         ErpBill bill = buildBill(type, bo);
         bill.setId(old.getId());
+        if (bill.getEmployeeId() == null) {
+            bill.setEmployeeId(old.getEmployeeId());
+        }
+        normalizeSaleEmployeeName(bill, old);
         bill.setBillNo(StrUtil.isBlank(bo.getBillNo()) ? old.getBillNo() : bo.getBillNo());
         ensureBillNoUnique(bill.getBillNo(), bill.getId());
         billService.updateById(bill);
         billItemService.remove(new QueryWrapper<ErpBillItem>().eq("bill_id", bill.getId()));
         saveItems(bill, bo.getItems());
+        auditService.auditBill(bill.getId());
         return Result.success();
     }
 
@@ -182,23 +200,49 @@ public class ErpBillController {
         String type = billType(module);
         for (Long id : ids) {
             ErpBill bill = requireBill(id, type);
-            ensureUnaudited(bill);
+            rollbackBillIfAudited(bill);
             billItemService.remove(new QueryWrapper<ErpBillItem>().eq("bill_id", id));
         }
         billService.removeByIds(ids);
         return Result.success();
     }
 
-    @PostMapping("/{module:sale|sale-return|purchase|purchase-return}/copy/{id}")
+    @PutMapping("/production/{id}")
+    @Log(title = "生产单维护", businessType = BusinessType.UPDATE)
+    public Result<Void> updateProduction(@PathVariable Long id, @Valid @RequestBody ErpProductionUpdateBO bo) {
+        check("production", "edit");
+        checkProductionAdmin();
+        requireBill(id, "SALE");
+        String productionUserName = blankToNull(bo.getProductionUserName());
+        if (productionUserName == null && bo.getProductionUserId() != null) {
+            productionUserName = userDisplayName(bo.getProductionUserId());
+        }
+        billService.update(new UpdateWrapper<ErpBill>()
+                .eq("id", id)
+                .set("production_progress", blankToNull(bo.getProductionProgress()))
+                .set("tracking_no", blankToNull(bo.getTrackingNo()))
+                .set("production_user_id", null)
+                .set("production_user_name", productionUserName));
+        return Result.success();
+    }
+
+    @PostMapping("/{module:sale|sale-return|purchase|purchase-return|production}/copy/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Log(title = "ERP业务单据", businessType = BusinessType.INSERT)
     public Result<Long> copy(@PathVariable String module, @PathVariable Long id) {
-        check(module, "add");
+        check(module, "production".equals(module) ? "copy" : "add");
         String type = billType(module);
         ErpBill source = requireBill(id, type);
+        if ("production".equals(module)) {
+            checkProductionVisible(source);
+        }
         ErpBill copy = BeanUtil.copyProperties(source, ErpBill.class);
         copy.setId(null);
         copy.setBillNo(nextBillNo(type));
+        copy.setProductionProgress(null);
+        copy.setTrackingNo(null);
+        copy.setProductionUserId(null);
+        copy.setProductionUserName(null);
         copy.setAuditStatus(0);
         copy.setAuditTime(null);
         copy.setAuditBy(null);
@@ -219,6 +263,7 @@ public class ErpBillController {
         if (!copyItems.isEmpty()) {
             billItemService.saveBatch(copyItems);
         }
+        auditService.auditBill(copy.getId());
         return Result.success(copy.getId());
     }
 
@@ -295,6 +340,10 @@ public class ErpBillController {
     }
 
     private QueryWrapper<ErpBill> billListWrapper(String type, ErpBillQueryBO query) {
+        return billListWrapper(type, query, false);
+    }
+
+    private QueryWrapper<ErpBill> billListWrapper(String type, ErpBillQueryBO query, boolean productionModule) {
         QueryWrapper<ErpBill> wrapper = new QueryWrapper<ErpBill>()
                 .eq("bill_type", type)
                 .like(StrUtil.isNotBlank(query.getBillNo()), "bill_no", query.getBillNo())
@@ -305,8 +354,21 @@ public class ErpBillController {
                 .le(query.getEndDate() != null, "bill_date", query.getEndDate())
                 .orderByDesc("bill_date")
                 .orderByDesc("create_time");
-        applyDataAuth(wrapper, type);
+        if (productionModule) {
+            applyProductionDataAuth(wrapper, query);
+        } else {
+            applyDataAuth(wrapper, type);
+        }
         return wrapper;
+    }
+
+    private void applyProductionDataAuth(QueryWrapper<ErpBill> wrapper, ErpBillQueryBO query) {
+        if (isProductionFullAccessUser()) {
+            wrapper.eq(query.getEmployeeId() != null, "employee_id", query.getEmployeeId());
+            return;
+        }
+        Long userId = currentUserId();
+        wrapper.eq("employee_id", userId == null ? -1L : userId);
     }
 
     private void applyDataAuth(QueryWrapper<ErpBill> wrapper, String type) {
@@ -336,6 +398,25 @@ public class ErpBillController {
         return userService.isSuperAdmin(user);
     }
 
+    private boolean isProductionFullAccessUser() {
+        List<String> permissions = StpAdminUtil.stpLogic.getPermissionList();
+        if (permissions.contains("*:*:*")) {
+            return true;
+        }
+        Long userId = currentUserId();
+        return userId != null && roleService.selectRoleKeysByUserId(userId).contains("admin");
+    }
+
+    private void checkProductionVisible(ErpBill bill) {
+        if (isProductionFullAccessUser()) {
+            return;
+        }
+        Long userId = currentUserId();
+        if (userId == null || bill.getEmployeeId() == null || !bill.getEmployeeId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NO_AUTH, "只能查看自己录入的生产单");
+        }
+    }
+
     private Long currentUserId() {
         Object loginId = StpAdminUtil.getLoginIdDefaultNull();
         return loginId == null ? null : Long.valueOf(String.valueOf(loginId));
@@ -356,9 +437,6 @@ public class ErpBillController {
         BigDecimal beforeCost = nvl(balance.getCostAmount());
         BigDecimal beforeAvgCost = nvl(balance.getAvgCost());
         BigDecimal after = "IN".equals(direction) ? before.add(item.getQty()) : before.subtract(item.getQty());
-        if (after.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, item.getProductName() + "库存不足");
-        }
         BigDecimal costPrice = "IN".equals(direction) ? item.getPrice() : beforeAvgCost;
         BigDecimal costAmount = item.getQty().multiply(costPrice).setScale(4, RoundingMode.HALF_UP);
         BigDecimal afterCost = "IN".equals(direction) ? beforeCost.add(costAmount) : beforeCost.subtract(costAmount);
@@ -402,9 +480,6 @@ public class ErpBillController {
             BigDecimal after = "IN".equals(flow.getDirection())
                     ? balance.getQty().subtract(flow.getQty())
                     : balance.getQty().add(flow.getQty());
-            if (after.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "反审核后库存不能为负");
-            }
             BigDecimal afterCost = "IN".equals(flow.getDirection())
                     ? nvl(balance.getCostAmount()).subtract(nvl(flow.getAmount()))
                     : nvl(balance.getCostAmount()).add(nvl(flow.getAmount()));
@@ -488,9 +563,6 @@ public class ErpBillController {
         if (payable.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "应收应付金额不能小于0");
         }
-        if (paidAmount.compareTo(payable) > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "付款金额不能大于应收应付金额");
-        }
         validatePaymentMethod(bo.getPaymentMethod(), paidAmount);
         ErpBill bill = BeanUtil.copyProperties(bo, ErpBill.class);
         bill.setBillType(type);
@@ -543,6 +615,7 @@ public class ErpBillController {
             item.setProductCode(product.getCode());
             item.setProductName(product.getName());
             item.setProductImageUrl(product.getImageUrl());
+            item.setLogoImageUrl(source.getLogoImageUrl());
             item.setSpec(product.getSpec());
             item.setAttributeText(StrUtil.isNotBlank(source.getAttributeText()) ? source.getAttributeText() : product.getAttributeText());
             item.setCategoryLevel1Id(source.getCategoryLevel1Id());
@@ -571,12 +644,40 @@ public class ErpBillController {
         vo.setPartnerName("CUSTOMER".equals(bill.getPartnerType())
                 ? masterName(customerService.getById(bill.getPartnerId()))
                 : masterName(supplierService.getById(bill.getPartnerId())));
+        vo.setEmployeeName(StrUtil.isNotBlank(bill.getEmployeeName()) ? bill.getEmployeeName() : userDisplayName(bill.getEmployeeId()));
+        vo.setProductionUserName(StrUtil.isNotBlank(bill.getProductionUserName()) ? bill.getProductionUserName() : userDisplayName(bill.getProductionUserId()));
         vo.setWarehouseName(masterName(warehouseService.getById(bill.getWarehouseId())));
         vo.setAccountName(masterName(accountService.getById(bill.getAccountId())));
         if (withItems) {
             vo.setItems(billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", bill.getId())).stream().map(this::itemVO).toList());
         }
         return vo;
+    }
+
+    private String userDisplayName(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        SysUser user = userService.getById(userId);
+        if (user == null) {
+            return String.valueOf(userId);
+        }
+        return StrUtil.isNotBlank(user.getNickname()) ? user.getNickname() : user.getUsername();
+    }
+
+    private void normalizeSaleEmployeeName(ErpBill bill, ErpBill old) {
+        if (bill == null || !String.valueOf(bill.getBillType()).startsWith("SALE")) {
+            return;
+        }
+        if (StrUtil.isNotBlank(bill.getEmployeeName())) {
+            bill.setEmployeeName(bill.getEmployeeName().trim());
+            return;
+        }
+        if (old != null && StrUtil.isNotBlank(old.getEmployeeName())) {
+            bill.setEmployeeName(old.getEmployeeName());
+            return;
+        }
+        bill.setEmployeeName(userDisplayName(bill.getEmployeeId()));
     }
 
     private ErpBillVO.Item itemVO(ErpBillItem item) {
@@ -623,6 +724,12 @@ public class ErpBillController {
         }
     }
 
+    private void rollbackBillIfAudited(ErpBill bill) {
+        if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
+            auditService.unauditBill(bill.getId());
+        }
+    }
+
     private void ensureCanAudit(ErpBill bill) {
         if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "单据已审核，不能重复审核");
@@ -662,6 +769,10 @@ public class ErpBillController {
         }
     }
 
+    private String blankToNull(String value) {
+        return StrUtil.isBlank(value) ? null : value.trim();
+    }
+
     private void requireEnabledWarehouse(Long warehouseId) {
         ErpWarehouse warehouse = warehouseService.getById(warehouseId);
         if (warehouse == null || !Integer.valueOf(1).equals(warehouse.getStatus())) {
@@ -699,6 +810,7 @@ public class ErpBillController {
 
     private String billType(String module) {
         return switch (module) {
+            case "production" -> "SALE";
             case "sale" -> "SALE";
             case "sale-return" -> "SALE_RETURN";
             case "purchase-return" -> "PURCHASE_RETURN";
@@ -708,6 +820,7 @@ public class ErpBillController {
 
     private String titleName(String module) {
         return switch (module) {
+            case "production" -> "生产单";
             case "sale" -> "销售单";
             case "sale-return" -> "销售退货单";
             case "purchase-return" -> "进货退货单";
@@ -719,10 +832,13 @@ public class ErpBillController {
         return billType != null && billType.startsWith("SALE") ? "客户" : "供应商";
     }
 
-    private List<String> printFields(String billType) {
-        List<String> fields = new ArrayList<>(List.of("单号", "日期", partnerTitle(billType), "仓库"));
+    private List<String> printFields(String module, String billType) {
+        List<String> fields = new ArrayList<>(List.of("单号", "日期", billType != null && billType.startsWith("SALE") ? "业务员" : partnerTitle(billType), "仓库"));
         if (billType != null && billType.startsWith("SALE")) {
-            fields.addAll(List.of("收货人", "收货电话", "收货地址"));
+            fields.addAll(List.of("客户", "收货电话", "收货地址"));
+        }
+        if ("production".equals(module)) {
+            fields.addAll(List.of("生产进度", "快递单号", "生产人员"));
         }
         fields.addAll(List.of("应收应付", "付款方式", "付款金额", "审核状态", "备注"));
         return fields;
@@ -730,6 +846,13 @@ public class ErpBillController {
 
     private void check(String module, String action) {
         StpAdminUtil.stpLogic.checkPermission("erp:" + module + ":" + action);
+    }
+
+    private void checkProductionAdmin() {
+        if (isProductionFullAccessUser()) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.NO_AUTH, "生产单只能管理员维护");
     }
 
     private String masterName(ErpMasterData data) {

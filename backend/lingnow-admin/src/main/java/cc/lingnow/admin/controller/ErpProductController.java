@@ -29,6 +29,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,6 +42,8 @@ import java.util.Objects;
 @RequestMapping("/erp/product")
 @RequiredArgsConstructor
 public class ErpProductController {
+
+    private static final String COST_PRICE_EDIT_PERMISSION = "erp:product:cost:edit";
 
     private final ErpProductService productService;
     private final ErpProductCategoryService categoryService;
@@ -83,6 +87,8 @@ public class ErpProductController {
     @Log(title = "ERP商品", businessType = BusinessType.INSERT)
     public Result<Void> add(@Valid @RequestBody ErpProductSaveBO bo) {
         StpAdminUtil.stpLogic.checkPermission("erp:product:add");
+        bo.setCode(StrUtil.isBlank(bo.getCode()) ? nextProductCode() : bo.getCode());
+        applyCostPriceOnAdd(bo);
         ensureCodeUnique(bo.getCode(), null);
         productService.save(toEntity(bo));
         return Result.success();
@@ -95,6 +101,12 @@ public class ErpProductController {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
         }
         StpAdminUtil.stpLogic.checkPermission("erp:product:edit");
+        ErpProduct old = productService.getById(bo.getId());
+        if (old == null) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
+        }
+        bo.setCode(StrUtil.isBlank(bo.getCode()) ? old.getCode() : bo.getCode());
+        applyCostPriceOnEdit(bo, old);
         ensureCodeUnique(bo.getCode(), bo.getId());
         productService.updateById(toEntity(bo));
         return Result.success();
@@ -142,7 +154,7 @@ public class ErpProductController {
                         text(item.getRemark())
                 )).toList();
         CsvExportUtil.write(response, "商品管理.csv",
-                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "商品图片", "条码", "货位", "采购价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
+                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "商品图片", "条码", "货位", "成本价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
                 rows);
     }
 
@@ -150,7 +162,7 @@ public class ErpProductController {
     public void importTemplate(HttpServletResponse response) throws Exception {
         StpAdminUtil.stpLogic.checkPermission("erp:product:import");
         CsvExportUtil.write(response, "商品导入模板.csv",
-                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "商品图片", "条码", "货位", "采购价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
+                List.of("商品编号", "商品名称", "规格", "分类", "品牌", "单位", "辅助属性", "商品图片", "条码", "货位", "成本价", "销售价", "零售价", "最低库存", "最高库存", "状态", "备注"),
                 List.of());
     }
 
@@ -161,6 +173,7 @@ public class ErpProductController {
         if (file.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "导入文件不能为空");
         }
+        boolean canEditCostPrice = canEditCostPrice();
         List<String> errors = new ArrayList<>();
         int success = 0;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -177,6 +190,8 @@ public class ErpProductController {
                 }
                 try {
                     ErpProductSaveBO bo = parseProduct(line);
+                    bo.setCode(StrUtil.isBlank(bo.getCode()) ? nextProductCode() : bo.getCode());
+                    applyCostPriceOnAdd(bo, canEditCostPrice);
                     ensureCodeUnique(bo.getCode(), null);
                     productService.save(toEntity(bo));
                     success++;
@@ -217,6 +232,39 @@ public class ErpProductController {
         }
     }
 
+    private String nextProductCode() {
+        String prefix = "SP-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-";
+        long serial = productService.count(new QueryWrapper<ErpProduct>().likeRight("code", prefix)) + 1;
+        String code;
+        do {
+            code = prefix + String.format("%04d", serial++);
+        } while (productService.count(new QueryWrapper<ErpProduct>().eq("code", code)) > 0);
+        return code;
+    }
+
+    private void applyCostPriceOnAdd(ErpProductSaveBO bo) {
+        applyCostPriceOnAdd(bo, canEditCostPrice());
+    }
+
+    private void applyCostPriceOnAdd(ErpProductSaveBO bo, boolean canEditCostPrice) {
+        if (canEditCostPrice) {
+            return;
+        }
+        bo.setPurchasePrice(BigDecimal.ZERO);
+    }
+
+    private void applyCostPriceOnEdit(ErpProductSaveBO bo, ErpProduct old) {
+        if (canEditCostPrice()) {
+            return;
+        }
+        bo.setPurchasePrice(old.getPurchasePrice());
+    }
+
+    private boolean canEditCostPrice() {
+        List<String> permissions = StpAdminUtil.stpLogic.getPermissionList();
+        return permissions.contains("*:*:*") || permissions.contains(COST_PRICE_EDIT_PERMISSION);
+    }
+
     private ErpProduct toEntity(ErpProductSaveBO bo) {
         ErpProduct product = BeanUtil.copyProperties(bo, ErpProduct.class);
         product.setStatus(product.getStatus() == null ? 1 : product.getStatus());
@@ -243,9 +291,6 @@ public class ErpProductController {
         List<String> values = parseCsvLine(line);
         String code = value(values, 0);
         String name = value(values, 1);
-        if (StrUtil.isBlank(code)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "商品编号不能为空");
-        }
         if (StrUtil.isBlank(name)) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "商品名称不能为空");
         }
@@ -260,7 +305,7 @@ public class ErpProductController {
         bo.setImageUrl(value(values, 7));
         bo.setBarcode(value(values, 8));
         bo.setLocation(value(values, 9));
-        bo.setPurchasePrice(decimal(value(values, 10), "采购价"));
+        bo.setPurchasePrice(decimal(value(values, 10), "成本价"));
         bo.setSalePrice(decimal(value(values, 11), "销售价"));
         bo.setRetailPrice(decimal(value(values, 12), "零售价"));
         bo.setMinStock(decimal(value(values, 13), "最低库存"));

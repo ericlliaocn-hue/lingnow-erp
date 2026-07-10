@@ -51,11 +51,7 @@ public class FileWebConfig implements WebMvcConfigurer {
                         basePath += "/";
                     }
 
-                    // 修正：macOS/Linux下 file: 协议后跟绝对路径建议使用 file://
-                    // 如果 basePath 已经是 /Users/... 开头，则 "file:" + basePath 变成 "file:/Users/..."
-                    // 为了保险，我们可以尝试使用 "file:" + basePath
-
-                    String location = "file:" + basePath;
+                    String location = java.nio.file.Paths.get(basePath).toAbsolutePath().normalize().toUri().toString();
 
                     log.info("映射静态资源: {} -> {}", pathPattern, location);
                     registry.addResourceHandler(pathPattern)
@@ -66,13 +62,13 @@ public class FileWebConfig implements WebMvcConfigurer {
                 String defaultPath = defaultBasePath();
                 log.info("未找到本地存储配置，使用默认映射: /files/** -> file:{}", defaultPath);
                 registry.addResourceHandler("/files/**")
-                        .addResourceLocations("file:" + defaultPath);
+                        .addResourceLocations(java.nio.file.Paths.get(defaultPath).toAbsolutePath().normalize().toUri().toString());
             }
         } catch (Exception e) {
             log.error("加载文件资源映射失败", e);
             // Fallback
                 registry.addResourceHandler(DEFAULT_FILE_DOMAIN + "**")
-                    .addResourceLocations("file:" + defaultBasePath());
+                    .addResourceLocations(java.nio.file.Paths.get(defaultBasePath()).toAbsolutePath().normalize().toUri().toString());
         }
     }
 

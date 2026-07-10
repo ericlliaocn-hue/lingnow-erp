@@ -13,6 +13,11 @@ public class ErpAddressParseVO {
     private String province;
     private String city;
     private String district;
+    private String street;
+    private String village;
+    private List<String> regionPath = new ArrayList<>();
+    private List<String> regionPathNames = new ArrayList<>();
+    private List<String> contactCandidates = new ArrayList<>();
     private String detailAddress;
     private String normalizedAddress;
     private Integer confidence;

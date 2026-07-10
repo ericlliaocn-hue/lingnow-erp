@@ -41,6 +41,18 @@ export interface UserUpdatePayload {
     roleIds?: string[]
 }
 
+export interface UserCreatePayload {
+    username: string
+    password: string
+    nickname: string
+    phone?: string
+    email?: string
+    gender?: number
+    status: number
+    roleIds?: string[]
+    postIds?: string[]
+}
+
 export interface UserStats {
     totalUsers: number
     disabledUsers: number
@@ -90,6 +102,14 @@ export const updateUserStatus = (userId: string, status: number) => {
         url: `/user/${userId}/status`,
         method: 'put',
         params: { status }
+    })
+}
+
+export const addUser = (data: UserCreatePayload) => {
+    return request({
+        url: '/system/staff',
+        method: 'post',
+        data
     })
 }
 

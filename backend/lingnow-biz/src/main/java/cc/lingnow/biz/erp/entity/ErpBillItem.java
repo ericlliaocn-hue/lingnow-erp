@@ -26,6 +26,7 @@ public class ErpBillItem extends BaseEntity implements Serializable {
     private String productCode;
     private String productName;
     private String productImageUrl;
+    private String logoImageUrl;
     private String spec;
     private String attributeText;
     private Long categoryLevel1Id;

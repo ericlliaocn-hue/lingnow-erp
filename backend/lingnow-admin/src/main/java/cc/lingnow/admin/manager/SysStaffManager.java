@@ -14,6 +14,7 @@ import cc.lingnow.biz.post.service.SysUserPostService;
 import cc.lingnow.biz.role.service.SysRoleService;
 import cc.lingnow.biz.user.entity.SysUser;
 import cc.lingnow.biz.user.service.SysUserService;
+import cc.lingnow.common.constant.CommonConstants;
 import cc.lingnow.common.enums.ErrorCode;
 import cc.lingnow.common.exception.BusinessException;
 import cc.lingnow.common.vo.PageResult;
@@ -147,6 +148,23 @@ public class SysStaffManager {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR); // Cannot delete admin
         }
         userService.removeByIds(userIds);
+    }
+
+    /**
+     * 更新员工状态
+     */
+    public void updateStatus(Long userId, Integer status) {
+        SysUser current = userService.getById(userId);
+        if (current == null || userService.isInternalAccount(current)) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST);
+        }
+        if (!CommonConstants.STATUS_NORMAL.equals(status) && !CommonConstants.STATUS_DISABLED.equals(status)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "用户状态不正确");
+        }
+        SysUser user = new SysUser();
+        user.setUserId(userId);
+        user.setStatus(status);
+        userService.updateById(user);
     }
 
     /**

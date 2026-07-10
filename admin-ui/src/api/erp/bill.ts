@@ -2,7 +2,7 @@ import request from '@/utils/request'
 import type { PageResult } from '@/api/types'
 import type { ApprovalStatus } from './approval'
 
-export type BillModule = 'sale' | 'sale-return' | 'purchase' | 'purchase-return'
+export type BillModule = 'sale' | 'sale-return' | 'purchase' | 'purchase-return' | 'production'
 
 export interface BillItem {
   id?: string
@@ -10,6 +10,7 @@ export interface BillItem {
   productCode?: string
   productName?: string
   productImageUrl?: string
+  logoImageUrl?: string
   spec?: string
   attributeText?: string
   categoryLevel1Id?: string
@@ -18,11 +19,16 @@ export interface BillItem {
   categoryLevel2Name?: string
   optionAttributeIds?: string
   optionAttributeText?: string
-  categoryPickerId?: string
+  attributeSelections?: Record<string, string>
+  availableAttributeIds?: string
+  availableAttributeText?: string
+  productOptionsRequestId?: number
   unitId?: string
   unitName?: string
   warehouseId?: string
   qty: number
+  purchasePrice?: number
+  basePrice?: number
   price: number
   amount?: number
   discountRate?: number
@@ -43,6 +49,8 @@ export interface ErpBill {
   warehouseName?: string
   accountId?: string
   accountName?: string
+  employeeId?: string
+  employeeName?: string
   receiverName?: string
   receiverPhone?: string
   receiverAddress?: string
@@ -61,6 +69,10 @@ export interface ErpBill {
   approvalSubmitTime?: string
   approvalFinishTime?: string
   paymentStatus?: string
+  productionProgress?: string
+  trackingNo?: string
+  productionUserId?: string
+  productionUserName?: string
   remark?: string
   items: BillItem[]
 }
@@ -69,9 +81,18 @@ export interface BillQuery {
   current: number
   size: number
   billNo?: string
+  employeeId?: string
   partnerId?: string
   auditStatus?: number
   paymentStatus?: string
+  beginDate?: string
+  endDate?: string
+}
+
+export interface ProductionUpdatePayload {
+  productionProgress?: string
+  trackingNo?: string
+  productionUserName?: string
 }
 
 export function listBill(module: BillModule, params: BillQuery) {
@@ -92,6 +113,10 @@ export function addBill(module: BillModule, data: ErpBill) {
 
 export function updateBill(module: BillModule, data: ErpBill) {
   return request({ url: `/erp/${module}`, method: 'put', data })
+}
+
+export function updateProductionBill(id: string, data: ProductionUpdatePayload) {
+  return request({ url: `/erp/production/${id}`, method: 'put', data })
 }
 
 export function deleteBill(module: BillModule, ids: string | string[]) {

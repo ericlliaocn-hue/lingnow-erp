@@ -3,15 +3,21 @@ package cc.lingnow.admin.controller;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.model.ErpAddressParseBO;
 import cc.lingnow.biz.erp.model.ErpAddressParseVO;
+import cc.lingnow.biz.erp.model.ErpAddressRegionVO;
 import cc.lingnow.biz.erp.service.ErpAddressParseService;
+import cc.lingnow.biz.erp.service.ErpAddressRegionService;
 import cc.lingnow.common.vo.Result;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Tag(name = "ERP通用能力")
 @RestController
@@ -20,10 +26,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class ErpCommonController {
 
     private final ErpAddressParseService addressParseService;
+    private final ErpAddressRegionService addressRegionService;
 
     @PostMapping("/address/parse")
     public Result<ErpAddressParseVO> parseAddress(@Valid @RequestBody ErpAddressParseBO bo) {
         StpAdminUtil.stpLogic.checkLogin();
         return Result.success(addressParseService.parse(bo.getRawText()));
+    }
+
+    @GetMapping("/address/regions")
+    public Result<List<ErpAddressRegionVO>> addressRegions(@RequestParam(required = false) String parentCode) {
+        StpAdminUtil.stpLogic.checkLogin();
+        return Result.success(addressRegionService.listChildren(parentCode));
+    }
+
+    @GetMapping("/address/search")
+    public Result<List<ErpAddressRegionVO>> searchAddressRegions(@RequestParam String keyword,
+                                                                 @RequestParam(defaultValue = "20") Integer limit) {
+        StpAdminUtil.stpLogic.checkLogin();
+        return Result.success(addressRegionService.search(keyword, limit == null ? 20 : limit));
     }
 }

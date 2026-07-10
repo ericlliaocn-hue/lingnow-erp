@@ -31,6 +31,9 @@
     </el-card>
 
     <el-card shadow="never" class="table-wrapper">
+      <div class="table-toolbar">
+        <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
+      </div>
       <div style="flex: 1; overflow: hidden;">
         <el-table v-loading="loading" :data="userList" border style="width: 100%" height="100%">
           <el-table-column prop="userId" label="用户ID" width="160" align="center">
@@ -93,6 +96,69 @@
         @pagination="handleQuery"
       />
     </el-card>
+
+    <!-- 新增用户弹框 -->
+    <el-dialog v-model="addVisible" title="新增用户" width="700px" :close-on-click-modal="false">
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="90px">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="用户名" prop="username">
+              <el-input v-model="addForm.username" placeholder="请输入用户名" maxlength="30" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="密码" prop="password">
+              <el-input v-model="addForm.password" placeholder="请输入密码" type="password" maxlength="20" show-password />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="昵称" prop="nickname">
+              <el-input v-model="addForm.nickname" placeholder="请输入昵称" maxlength="30" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="手机号">
+              <el-input v-model="addForm.phone" placeholder="请输入手机号" maxlength="20" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="邮箱">
+              <el-input v-model="addForm.email" placeholder="请输入邮箱" maxlength="50" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="状态">
+              <el-select v-model="addForm.status" placeholder="请选择状态" style="width: 100%">
+                <el-option
+                  v-for="dict in sys_normal_disable"
+                  :key="dict.value"
+                  :label="dict.label"
+                  :value="Number(dict.value)"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="角色">
+          <el-select v-model="addForm.roleIds" multiple placeholder="请选择角色" style="width: 100%">
+            <el-option
+              v-for="item in roleOptions"
+              :key="item.roleId"
+              :label="item.roleName"
+              :value="item.roleId"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addVisible = false">取消</el-button>
+        <el-button type="primary" :loading="addLoading" @click="submitAdd">确定</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 用户详情 / 编辑弹框 -->
     <el-dialog v-model="detailVisible" :title="isEdit ? '编辑用户' : '用户详情'" width="700px" :close-on-click-modal="false">
@@ -276,12 +342,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, nextTick } from 'vue'
-import { getUserList, updateUserStatus, getUserDetail, updateUser, deleteUser, resetUserPassword, assignUserRoles } from '@/api/sys/user.ts'
+import { getUserList, updateUserStatus, getUserDetail, updateUser, deleteUser, resetUserPassword, assignUserRoles, addUser } from '@/api/sys/user.ts'
 import { getActiveRoles, assignRoles } from '@/api/sys/role.ts'
 import type { User } from '@/api/sys/user.ts'
 import { uploadFile } from '@/api/sys/file'
 import { ElMessage, ElMessageBox, ElTable } from 'element-plus'
-import { View, Search, Refresh, Edit, Delete, Key, UserFilled, UploadFilled } from '@element-plus/icons-vue'
+import { View, Search, Refresh, Edit, Delete, Key, UserFilled, UploadFilled, Plus } from '@element-plus/icons-vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { useDict } from '@/hooks/web/useDict'
 import { useClipboard } from '@vueuse/core'
@@ -309,6 +375,26 @@ const detailLoading = ref(false)
 const isEdit = ref(false)
 const currentUser = ref<User | null>(null)
 const roleOptions = ref<any[]>([])
+
+const addVisible = ref(false)
+const addLoading = ref(false)
+const addFormRef = ref()
+const addForm = reactive({
+  username: '',
+  password: '',
+  nickname: '',
+  phone: '',
+  email: '',
+  gender: 2,
+  status: 1,
+  roleIds: [] as string[],
+  postIds: [] as string[]
+})
+const addRules = {
+  username: [{ required: true, message: '用户名不能为空', trigger: 'blur' }],
+  password: [{ required: true, message: '密码不能为空', trigger: 'blur' }],
+  nickname: [{ required: true, message: '昵称不能为空', trigger: 'blur' }]
+}
 
 // 编辑表单数据
 const editForm = reactive({
@@ -384,6 +470,44 @@ const resetQuery = () => {
   queryParams.status = undefined
   queryParams.current = 1
   handleQuery()
+}
+
+const resetAddForm = () => {
+  addForm.username = ''
+  addForm.password = ''
+  addForm.nickname = ''
+  addForm.phone = ''
+  addForm.email = ''
+  addForm.gender = 2
+  addForm.status = 1
+  addForm.roleIds = []
+  addForm.postIds = []
+  addFormRef.value?.clearValidate?.()
+}
+
+const handleAdd = async () => {
+  resetAddForm()
+  if (roleOptions.value.length === 0) {
+    await getRoles()
+  }
+  addVisible.value = true
+}
+
+const submitAdd = async () => {
+  const valid = await addFormRef.value?.validate?.().catch(() => false)
+  if (!valid) return
+  addLoading.value = true
+  try {
+    await addUser({ ...addForm })
+    ElMessage.success('新增成功')
+    addVisible.value = false
+    await handleQuery()
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('新增失败')
+  } finally {
+    addLoading.value = false
+  }
 }
 
 const confirmStatusChange = (row: User): Promise<boolean> => {
@@ -668,6 +792,11 @@ const handleCopy = (text: string | number | undefined) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
 :deep(.el-card__body) {
   flex: 1;

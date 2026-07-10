@@ -81,6 +81,7 @@ public class ErpFinanceController {
         bill.setBillNo(StrUtil.isBlank(bo.getBillNo()) ? nextBillNo(type) : bo.getBillNo());
         ensureBillNoUnique(bill.getBillNo(), null);
         financeBillService.save(bill);
+        auditService.auditFinanceBill(bill.getId());
         return Result.success();
     }
 
@@ -94,12 +95,13 @@ public class ErpFinanceController {
         check(module, "edit");
         String type = billType(module);
         ErpFinanceBill old = requireBill(bo.getId(), type);
-        ensureUnaudited(old);
+        rollbackFinanceBillIfAudited(old);
         ErpFinanceBill bill = buildBill(type, bo);
         bill.setId(old.getId());
         bill.setBillNo(StrUtil.isBlank(bo.getBillNo()) ? old.getBillNo() : bo.getBillNo());
         ensureBillNoUnique(bill.getBillNo(), bill.getId());
         financeBillService.updateById(bill);
+        auditService.auditFinanceBill(bill.getId());
         return Result.success();
     }
 
@@ -110,7 +112,7 @@ public class ErpFinanceController {
         check(module, "remove");
         String type = billType(module);
         for (Long id : ids) {
-            ensureUnaudited(requireBill(id, type));
+            rollbackFinanceBillIfAudited(requireBill(id, type));
         }
         financeBillService.removeByIds(ids);
         return Result.success();
@@ -302,6 +304,12 @@ public class ErpFinanceController {
         }
         if (ErpApprovalStatus.PENDING.equals(bill.getApprovalStatus()) || ErpApprovalStatus.APPROVED.equals(bill.getApprovalStatus())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "审批中或已审批单据不能修改或删除");
+        }
+    }
+
+    private void rollbackFinanceBillIfAudited(ErpFinanceBill bill) {
+        if (Integer.valueOf(1).equals(bill.getAuditStatus())) {
+            auditService.unauditFinanceBill(bill.getId());
         }
     }
 

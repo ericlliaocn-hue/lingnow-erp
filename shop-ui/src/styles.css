@@ -1,0 +1,334 @@
+:root {
+  /* ===== Design Tokens：荣时衣架商城暖色主题 ===== */
+  --brand-brown: #7a3f18;
+  --brand-brown-soft: #95612b;
+  --brand-teal: #1d6d5f;
+  --brand-orange: #c4512a;
+  --brand-gold: #b98648;
+  --bg-cream: #fff6e8;
+  --bg-cream-soft: #fff1df;
+  --bg-page: #f5f6f2;
+  --bg-card: #ffffff;
+  --bg-muted: #f5f1ec;
+  --text-main: #241b16;
+  --text-sub: #817367;
+  --text-muted: #918173;
+  --border-soft: rgba(139, 97, 57, 0.12);
+  --border-line: #eadccf;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --shadow-card: 0 8px 18px rgba(71, 49, 31, 0.06);
+  --shadow-pop: 0 10px 24px rgba(71, 49, 31, 0.08);
+  --shadow-deep: 0 14px 28px rgba(77, 55, 37, 0.16);
+
+  color: var(--text-main);
+  background: var(--bg-page);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page {
+  position: relative;
+  width: min(100%, 640px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 14px 14px calc(92px + env(safe-area-inset-bottom));
+  background: var(--bg-page);
+  overflow-x: hidden;
+}
+
+.page-inner {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ===== 顶栏：统一暖色（替代原 ERP 蓝） ===== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: -14px -14px 14px;
+  padding: calc(14px + env(safe-area-inset-top)) 14px 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand-brown), var(--brand-teal));
+  box-shadow: 0 8px 18px rgba(122, 63, 24, 0.18);
+}
+
+.topbar-inner {
+  width: min(100%, 640px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.topbar p {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+}
+
+.icon-button,
+.plain-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.card {
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.field label {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  color: var(--text-main);
+  background: #fff;
+  outline: none;
+}
+
+.textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--brand-teal);
+  box-shadow: 0 0 0 3px rgba(29, 109, 95, 0.14);
+}
+
+.primary-button,
+.secondary-button,
+.danger-button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+}
+
+.primary-button {
+  color: #fff;
+  background: var(--brand-teal);
+}
+
+.secondary-button {
+  color: var(--brand-brown);
+  background: var(--bg-cream-soft);
+}
+
+.danger-button {
+  color: #9b2c2c;
+  background: #ffe9e7;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.muted {
+  color: var(--text-sub);
+}
+
+.price {
+  color: var(--brand-orange);
+  font-weight: 800;
+}
+
+.empty {
+  padding: 32px 10px;
+  color: var(--text-sub);
+  text-align: center;
+}
+
+/* ===== 底部导航 ===== */
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 20;
+  width: min(100vw, 640px);
+  transform: translateX(-50%);
+  padding: 8px 14px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-line);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -8px 24px rgba(71, 49, 31, 0.08);
+}
+
+.bottom-nav-inner {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.nav-item {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  place-items: center;
+  min-height: 48px;
+  border-radius: var(--radius-sm);
+  color: #617086;
+  font-size: 12px;
+}
+
+.nav-item.router-link-active {
+  color: var(--brand-brown);
+  background: var(--bg-cream-soft);
+  font-weight: 700;
+}
+
+.cart-nav em {
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: var(--brand-orange);
+  font-style: normal;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--bg-muted);
+  color: #475569;
+}
+
+.pill.warning {
+  color: #9a5b00;
+  background: #fff4d6;
+}
+
+.pill.success {
+  color: #20734d;
+  background: #e0f6eb;
+}
+
+.pill.info {
+  color: #5d6878;
+  background: #eef2f6;
+}
+
+/* ===== 通用骨架屏 ===== */
+.skeleton {
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, #efe9e2 20%, #faf7f3 40%, #efe9e2 60%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.2s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.divider {
+  height: 1px;
+  margin: 12px 0;
+  border: 0;
+  background: var(--border-soft);
+}
+
+@media (min-width: 700px) {
+  .page {
+    padding-top: 18px;
+  }
+}

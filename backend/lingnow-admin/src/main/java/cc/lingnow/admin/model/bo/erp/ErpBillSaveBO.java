@@ -21,6 +21,7 @@ public class ErpBillSaveBO {
     private Long warehouseId;
     private Long accountId;
     private Long employeeId;
+    private String employeeName;
     private String receiverName;
     private String receiverPhone;
     private String receiverAddress;
@@ -47,6 +48,7 @@ public class ErpBillSaveBO {
         private String categoryLevel2Name;
         private String optionAttributeIds;
         private String optionAttributeText;
+        private String logoImageUrl;
         @NotNull(message = "数量不能为空")
         private BigDecimal qty;
         @NotNull(message = "单价不能为空")

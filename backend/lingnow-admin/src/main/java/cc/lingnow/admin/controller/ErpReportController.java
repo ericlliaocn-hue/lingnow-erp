@@ -199,7 +199,7 @@ public class ErpReportController {
     public Result<List<Map<String, Object>>> trend(LocalDate beginDate, LocalDate endDate) {
         StpAdminUtil.stpLogic.checkPermission("erp:report:sale-analysis");
         Map<LocalDate, Map<String, Object>> rows = new HashMap<>();
-        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>().eq("audit_status", 1)
+        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>()
                 .in("bill_type", List.of("SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"))
                 .ge(beginDate != null, "bill_date", beginDate)
                 .le(endDate != null, "bill_date", endDate))) {
@@ -268,7 +268,7 @@ public class ErpReportController {
     public Result<List<Map<String, Object>>> employeePerformance(LocalDate beginDate, LocalDate endDate) {
         StpAdminUtil.stpLogic.checkPermission("erp:report:employee-performance");
         Map<Long, Map<String, Object>> rows = new HashMap<>();
-        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>().eq("audit_status", 1)
+        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>()
                 .in("bill_type", List.of("SALE", "SALE_RETURN"))
                 .ge(beginDate != null, "bill_date", beginDate)
                 .le(endDate != null, "bill_date", endDate))) {
@@ -359,7 +359,7 @@ public class ErpReportController {
     }
 
     private BigDecimal billAmount(String billType, LocalDate date) {
-        return billService.list(new QueryWrapper<ErpBill>().eq("bill_type", billType).eq("bill_date", date).eq("audit_status", 1))
+        return billService.list(new QueryWrapper<ErpBill>().eq("bill_type", billType).eq("bill_date", date))
                 .stream().map(ErpBill::getPayableAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -496,7 +496,6 @@ public class ErpReportController {
     private QueryWrapper<ErpBill> billWrapper(String billType, LocalDate beginDate, LocalDate endDate) {
         return new QueryWrapper<ErpBill>()
                 .eq("bill_type", billType)
-                .eq("audit_status", 1)
                 .ge(beginDate != null, "bill_date", beginDate)
                 .le(endDate != null, "bill_date", endDate);
     }

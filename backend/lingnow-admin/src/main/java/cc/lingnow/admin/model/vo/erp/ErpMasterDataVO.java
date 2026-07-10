@@ -22,6 +22,7 @@ public class ErpMasterDataVO {
     private BigDecimal openingBalance;
     private BigDecimal discountRate;
     private String attributeIds;
+    private BigDecimal extraAmount;
     private Integer sortOrder;
     private Integer status;
     private String remark;

@@ -2,6 +2,7 @@ package cc.lingnow.admin.config;
 
 import cn.dev33.satoken.stp.StpInterface;
 import cc.lingnow.admin.util.StpAdminUtil;
+import cc.lingnow.admin.util.StpShopUtil;
 import cc.lingnow.biz.role.service.SysRoleService;
 import cc.lingnow.biz.user.entity.SysUser;
 import cc.lingnow.biz.user.service.SysUserService;
@@ -39,6 +40,9 @@ public class StpInterfaceImpl implements StpInterface {
             Set<String> permissions = roleService.selectPermissionsByUserId(userId);
             return new ArrayList<>(permissions);
         }
+        if (StpShopUtil.TYPE.equals(loginType)) {
+            return new ArrayList<>();
+        }
         return new ArrayList<>();
     }
 
@@ -58,6 +62,9 @@ public class StpInterfaceImpl implements StpInterface {
 
             Set<String> roles = roleService.selectRoleKeysByUserId(userId);
             return new ArrayList<>(roles);
+        }
+        if (StpShopUtil.TYPE.equals(loginType)) {
+            return List.of("shop_customer");
         }
         return new ArrayList<>();
     }

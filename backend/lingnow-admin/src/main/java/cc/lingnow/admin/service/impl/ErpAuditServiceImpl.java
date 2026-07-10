@@ -204,9 +204,6 @@ public class ErpAuditServiceImpl implements ErpAuditService {
         BigDecimal beforeCost = nvl(balance.getCostAmount());
         BigDecimal beforeAvgCost = nvl(balance.getAvgCost());
         BigDecimal after = "IN".equals(direction) ? before.add(item.getQty()) : before.subtract(item.getQty());
-        if (after.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, item.getProductName() + "库存不足");
-        }
         BigDecimal costPrice = "IN".equals(direction) ? item.getPrice() : beforeAvgCost;
         BigDecimal costAmount = item.getQty().multiply(costPrice).setScale(4, RoundingMode.HALF_UP);
         BigDecimal afterCost = "IN".equals(direction) ? beforeCost.add(costAmount) : beforeCost.subtract(costAmount);
@@ -250,9 +247,6 @@ public class ErpAuditServiceImpl implements ErpAuditService {
             BigDecimal after = "IN".equals(flow.getDirection())
                     ? balance.getQty().subtract(flow.getQty())
                     : balance.getQty().add(flow.getQty());
-            if (after.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "反审核后库存不能为负");
-            }
             BigDecimal afterCost = "IN".equals(flow.getDirection())
                     ? nvl(balance.getCostAmount()).subtract(nvl(flow.getAmount()))
                     : nvl(balance.getCostAmount()).add(nvl(flow.getAmount()));
@@ -326,9 +320,6 @@ public class ErpAuditServiceImpl implements ErpAuditService {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "库存余额不存在，无法反审核");
             }
             BigDecimal after = "IN".equals(flow.getDirection()) ? balance.getQty().subtract(flow.getQty()) : balance.getQty().add(flow.getQty());
-            if (after.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "反审核后库存不能为负");
-            }
             BigDecimal afterAmount = "IN".equals(flow.getDirection()) ? nvl(balance.getCostAmount()).subtract(nvl(flow.getAmount())) : nvl(balance.getCostAmount()).add(nvl(flow.getAmount()));
             if (after.compareTo(BigDecimal.ZERO) == 0) {
                 afterAmount = BigDecimal.ZERO;

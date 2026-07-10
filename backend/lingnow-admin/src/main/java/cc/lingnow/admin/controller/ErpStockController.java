@@ -152,6 +152,7 @@ public class ErpStockController {
         ensureNoUnique(check.getCheckNo(), null);
         stockCheckService.save(check);
         saveItems(check, bo.getItems());
+        auditService.auditStockCheck(check.getId());
         return Result.success();
     }
 
@@ -164,7 +165,7 @@ public class ErpStockController {
         }
         StpAdminUtil.stpLogic.checkPermission("erp:stock-check:edit");
         ErpStockCheck old = requireCheck(bo.getId());
-        ensureUnaudited(old);
+        rollbackStockCheckIfAudited(old);
         ErpStockCheck check = buildCheck(bo);
         check.setId(old.getId());
         check.setCheckNo(StrUtil.isBlank(bo.getCheckNo()) ? old.getCheckNo() : bo.getCheckNo());
@@ -172,6 +173,7 @@ public class ErpStockController {
         stockCheckService.updateById(check);
         stockCheckItemService.remove(new QueryWrapper<ErpStockCheckItem>().eq("check_id", check.getId()));
         saveItems(check, bo.getItems());
+        auditService.auditStockCheck(check.getId());
         return Result.success();
     }
 
@@ -181,7 +183,7 @@ public class ErpStockController {
     public Result<Void> removeCheck(@PathVariable List<Long> ids) {
         StpAdminUtil.stpLogic.checkPermission("erp:stock-check:remove");
         for (Long id : ids) {
-            ensureUnaudited(requireCheck(id));
+            rollbackStockCheckIfAudited(requireCheck(id));
             stockCheckItemService.remove(new QueryWrapper<ErpStockCheckItem>().eq("check_id", id));
         }
         stockCheckService.removeByIds(ids);
@@ -322,9 +324,6 @@ public class ErpStockController {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "库存余额不存在，无法反审核");
             }
             BigDecimal after = "IN".equals(flow.getDirection()) ? balance.getQty().subtract(flow.getQty()) : balance.getQty().add(flow.getQty());
-            if (after.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "反审核后库存不能为负");
-            }
             BigDecimal afterAmount = "IN".equals(flow.getDirection()) ? nvl(balance.getCostAmount()).subtract(nvl(flow.getAmount())) : nvl(balance.getCostAmount()).add(nvl(flow.getAmount()));
             if (after.compareTo(BigDecimal.ZERO) == 0) {
                 afterAmount = BigDecimal.ZERO;
@@ -394,6 +393,12 @@ public class ErpStockController {
         }
         if (ErpApprovalStatus.PENDING.equals(check.getApprovalStatus()) || ErpApprovalStatus.APPROVED.equals(check.getApprovalStatus())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "审批中或已审批盘点单不能修改或删除");
+        }
+    }
+
+    private void rollbackStockCheckIfAudited(ErpStockCheck check) {
+        if (Integer.valueOf(1).equals(check.getAuditStatus())) {
+            auditService.unauditStockCheck(check.getId());
         }
     }
 

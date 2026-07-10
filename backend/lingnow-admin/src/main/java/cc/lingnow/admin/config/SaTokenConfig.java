@@ -37,6 +37,7 @@ public class SaTokenConfig {
                         "/v3/api-docs/**",
                         "/auth/**",
                         "/system/auth/**",
+                        "/shop-api/**",
                         "/api/admin-api/**",
                         "/ws/**",
                         "/admin/file/**", // 排除认证接口和静态资源

@@ -32,6 +32,8 @@
         />
       </el-form-item>
 
+      <el-checkbox v-model="rememberPassword" class="remember-checkbox">记住密码</el-checkbox>
+
       <el-button
         type="primary"
         size="large"
@@ -45,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/modules/user'
@@ -55,10 +57,25 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const loading = ref(false)
+const REMEMBER_LOGIN_KEY = 'lingnow-admin-remember-login'
 
 const form = reactive({
   username: '',
   password: ''
+})
+const rememberPassword = ref(true)
+
+onMounted(() => {
+  const saved = localStorage.getItem(REMEMBER_LOGIN_KEY)
+  if (!saved) return
+  try {
+    const data = JSON.parse(saved)
+    form.username = data.username || ''
+    form.password = data.password || ''
+    rememberPassword.value = data.remember !== false
+  } catch {
+    localStorage.removeItem(REMEMBER_LOGIN_KEY)
+  }
 })
 
 const handleLogin = async () => {
@@ -74,6 +91,16 @@ const handleLogin = async () => {
        userStore.login(form),
        new Promise(resolve => setTimeout(resolve, 800)) // 最少显示 800ms
      ])
+
+     if (rememberPassword.value) {
+       localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({
+         remember: true,
+         username: form.username,
+         password: form.password
+       }))
+     } else {
+       localStorage.removeItem(REMEMBER_LOGIN_KEY)
+     }
 
      ElMessage.success('登录成功')
 
@@ -131,6 +158,11 @@ const handleLogin = async () => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+
+.remember-checkbox {
+  margin: -4px 0 12px;
+  color: #637381;
 }
 
 .login-btn {

@@ -64,6 +64,13 @@ public class SysStaffController {
         return Result.success();
     }
 
+    @Operation(summary = "更新员工状态")
+    @PutMapping("/{userId}/status")
+    public Result<Void> updateStatus(@PathVariable Long userId, @RequestParam Integer status) {
+        staffManager.updateStatus(userId, status);
+        return Result.success();
+    }
+
     @Operation(summary = "重置密码")
     @PutMapping("/reset-pwd")
     public Result<Void> resetPwd(@RequestBody SysStaffResetPwdBO bo) {

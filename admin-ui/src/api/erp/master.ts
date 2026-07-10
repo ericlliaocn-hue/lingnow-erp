@@ -25,6 +25,7 @@ export interface ErpMasterVO {
   openingBalance?: number
   discountRate?: number
   attributeIds?: string
+  extraAmount?: number
   sortOrder: number
   status: number
   remark?: string
@@ -55,6 +56,7 @@ export interface ErpMasterForm {
   openingBalance?: number
   discountRate?: number
   attributeIds?: string
+  extraAmount?: number
   sortOrder: number
   status: number
   remark?: string

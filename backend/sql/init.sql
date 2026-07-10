@@ -283,6 +283,15 @@ CREATE TABLE IF NOT EXISTS `sys_role_menu`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='角色和菜单关联';
 
+-- Role Department Join
+CREATE TABLE IF NOT EXISTS `sys_role_dept`
+(
+    `role_id` bigint(20) NOT NULL,
+    `dept_id` bigint(20) NOT NULL,
+    PRIMARY KEY (`role_id`, `dept_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='角色和部门关联';
+
 -- User Role Join
 CREATE TABLE IF NOT EXISTS `sys_user_role`
 (
@@ -761,6 +770,7 @@ CREATE TABLE IF NOT EXISTS `erp_unit`
     `account_type` varchar(32)          DEFAULT NULL COMMENT '账户类型',
     `opening_balance` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '期初余额',
     `discount_rate` decimal(10, 4)      DEFAULT NULL COMMENT '折扣率',
+    `extra_amount` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '配置加价金额',
     `sort_order`  int(11)               DEFAULT '0' COMMENT '显示顺序',
     `status`      tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0停用)',
     `remark`      varchar(500)          DEFAULT NULL COMMENT '备注',
@@ -864,6 +874,28 @@ CREATE TABLE IF NOT EXISTS `erp_customer`
     KEY `idx_customer_level` (`level_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户';
+
+CREATE TABLE IF NOT EXISTS `erp_customer_account`
+(
+    `id`              bigint(20)   NOT NULL COMMENT '客户账号ID',
+    `customer_id`     bigint(20)   NOT NULL COMMENT '客户ID',
+    `username`        varchar(64)  NOT NULL COMMENT '登录账号',
+    `password`        varchar(128) NOT NULL COMMENT '登录密码',
+    `nickname`        varchar(64)           DEFAULT NULL COMMENT '昵称',
+    `phone`           varchar(32)           DEFAULT NULL COMMENT '手机号',
+    `status`          tinyint(1)   NOT NULL DEFAULT '1' COMMENT '状态 (1启用 0禁用)',
+    `last_login_time` datetime              DEFAULT NULL COMMENT '最后登录时间',
+    `remark`          varchar(500)          DEFAULT NULL COMMENT '备注',
+    `create_time`     datetime              DEFAULT NULL,
+    `update_time`     datetime              DEFAULT NULL,
+    `create_by`       varchar(64)           DEFAULT NULL,
+    `update_by`       varchar(64)           DEFAULT NULL,
+    `del_flag`        tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_customer_account_username` (`username`, `del_flag`),
+    KEY `idx_customer_account_customer` (`customer_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户登录账号';
 
 CREATE TABLE IF NOT EXISTS `erp_supplier`
 (
@@ -982,7 +1014,7 @@ CREATE TABLE IF NOT EXISTS `erp_product`
     `attribute_text` varchar(255)            DEFAULT NULL COMMENT '辅助属性',
     `barcode`        varchar(128)            DEFAULT NULL COMMENT '条码',
     `location`       varchar(128)            DEFAULT NULL COMMENT '货位',
-    `purchase_price` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '采购价',
+    `purchase_price` decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '成本价',
     `sale_price`     decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '销售价',
     `retail_price`   decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '零售价',
     `min_stock`      decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '最低库存',
@@ -1016,6 +1048,7 @@ CREATE TABLE IF NOT EXISTS `erp_bill`
     `warehouse_id`   bigint(20)      NOT NULL COMMENT '仓库ID',
     `account_id`     bigint(20)               DEFAULT NULL COMMENT '结算账户ID',
     `employee_id`    bigint(20)               DEFAULT NULL COMMENT '业务员ID',
+    `employee_name`  varchar(64)              DEFAULT NULL COMMENT '业务员',
     `receiver_name`  varchar(64)              DEFAULT NULL COMMENT '收货人',
     `receiver_phone` varchar(32)              DEFAULT NULL COMMENT '收货电话',
     `receiver_address` varchar(500)           DEFAULT NULL COMMENT '收货地址',
@@ -1029,6 +1062,10 @@ CREATE TABLE IF NOT EXISTS `erp_bill`
     `debt_amount`    decimal(18, 4)  NOT NULL DEFAULT '0.0000' COMMENT '欠款金额',
     `audit_status`   tinyint(1)      NOT NULL DEFAULT '0' COMMENT '审核状态 0未审核 1已审核',
     `payment_status` varchar(32)     NOT NULL DEFAULT 'UNPAID' COMMENT '收付款状态',
+    `production_progress` varchar(64) DEFAULT NULL COMMENT '生产进度',
+    `tracking_no` varchar(100)        DEFAULT NULL COMMENT '快递单号',
+    `production_user_id` bigint(20)    DEFAULT NULL COMMENT '生产人员ID',
+    `production_user_name` varchar(64) DEFAULT NULL COMMENT '生产人员',
     `approval_status` varchar(20)     NOT NULL DEFAULT 'NONE' COMMENT '审批状态',
     `approval_instance_id` bigint(20) DEFAULT NULL COMMENT '审批实例ID',
     `approval_submit_by` varchar(64)  DEFAULT NULL COMMENT '审批提交人',
@@ -1060,6 +1097,7 @@ CREATE TABLE IF NOT EXISTS `erp_bill_item`
     `product_code`    varchar(64)     NOT NULL COMMENT '商品编号',
     `product_name`    varchar(128)    NOT NULL COMMENT '商品名称',
     `product_image_url` varchar(500)            DEFAULT NULL COMMENT '商品图片快照',
+    `logo_image_url`  varchar(500)             DEFAULT NULL COMMENT 'LOGO图片',
     `spec`            varchar(128)             DEFAULT NULL COMMENT '规格型号',
     `attribute_text`  varchar(500)             DEFAULT NULL COMMENT '商品属性快照',
     `category_level1_id` bigint(20)            DEFAULT NULL COMMENT '一级类目ID',
@@ -1088,6 +1126,75 @@ CREATE TABLE IF NOT EXISTS `erp_bill_item`
     KEY `idx_bill_item_warehouse` (`warehouse_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP业务单据明细';
+
+CREATE TABLE IF NOT EXISTS `erp_customer_order`
+(
+    `id`               bigint(20)    NOT NULL COMMENT '客户订单ID',
+    `order_no`         varchar(64)    NOT NULL COMMENT '客户订单号',
+    `customer_id`      bigint(20)     NOT NULL COMMENT '客户ID',
+    `customer_name`    varchar(128)            DEFAULT NULL COMMENT '客户名称快照',
+    `account_id`       bigint(20)     NOT NULL COMMENT '客户账号ID',
+    `account_name`     varchar(64)             DEFAULT NULL COMMENT '下单账号快照',
+    `status`           varchar(32)    NOT NULL DEFAULT 'PENDING' COMMENT '状态 PENDING/CONFIRMED/CANCELLED',
+    `order_time`       datetime       NOT NULL COMMENT '下单时间',
+    `total_qty`        decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '总数量',
+    `total_amount`     decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '总金额',
+    `receiver_name`    varchar(64)             DEFAULT NULL COMMENT '收货人',
+    `receiver_phone`   varchar(32)             DEFAULT NULL COMMENT '收货电话',
+    `receiver_address` varchar(500)            DEFAULT NULL COMMENT '收货地址',
+    `remark`           varchar(500)            DEFAULT NULL COMMENT '备注',
+    `bill_id`          bigint(20)              DEFAULT NULL COMMENT '销售单ID',
+    `bill_no`          varchar(64)             DEFAULT NULL COMMENT '销售单号',
+    `confirm_time`     datetime                DEFAULT NULL COMMENT '确认时间',
+    `confirm_by`       varchar(64)             DEFAULT NULL COMMENT '确认人',
+    `cancel_time`      datetime                DEFAULT NULL COMMENT '作废时间',
+    `cancel_by`        varchar(64)             DEFAULT NULL COMMENT '作废人',
+    `cancel_reason`    varchar(500)            DEFAULT NULL COMMENT '作废原因',
+    `create_time`      datetime                DEFAULT NULL,
+    `update_time`      datetime                DEFAULT NULL,
+    `create_by`        varchar(64)             DEFAULT NULL,
+    `update_by`        varchar(64)             DEFAULT NULL,
+    `del_flag`         tinyint(1)     NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_customer_order_no` (`order_no`, `del_flag`),
+    KEY `idx_customer_order_customer` (`customer_id`),
+    KEY `idx_customer_order_account` (`account_id`),
+    KEY `idx_customer_order_status` (`status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户H5订单';
+
+CREATE TABLE IF NOT EXISTS `erp_customer_order_item`
+(
+    `id`                   bigint(20)    NOT NULL COMMENT '客户订单明细ID',
+    `order_id`             bigint(20)    NOT NULL COMMENT '客户订单ID',
+    `product_id`           bigint(20)    NOT NULL COMMENT '商品ID',
+    `product_code`         varchar(64)             DEFAULT NULL COMMENT '商品编号快照',
+    `product_name`         varchar(128)            DEFAULT NULL COMMENT '商品名称快照',
+    `product_image_url`    varchar(500)            DEFAULT NULL COMMENT '商品图片快照',
+    `logo_image_url`       varchar(500)            DEFAULT NULL COMMENT 'LOGO图片',
+    `spec`                 varchar(128)            DEFAULT NULL COMMENT '规格快照',
+    `attribute_text`       varchar(500)            DEFAULT NULL COMMENT '商品属性快照',
+    `category_level1_id`   bigint(20)              DEFAULT NULL COMMENT '一级类目ID',
+    `category_level1_name` varchar(128)            DEFAULT NULL COMMENT '一级类目快照',
+    `category_level2_id`   bigint(20)              DEFAULT NULL COMMENT '二级类目ID',
+    `category_level2_name` varchar(128)            DEFAULT NULL COMMENT '二级类目快照',
+    `option_attribute_ids` varchar(500)            DEFAULT NULL COMMENT '选项属性ID集合',
+    `option_attribute_text` varchar(500)           DEFAULT NULL COMMENT '选项属性快照',
+    `unit_id`              bigint(20)              DEFAULT NULL COMMENT '单位ID',
+    `qty`                  decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '数量',
+    `price`                decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '单价',
+    `amount`               decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '金额',
+    `remark`               varchar(500)            DEFAULT NULL COMMENT '定制说明',
+    `create_time`          datetime                DEFAULT NULL,
+    `update_time`          datetime                DEFAULT NULL,
+    `create_by`            varchar(64)             DEFAULT NULL,
+    `update_by`            varchar(64)             DEFAULT NULL,
+    `del_flag`             tinyint(1)     NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_customer_order_item_order` (`order_id`),
+    KEY `idx_customer_order_item_product` (`product_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户H5订单明细';
 
 CREATE TABLE IF NOT EXISTS `erp_stock_balance`
 (
@@ -1379,6 +1486,11 @@ INSERT IGNORE INTO `sys_role`
 (`role_id`, `role_name`, `role_key`, `sort_order`, `status`, `create_time`, `del_flag`)
 VALUES (1, '超级管理员', 'admin', 1, 1, NOW(), 0);
 
+-- Default Salesperson Role
+INSERT IGNORE INTO `sys_role`
+(`role_id`, `role_name`, `role_key`, `sort_order`, `status`, `data_scope`, `remark`, `create_time`, `del_flag`)
+VALUES (880000200001, '业务员', 'salesperson', 2, 1, 1, '销售业务员角色，可查看成本价但不能修改成本价', NOW(), 0);
+
 -- Default Department
 INSERT IGNORE INTO `sys_dept`
 (`dept_id`, `parent_id`, `ancestors`, `dept_name`, `order_num`, `leader`, `phone`, `email`, `status`, `create_time`, `del_flag`)
@@ -1439,13 +1551,13 @@ VALUES
 (1430, 1400, '在线用户', 1, 'Connection', '/monitor/online', 'monitor/online/index', 'monitor:online:view', 43, 1, 1, 'N', NOW(), 0),
 (1440, 1400, '实时日志', 1, 'Document', '/monitor/log', 'monitor/log/index', 'monitor:log:view', 44, 1, 1, 'N', NOW(), 0),
 (1450, 1400, '任务监控', 1, 'Timer', '/monitor/job', 'monitor/job/index', 'monitor:job:list', 45, 1, 1, 'N', NOW(), 0),
-(1500, 0, '审批中心', 0, 'Stamp', '/erp/approval', 'Layout', NULL, 50, 1, 1, 'N', NOW(), 0),
-(1510, 1500, '待我审批', 1, 'Checked', '/erp/approval/todo', 'erp/approval/todo', 'erp:approval:task', 51, 1, 1, 'N', NOW(), 0),
-(1520, 1500, '我发起的', 1, 'Promotion', '/erp/approval/mine', 'erp/approval/mine', 'erp:approval:task', 52, 1, 1, 'N', NOW(), 0),
-(1530, 1500, '已办审批', 1, 'Finished', '/erp/approval/done', 'erp/approval/done', 'erp:approval:task', 53, 1, 1, 'N', NOW(), 0),
-(1540, 1500, '流程设计器', 1, 'Share', '/erp/workflow/designer', 'erp/approval/designer', 'erp:workflow:designer', 54, 1, 1, 'N', NOW(), 0),
+(1500, 0, '审批中心', 0, 'Stamp', '/erp/approval', 'Layout', NULL, 50, 1, 0, 'N', NOW(), 0),
+(1510, 1500, '待我审批', 1, 'Checked', '/erp/approval/todo', 'erp/approval/todo', 'erp:approval:task', 51, 1, 0, 'N', NOW(), 0),
+(1520, 1500, '我发起的', 1, 'Promotion', '/erp/approval/mine', 'erp/approval/mine', 'erp:approval:task', 52, 1, 0, 'N', NOW(), 0),
+(1530, 1500, '已办审批', 1, 'Finished', '/erp/approval/done', 'erp/approval/done', 'erp:approval:task', 53, 1, 0, 'N', NOW(), 0),
+(1540, 1500, '流程设计器', 1, 'Share', '/erp/workflow/designer', 'erp/approval/designer', 'erp:workflow:designer', 54, 1, 0, 'N', NOW(), 0),
 (2000, 0, '商品', 0, 'Goods', '/erp/product', 'Layout', NULL, 100, 1, 1, 'N', NOW(), 0),
-(2010, 2000, '商品分类', 1, 'FolderOpened', '/erp/product/category', 'erp/master/index', 'erp:product-category:list', 101, 0, 1, 'N', NOW(), 0),
+(2010, 2000, '商品分类', 1, 'FolderOpened', '/erp/product/category', 'erp/master/index', 'erp:product-category:list', 101, 0, 0, 'N', NOW(), 0),
 (2020, 2000, '单位管理', 1, 'CollectionTag', '/erp/product/unit', 'erp/master/index', 'erp:unit:list', 102, 0, 1, 'N', NOW(), 0),
 (2030, 2000, '商品品牌', 1, 'PriceTag', '/erp/product/brand', 'erp/master/index', 'erp:product-brand:list', 103, 0, 1, 'N', NOW(), 0),
 (2040, 2000, '商品属性', 1, 'Operation', '/erp/product/attribute', 'erp/master/index', 'erp:product-attribute:list', 104, 1, 1, 'N', NOW(), 0),
@@ -1459,11 +1571,14 @@ VALUES
 (2160, 2100, '单号规则', 1, 'Tickets', '/erp/setting/bill-no-rule', 'erp/config/billNoRule', 'erp:config:bill-no-rule:list', 116, 1, 1, 'N', NOW(), 0),
 (2170, 2100, '字段设置', 1, 'SetUp', '/erp/setting/field-setting', 'erp/config/fieldSetting', 'erp:config:field-setting:list', 117, 1, 1, 'N', NOW(), 0),
 (2180, 2100, '打印模板', 1, 'Printer', '/erp/setting/print-template', 'erp/config/printTemplate', 'erp:config:print-template:list', 118, 1, 1, 'N', NOW(), 0),
+(2190, 2100, '客户账号', 1, 'User', '/erp/setting/customer-account', 'erp/customerAccount/index', 'erp:customer-account:list', 120, 1, 1, 'N', NOW(), 0),
 (2200, 0, '销售', 0, 'Sell', '/erp/sale', 'Layout', NULL, 120, 1, 1, 'N', NOW(), 0),
 (2210, 2200, '销售单', 1, 'Document', '/erp/sale/list', 'erp/bill/index', 'erp:sale:list', 121, 1, 1, 'N', NOW(), 0),
 (2220, 2200, '新增销售单', 1, 'Plus', '/erp/sale/add', 'erp/bill/form', 'erp:sale:add', 122, 1, 1, 'N', NOW(), 0),
 (2230, 2200, '销售退货单', 1, 'Document', '/erp/sale-return/list', 'erp/bill/index', 'erp:sale-return:list', 123, 1, 1, 'N', NOW(), 0),
 (2240, 2200, '新增销售退货', 1, 'Plus', '/erp/sale-return/add', 'erp/bill/form', 'erp:sale-return:add', 124, 1, 1, 'N', NOW(), 0),
+(2250, 2200, '生产单', 1, 'Document', '/erp/production/list', 'erp/bill/index', 'erp:production:list', 125, 1, 1, 'N', NOW(), 0),
+(2260, 2200, '客户订单', 1, 'Tickets', '/erp/customer-order/list', 'erp/customerOrder/index', 'erp:customer-order:list', 126, 1, 1, 'N', NOW(), 0),
 (2300, 0, '进货', 0, 'ShoppingCart', '/erp/purchase', 'Layout', NULL, 130, 1, 1, 'N', NOW(), 0),
 (2310, 2300, '进货单', 1, 'Document', '/erp/purchase/list', 'erp/bill/index', 'erp:purchase:list', 131, 1, 1, 'N', NOW(), 0),
 (2320, 2300, '新增进货单', 1, 'Plus', '/erp/purchase/add', 'erp/bill/form', 'erp:purchase:add', 132, 1, 1, 'N', NOW(), 0),
@@ -1572,6 +1687,7 @@ VALUES
 (2054, 2050, '商品选项', 2, NULL, NULL, NULL, 'erp:product:options', 4, 1, 1, 'N', NOW(), 0),
 (2055, 2050, '商品导入', 2, NULL, NULL, NULL, 'erp:product:import', 5, 1, 1, 'N', NOW(), 0),
 (2056, 2050, '商品导出', 2, NULL, NULL, NULL, 'erp:product:export', 6, 1, 1, 'N', NOW(), 0),
+(2057, 2050, '成本价编辑', 2, NULL, NULL, NULL, 'erp:product:cost:edit', 7, 1, 1, 'N', NOW(), 0),
 (2111, 2110, '客户新增', 2, NULL, NULL, NULL, 'erp:customer:add', 1, 1, 1, 'N', NOW(), 0),
 (2112, 2110, '客户编辑', 2, NULL, NULL, NULL, 'erp:customer:edit', 2, 1, 1, 'N', NOW(), 0),
 (2113, 2110, '客户删除', 2, NULL, NULL, NULL, 'erp:customer:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -1597,6 +1713,8 @@ VALUES
 (2182, 2180, '打印模板编辑', 2, NULL, NULL, NULL, 'erp:config:print-template:edit', 2, 1, 1, 'N', NOW(), 0),
 (2183, 2180, '打印模板删除', 2, NULL, NULL, NULL, 'erp:config:print-template:remove', 3, 1, 1, 'N', NOW(), 0),
 (2184, 2100, 'ERP参数读取', 2, NULL, NULL, NULL, 'erp:config:params', 119, 1, 1, 'N', NOW(), 0),
+(2191, 2190, '客户账号新增', 2, NULL, NULL, NULL, 'erp:customer-account:add', 1, 1, 1, 'N', NOW(), 0),
+(2192, 2190, '客户账号编辑', 2, NULL, NULL, NULL, 'erp:customer-account:edit', 2, 1, 1, 'N', NOW(), 0),
 (2211, 2210, '销售新增', 2, NULL, NULL, NULL, 'erp:sale:add', 1, 1, 1, 'N', NOW(), 0),
 (2212, 2210, '销售编辑', 2, NULL, NULL, NULL, 'erp:sale:edit', 2, 1, 1, 'N', NOW(), 0),
 (2213, 2210, '销售删除', 2, NULL, NULL, NULL, 'erp:sale:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -1628,6 +1746,12 @@ VALUES
 (2235, 2230, '销售退货反审核', 2, NULL, NULL, NULL, 'erp:sale-return:unaudit', 5, 1, 1, 'N', NOW(), 0),
 (2236, 2230, '销售退货导出', 2, NULL, NULL, NULL, 'erp:sale-return:export', 6, 1, 1, 'N', NOW(), 0),
 (2237, 2230, '销售退货打印', 2, NULL, NULL, NULL, 'erp:sale-return:print', 7, 1, 1, 'N', NOW(), 0),
+(2251, 2250, '生产单复制', 2, NULL, NULL, NULL, 'erp:production:copy', 1, 1, 1, 'N', NOW(), 0),
+(2252, 2250, '生产单打印', 2, NULL, NULL, NULL, 'erp:production:print', 2, 1, 1, 'N', NOW(), 0),
+(2253, 2250, '生产单维护', 2, NULL, NULL, NULL, 'erp:production:edit', 3, 1, 1, 'N', NOW(), 0),
+(2261, 2260, '客户订单确认', 2, NULL, NULL, NULL, 'erp:customer-order:confirm', 1, 1, 1, 'N', NOW(), 0),
+(2262, 2260, '客户订单作废', 2, NULL, NULL, NULL, 'erp:customer-order:cancel', 2, 1, 1, 'N', NOW(), 0),
+(2263, 2260, '客户订单打印', 2, NULL, NULL, NULL, 'erp:customer-order:print', 3, 1, 1, 'N', NOW(), 0),
 (2331, 2330, '进货退货新增', 2, NULL, NULL, NULL, 'erp:purchase-return:add', 1, 1, 1, 'N', NOW(), 0),
 (2332, 2330, '进货退货编辑', 2, NULL, NULL, NULL, 'erp:purchase-return:edit', 2, 1, 1, 'N', NOW(), 0),
 (2333, 2330, '进货退货删除', 2, NULL, NULL, NULL, 'erp:purchase-return:remove', 3, 1, 1, 'N', NOW(), 0),
@@ -1653,7 +1777,19 @@ VALUES
 
 -- Assign Super Admin Role to All Menus
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
-SELECT 1, menu_id FROM `sys_menu` WHERE menu_id NOT IN (1100, 1200, 1300, 1400, 1500);
+SELECT 1, menu_id FROM `sys_menu` WHERE menu_id NOT IN (1200, 1300, 1400, 1500);
+
+-- Assign Salesperson Role to Sales Workflow Menus
+INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
+SELECT 880000200001, menu_id FROM `sys_menu`
+WHERE menu_id IN (
+    1000,
+    2000, 2010, 2020, 2030, 2040, 2050, 2052, 2054, 2056,
+    2100, 2110, 2111, 2112, 2130, 2131, 2140,
+    2200, 2210, 2220, 2211, 2212, 2213, 2216, 2217,
+    2230, 2240, 2231, 2232, 2233, 2236, 2237,
+    2250, 2251, 2252, 2260, 2263
+);
 
 -- Default Dictionaries
 INSERT IGNORE INTO `sys_dict_type`

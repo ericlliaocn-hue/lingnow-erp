@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 @Data
 public class ErpProductSaveBO {
     private Long id;
-    @NotBlank(message = "商品编号不能为空")
     private String code;
     @NotBlank(message = "商品名称不能为空")
     private String name;

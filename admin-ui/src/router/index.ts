@@ -45,6 +45,12 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('@/views/home/index.vue'),
         meta: { title: '数据看板', icon: 'DataAnalysis', affix: true }
       },
+      {
+        path: '/erp/production/add',
+        name: 'ProductionBillMaintain',
+        component: () => import('@/views/erp/bill/form.vue'),
+        meta: { title: '生产单', hidden: true }
+      },
     ]
   }
 ]

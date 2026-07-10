@@ -21,6 +21,7 @@ public class ErpBillVO {
     private Long accountId;
     private String accountName;
     private Long employeeId;
+    private String employeeName;
     private String receiverName;
     private String receiverPhone;
     private String receiverAddress;
@@ -34,6 +35,10 @@ public class ErpBillVO {
     private BigDecimal debtAmount;
     private Integer auditStatus;
     private String paymentStatus;
+    private String productionProgress;
+    private String trackingNo;
+    private Long productionUserId;
+    private String productionUserName;
     private String approvalStatus;
     private Long approvalInstanceId;
     private String approvalSubmitBy;
@@ -53,6 +58,7 @@ public class ErpBillVO {
         private String productCode;
         private String productName;
         private String productImageUrl;
+        private String logoImageUrl;
         private String spec;
         private String attributeText;
         private Long categoryLevel1Id;

@@ -9,6 +9,10 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+  servlet:
+    multipart:
+      max-file-size: ${LINGNOW_MAX_FILE_SIZE:20MB}
+      max-request-size: ${LINGNOW_MAX_REQUEST_SIZE:20MB}
 
 # 日志配置
 logging:

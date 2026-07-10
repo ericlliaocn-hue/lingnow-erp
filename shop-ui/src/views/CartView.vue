@@ -1,0 +1,275 @@
+<template>
+  <main class="page cart-page">
+    <header class="simple-header">
+      <div class="page-inner">
+        <h1>购物车</h1>
+        <p>确认想要的商品，再一起填写购买信息</p>
+      </div>
+    </header>
+
+    <section class="page-inner cart-content">
+      <div v-if="cart.items.length === 0" class="cart-empty">
+        <strong>购物车还是空的</strong>
+        <p>去首页挑选衣架、裤架和配件商品。</p>
+        <RouterLink to="/home">去逛逛</RouterLink>
+      </div>
+
+      <article v-for="item in cart.items" :key="item.key" class="cart-item">
+        <img v-if="item.productImageUrl" :src="item.productImageUrl" alt="" loading="lazy" />
+        <div v-else class="image-empty">荣时</div>
+        <div class="cart-info">
+          <h2 @click="goDetail(item.productId)">{{ item.productName }}</h2>
+          <p>{{ item.spec || '多规格可选' }}</p>
+          <div class="cart-price-row">
+            <strong>{{ priceLabel(item.price) }}</strong>
+            <span v-if="item.price > 0" class="line-subtotal">小计 ￥{{ money(item.price * item.qty) }}</span>
+          </div>
+          <div class="cart-actions">
+            <div class="qty-stepper">
+              <button type="button" @click="cart.updateQty(item.key, item.qty - 1)">−</button>
+              <span>{{ item.qty }}</span>
+              <button type="button" @click="cart.updateQty(item.key, item.qty + 1)">＋</button>
+            </div>
+            <button class="remove" type="button" @click="cart.remove(item.key)">删除</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <footer v-if="cart.items.length" class="cart-bar">
+      <div>
+        <span>合计</span>
+        <strong>{{ cart.totalAmount > 0 ? `￥${money(cart.totalAmount)}` : '询价' }}</strong>
+      </div>
+      <button type="button" @click="checkout">去填写订单</button>
+    </footer>
+
+    <BottomNav />
+  </main>
+</template>
+
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { useCartStore } from '@/stores/cart'
+import { priceLabel } from '@/utils/label'
+import BottomNav from './components/BottomNav.vue'
+
+const router = useRouter()
+const cart = useCartStore()
+
+function money(value?: number) {
+  return Number(value || 0).toFixed(2)
+}
+
+function goDetail(id: string) {
+  router.push(`/products/${id}`)
+}
+
+function checkout() {
+  const productIds = cart.items.map(item => item.productId).join(',')
+  router.push(productIds ? { path: '/orders/new', query: { productIds } } : '/home')
+}
+</script>
+
+<style scoped>
+.cart-page {
+  padding-bottom: calc(150px + env(safe-area-inset-bottom));
+  background: var(--bg-page);
+}
+
+.simple-header {
+  margin: -14px -14px 12px;
+  padding: calc(16px + env(safe-area-inset-top)) 14px 14px;
+  background: var(--bg-cream);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.simple-header h1 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 22px;
+}
+
+.simple-header p {
+  margin: 4px 0 0;
+  color: var(--text-sub);
+  font-size: 13px;
+}
+
+.cart-content {
+  display: grid;
+  gap: 10px;
+}
+
+.cart-empty,
+.cart-item {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.cart-empty {
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.cart-empty strong {
+  color: var(--text-main);
+  font-size: 18px;
+}
+
+.cart-empty p {
+  color: var(--text-sub);
+}
+
+.cart-empty a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: var(--brand-teal);
+  font-weight: 800;
+}
+
+.cart-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.cart-item img,
+.image-empty {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius);
+  object-fit: contain;
+  background: var(--bg-muted);
+}
+
+.image-empty {
+  display: grid;
+  place-items: center;
+  color: #9b826b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cart-info h2 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 15px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.cart-info p {
+  margin: 5px 0;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+.cart-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.cart-price-row strong {
+  color: var(--brand-orange);
+  font-size: 16px;
+}
+
+.line-subtotal {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+.cart-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.qty-stepper button {
+  width: 32px;
+  height: 30px;
+  color: var(--brand-brown);
+  background: var(--bg-cream-soft);
+  font-weight: 900;
+}
+
+.qty-stepper span {
+  min-width: 34px;
+  text-align: center;
+  border-left: 1px solid var(--border-line);
+  border-right: 1px solid var(--border-line);
+  line-height: 30px;
+}
+
+.remove {
+  min-width: 48px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: #9b2c2c;
+  background: #ffe9e7;
+  font-size: 12px;
+}
+
+.cart-bar {
+  position: fixed;
+  right: 0;
+  bottom: calc(65px + env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.cart-bar div {
+  display: grid;
+  gap: 2px;
+}
+
+.cart-bar span {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+.cart-bar strong {
+  color: var(--brand-orange);
+  font-size: 20px;
+}
+
+.cart-bar button {
+  min-width: 132px;
+  min-height: 42px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: var(--brand-orange);
+  font-weight: 900;
+}
+</style>

@@ -48,6 +48,9 @@ public class ErpMasterDataSaveBO {
     @Schema(description = "关联属性节点ID集合")
     private String attributeIds;
 
+    @Schema(description = "配置加价金额")
+    private BigDecimal extraAmount;
+
     @Schema(description = "排序")
     private Integer sortOrder = 0;
 
