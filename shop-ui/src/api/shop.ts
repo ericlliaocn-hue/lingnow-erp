@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import type {
+  AddressRegionOption,
   CustomerOrder,
   OrderSubmitPayload,
   PageResult,
@@ -35,6 +36,22 @@ export function getProduct(id: string) {
 
 export function listAttributes() {
   return request<ShopAttribute[]>({ url: '/attributes', method: 'get' })
+}
+
+export function listAddressRegions(parentCode?: string) {
+  return request<AddressRegionOption[]>({
+    url: '/address/regions',
+    method: 'get',
+    params: { parentCode }
+  })
+}
+
+export function searchAddressRegions(keyword: string, limit = 20) {
+  return request<AddressRegionOption[]>({
+    url: '/address/search',
+    method: 'get',
+    params: { keyword, limit }
+  })
 }
 
 export function uploadImage(file: File) {

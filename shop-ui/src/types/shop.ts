@@ -42,6 +42,15 @@ export interface ShopAttribute {
   status?: number
 }
 
+export interface AddressRegionOption {
+  code: string
+  name: string
+  level?: number
+  leaf?: boolean
+  path?: string[]
+  pathNames?: string[]
+}
+
 export type CustomerOrderStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED'
 
 export interface CustomerOrderItem {

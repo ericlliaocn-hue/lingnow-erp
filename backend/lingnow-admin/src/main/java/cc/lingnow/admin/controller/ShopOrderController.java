@@ -6,6 +6,7 @@ import cc.lingnow.admin.model.vo.erp.ErpMasterDataVO;
 import cc.lingnow.admin.model.vo.shop.ShopProductVO;
 import cc.lingnow.admin.util.StpShopUtil;
 import cc.lingnow.biz.erp.entity.*;
+import cc.lingnow.biz.erp.model.ErpAddressRegionVO;
 import cc.lingnow.biz.erp.service.*;
 import cc.lingnow.biz.file.service.SysFileService;
 import cc.lingnow.common.constant.CommonConstants;
@@ -42,6 +43,7 @@ public class ShopOrderController {
     private final ErpProductCategoryService categoryService;
     private final ErpCustomerOrderService orderService;
     private final ErpCustomerOrderItemService orderItemService;
+    private final ErpAddressRegionService addressRegionService;
     private final SysFileService fileService;
 
     @GetMapping("/products")
@@ -76,6 +78,19 @@ public class ShopOrderController {
                 .map(item -> BeanUtil.copyProperties(item, ErpMasterDataVO.class))
                 .toList();
         return Result.success(records);
+    }
+
+    @GetMapping("/address/regions")
+    public Result<List<ErpAddressRegionVO>> addressRegions(@RequestParam(required = false) String parentCode) {
+        currentAccount();
+        return Result.success(addressRegionService.listChildren(parentCode));
+    }
+
+    @GetMapping("/address/search")
+    public Result<List<ErpAddressRegionVO>> searchAddressRegions(@RequestParam String keyword,
+                                                                 @RequestParam(defaultValue = "20") Integer limit) {
+        currentAccount();
+        return Result.success(addressRegionService.search(keyword, limit == null ? 20 : limit));
     }
 
     @PostMapping("/file/upload")

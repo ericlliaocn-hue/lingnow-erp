@@ -22,8 +22,13 @@
           <input v-model.trim="form.receiverPhone" class="input" inputmode="tel" placeholder="请输入联系电话" />
         </label>
         <label class="field">
-          <span>收货地址</span>
-          <textarea v-model.trim="form.receiverAddress" class="textarea" placeholder="请输入详细收货地址"></textarea>
+          <span>所在地区</span>
+          <AddressRegionPicker v-model:path="addressPath" v-model:path-names="addressPathNames" />
+        </label>
+        <label class="field">
+          <span>详细地址</span>
+          <textarea v-model.trim="addressDetail" class="textarea" placeholder="门牌号、楼栋、公司、房间号等；也可以粘贴完整地址"></textarea>
+          <small v-if="receiverAddressText" class="address-preview">完整地址：{{ receiverAddressText }}</small>
         </label>
         <label class="field">
           <span>给商家留言</span>
@@ -108,6 +113,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
 import { displayShopLabel } from '@/utils/label'
 import type { OrderSubmitPayload, ShopAttribute, ShopProduct } from '@/types/shop'
+import AddressRegionPicker from './components/AddressRegionPicker.vue'
 import BottomNav from './components/BottomNav.vue'
 import ProductPicker from './components/ProductPicker.vue'
 
@@ -127,16 +133,19 @@ const attributes = ref<ShopAttribute[]>([])
 const items = ref<DraftItem[]>([])
 const saving = ref(false)
 const error = ref('')
+const addressPath = ref<string[]>([])
+const addressPathNames = ref<string[]>([])
+const addressDetail = ref('')
 const form = reactive({
   receiverName: '',
   receiverPhone: '',
-  receiverAddress: '',
   remark: ''
 })
 const productMap = computed(() => new Map(products.value.map(item => [item.id, item])))
 const attributeMap = computed(() => new Map(attributes.value.map(item => [item.id, item])))
 const totalQty = computed(() => items.value.reduce((sum, item) => sum + Number(item.qty || 0), 0))
 const totalAmount = computed(() => items.value.reduce((sum, item) => sum + itemAmount(item), 0))
+const receiverAddressText = computed(() => [addressPathNames.value.join(''), addressDetail.value.trim()].filter(Boolean).join(''))
 
 function createItem(productId = ''): DraftItem {
   return { key: `${Date.now()}-${Math.random()}`, productId, qty: 1, selectedOptions: {}, logoImageUrl: '', remark: '' }
@@ -228,6 +237,15 @@ async function uploadLogo(event: Event, item: DraftItem) {
 }
 
 function validate() {
+  if (!form.receiverName.trim()) {
+    return '请填写收货人'
+  }
+  if (!form.receiverPhone.trim()) {
+    return '请填写联系电话'
+  }
+  if (!receiverAddressText.value.trim()) {
+    return '请选择或填写收货地址'
+  }
   const validItems = items.value.filter(item => item.productId && Number(item.qty || 0) > 0)
   if (validItems.length === 0) {
     return '请至少选择一个商品并填写数量'
@@ -246,7 +264,7 @@ async function submit() {
   const payload: OrderSubmitPayload = {
     receiverName: form.receiverName,
     receiverPhone: form.receiverPhone,
-    receiverAddress: form.receiverAddress,
+    receiverAddress: receiverAddressText.value,
     remark: form.remark,
     items: items.value
       .filter(item => item.productId)
@@ -294,6 +312,13 @@ onMounted(loadData)
 
 .receiver-card {
   border: 1px solid var(--border-soft);
+}
+
+.address-preview {
+  display: block;
+  color: var(--brand-teal);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .card-title {
