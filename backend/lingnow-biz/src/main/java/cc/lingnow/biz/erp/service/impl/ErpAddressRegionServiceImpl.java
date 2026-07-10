@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -22,26 +24,54 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
+public class ErpAddressRegionServiceImpl implements ErpAddressRegionService, ApplicationRunner {
 
     private static final String ROOT_PARENT_CODE = "0";
-    private static final String CACHE_PREFIX = "erp:address-region:v2:children:";
-    private static final String SEARCH_CACHE_PREFIX = "erp:address-region:v2:search:";
+    private static final String CACHE_PREFIX = "erp:address-region:v3:children:";
+    private static final String SEARCH_CACHE_PREFIX = "erp:address-region:v3:search:";
     private static final String PCAS_DATA_PATH = "erp/address/pcas-code.json";
     private static final String VILLAGE_DATA_PATH = "erp/address/villages.json.gz";
     private static final int DEFAULT_SEARCH_LIMIT = 20;
+    private static final int SINGLE_CHAR_SEARCH_MAX_LEVEL = 4;
+    private static final int PATH_SEARCH_MIN_LENGTH = 3;
+    private static final int CHILDREN_CACHE_WARM_MAX_PARENT_LEVEL = 3;
+    private static final List<String> REGION_ALIAS_SUFFIXES = List.of(
+            "街道办事处",
+            "街道",
+            "镇",
+            "乡",
+            "苏木",
+            "社区居民委员会",
+            "社区居委会",
+            "居民委员会",
+            "村民委员会",
+            "村委会",
+            "委员会"
+    );
     private static final Set<String> GENERIC_REGION_NAMES = Set.of("市辖区", "县");
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
 
     private volatile RegionStore regionStore;
+
+    @Override
+    public void run(ApplicationArguments args) {
+        try {
+            RegionStore store = getRegionStore();
+            warmUpChildrenCache(store);
+            log.info("行政区划启动预热完成");
+        } catch (Exception e) {
+            log.warn("行政区划数据预热失败: {}", e.getMessage(), e);
+        }
+    }
 
     @Override
     public List<ErpAddressRegionVO> listChildren(String parentCode) {
@@ -53,7 +83,7 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
         }
 
         List<ErpAddressRegionVO> children = getRegionStore().childrenIndex().getOrDefault(normalizedParentCode, List.of());
-        redisTemplate.opsForValue().set(cacheKey, new ArrayList<>(children));
+        cacheList(cacheKey, children);
         return children;
     }
 
@@ -70,22 +100,32 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
             return cached;
         }
 
-        List<RegionScore> scores = new ArrayList<>();
-        for (ErpAddressRegionVO region : getRegionStore().searchableRegions()) {
+        RegionStore store = getRegionStore();
+        List<ErpAddressRegionVO> searchRegions = normalizedKeyword.length() == 1
+                ? store.primarySearchRegions()
+                : store.searchableRegions();
+        PriorityQueue<RegionScore> topScores = new PriorityQueue<>(this::compareRegionScore);
+        for (ErpAddressRegionVO region : searchRegions) {
             int score = scoreRegion(region, normalizedKeyword);
             if (score >= 0) {
-                scores.add(new RegionScore(region, score));
+                RegionScore regionScore = new RegionScore(region, score, String.join("", region.getPathNames()));
+                if (topScores.size() < safeLimit) {
+                    topScores.offer(regionScore);
+                } else if (compareRegionScore(regionScore, topScores.peek()) > 0) {
+                    topScores.poll();
+                    topScores.offer(regionScore);
+                }
             }
         }
+        List<RegionScore> scores = new ArrayList<>(topScores);
         scores.sort(Comparator
                 .comparingInt(RegionScore::score).reversed()
                 .thenComparing((RegionScore score) -> score.region().getLevel(), Comparator.reverseOrder())
-                .thenComparing(score -> String.join("", score.region().getPathNames())));
+                .thenComparing(RegionScore::pathKey));
         List<ErpAddressRegionVO> result = scores.stream()
-                .limit(safeLimit)
                 .map(RegionScore::region)
                 .toList();
-        redisTemplate.opsForValue().set(cacheKey, new ArrayList<>(result));
+        cacheList(cacheKey, result);
         return result;
     }
 
@@ -108,7 +148,13 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
     }
 
     private List<ErpAddressRegionVO> readCachedList(String cacheKey) {
-        Object value = redisTemplate.opsForValue().get(cacheKey);
+        Object value;
+        try {
+            value = redisTemplate.opsForValue().get(cacheKey);
+        } catch (Exception e) {
+            log.warn("行政区划缓存读取失败: key={}, error={}", cacheKey, e.getMessage());
+            return null;
+        }
         if (!(value instanceof List<?> list)) {
             return null;
         }
@@ -120,6 +166,41 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
             }
         }
         return result;
+    }
+
+    private boolean cacheList(String cacheKey, List<ErpAddressRegionVO> list) {
+        try {
+            redisTemplate.opsForValue().set(cacheKey, new ArrayList<>(list));
+            return true;
+        } catch (Exception e) {
+            log.warn("行政区划缓存写入失败: key={}, error={}", cacheKey, e.getMessage());
+            return false;
+        }
+    }
+
+    private void warmUpChildrenCache(RegionStore store) {
+        int cachedKeys = 0;
+        for (Map.Entry<String, List<ErpAddressRegionVO>> entry : store.childrenIndex().entrySet()) {
+            if (shouldWarmChildrenCache(store, entry.getKey(), entry.getValue())) {
+                if (!cacheList(CACHE_PREFIX + entry.getKey(), entry.getValue())) {
+                    log.warn("行政区划 Redis 预热中止: cachedKeys={}", cachedKeys);
+                    break;
+                }
+                cachedKeys++;
+            }
+        }
+        log.info("行政区划 Redis 预热完成: childrenKeys={}", cachedKeys);
+    }
+
+    private boolean shouldWarmChildrenCache(RegionStore store, String parentCode, List<ErpAddressRegionVO> children) {
+        if (children == null || children.isEmpty()) {
+            return false;
+        }
+        if (ROOT_PARENT_CODE.equals(parentCode)) {
+            return true;
+        }
+        ErpAddressRegionVO parent = store.regionIndex().get(parentCode);
+        return parent != null && level(parent) <= CHILDREN_CACHE_WARM_MAX_PARENT_LEVEL;
     }
 
     private ErpAddressRegionVO convertRegion(Object item) {
@@ -155,7 +236,7 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
             loadVillageChildren(childrenIndex, regionIndex);
         } catch (Exception e) {
             log.error("加载行政区划数据失败", e);
-            return new RegionStore(Map.of(ROOT_PARENT_CODE, List.of()), Map.of(), List.of(), List.of());
+            return new RegionStore(Map.of(ROOT_PARENT_CODE, List.of()), Map.of(), List.of(), List.of(), List.of());
         }
 
         Map<String, List<ErpAddressRegionVO>> immutableChildren = new LinkedHashMap<>();
@@ -164,8 +245,11 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
         searchableRegions.sort(Comparator
                 .comparing((ErpAddressRegionVO region) -> region.getLevel() == null ? 0 : region.getLevel(), Comparator.reverseOrder())
                 .thenComparing(region -> String.join("", region.getPathNames())));
+        List<ErpAddressRegionVO> primarySearchRegions = searchableRegions.stream()
+                .filter(region -> level(region) <= SINGLE_CHAR_SEARCH_MAX_LEVEL)
+                .toList();
         log.info("行政区划数据加载完成: regions={}, parents={}, cost={}ms", regionIndex.size(), immutableChildren.size(), System.currentTimeMillis() - start);
-        return new RegionStore(Map.copyOf(immutableChildren), Map.copyOf(regionIndex), List.copyOf(searchableRegions), List.copyOf(searchableRegions));
+        return new RegionStore(Map.copyOf(immutableChildren), Map.copyOf(regionIndex), List.copyOf(searchableRegions), primarySearchRegions, List.copyOf(searchableRegions));
     }
 
     private void collectPcasChildren(Map<String, List<ErpAddressRegionVO>> childrenIndex,
@@ -241,15 +325,14 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
 
     private int scoreRegion(ErpAddressRegionVO region, String keyword) {
         String name = normalizeSearchText(region.getName());
-        String pathText = normalizeSearchText(String.join("", region.getPathNames()));
         if (StrUtil.isBlank(name)) {
             return -1;
         }
-        int level = region.getLevel() == null ? 0 : region.getLevel();
+        int level = level(region);
         if (name.equals(keyword)) {
             return level <= 4 ? 140 : 120;
         }
-        if (regionAliases(region.getName()).contains(keyword)) {
+        if (aliasEquals(name, keyword)) {
             return level <= 4 ? 135 : 115;
         }
         if (name.startsWith(keyword)) {
@@ -258,15 +341,33 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
         if (name.contains(keyword)) {
             return level <= 4 ? 115 : 100;
         }
-        if (pathText.contains(keyword)) {
+        if (keyword.length() >= PATH_SEARCH_MIN_LENGTH && level <= 4
+                && normalizeSearchText(String.join("", region.getPathNames())).contains(keyword)) {
             return 80 + Math.min(level, 5);
         }
-        for (String alias : regionAliases(region.getName())) {
-            if (alias.contains(keyword) || keyword.contains(alias)) {
-                return 90;
-            }
+        if (aliasContains(name, keyword)) {
+            return 90;
         }
         return -1;
+    }
+
+    private int compareRegionScore(RegionScore left, RegionScore right) {
+        if (right == null) {
+            return 1;
+        }
+        int scoreCompare = Integer.compare(left.score(), right.score());
+        if (scoreCompare != 0) {
+            return scoreCompare;
+        }
+        int levelCompare = Integer.compare(level(left.region()), level(right.region()));
+        if (levelCompare != 0) {
+            return levelCompare;
+        }
+        return right.pathKey().compareTo(left.pathKey());
+    }
+
+    private int level(ErpAddressRegionVO region) {
+        return region.getLevel() == null ? 0 : region.getLevel();
     }
 
     private boolean pathMatches(ErpAddressRegionVO region, String text) {
@@ -305,18 +406,30 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
         }
         Set<String> aliases = new LinkedHashSet<>();
         aliases.add(normalized);
-        addAlias(aliases, normalized, "街道办事处");
-        addAlias(aliases, normalized, "街道");
-        addAlias(aliases, normalized, "镇");
-        addAlias(aliases, normalized, "乡");
-        addAlias(aliases, normalized, "苏木");
-        addAlias(aliases, normalized, "社区居民委员会");
-        addAlias(aliases, normalized, "社区居委会");
-        addAlias(aliases, normalized, "居民委员会");
-        addAlias(aliases, normalized, "村民委员会");
-        addAlias(aliases, normalized, "村委会");
-        addAlias(aliases, normalized, "委员会");
+        REGION_ALIAS_SUFFIXES.forEach(suffix -> addAlias(aliases, normalized, suffix));
         return aliases;
+    }
+
+    private boolean aliasEquals(String normalizedName, String keyword) {
+        for (String suffix : REGION_ALIAS_SUFFIXES) {
+            if (normalizedName.endsWith(suffix) && normalizedName.length() > suffix.length()
+                    && normalizedName.substring(0, normalizedName.length() - suffix.length()).equals(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean aliasContains(String normalizedName, String keyword) {
+        for (String suffix : REGION_ALIAS_SUFFIXES) {
+            if (normalizedName.endsWith(suffix) && normalizedName.length() > suffix.length()) {
+                String alias = normalizedName.substring(0, normalizedName.length() - suffix.length());
+                if (alias.contains(keyword) || keyword.contains(alias)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void addAlias(Set<String> aliases, String value, String suffix) {
@@ -329,9 +442,30 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
         if (value == null) {
             return "";
         }
-        return value.toLowerCase(Locale.ROOT)
-                .replaceAll("[\\s/／,，;；:：()（）\\[\\]【】]+", "")
-                .trim();
+        String lowerValue = value.toLowerCase(Locale.ROOT).trim();
+        if (lowerValue.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(lowerValue.length());
+        for (int i = 0; i < lowerValue.length(); i++) {
+            char ch = lowerValue.charAt(i);
+            if (!isSearchSeparator(ch)) {
+                builder.append(ch);
+            }
+        }
+        return builder.toString();
+    }
+
+    private boolean isSearchSeparator(char ch) {
+        return Character.isWhitespace(ch)
+                || ch == '/' || ch == '／'
+                || ch == ',' || ch == '，'
+                || ch == ';' || ch == '；'
+                || ch == ':' || ch == '：'
+                || ch == '(' || ch == '（'
+                || ch == ')' || ch == '）'
+                || ch == '[' || ch == '【'
+                || ch == ']' || ch == '】';
     }
 
     private Integer levelOf(String code) {
@@ -360,9 +494,10 @@ public class ErpAddressRegionServiceImpl implements ErpAddressRegionService {
     private record RegionStore(Map<String, List<ErpAddressRegionVO>> childrenIndex,
                                Map<String, ErpAddressRegionVO> regionIndex,
                                List<ErpAddressRegionVO> searchableRegions,
+                               List<ErpAddressRegionVO> primarySearchRegions,
                                List<ErpAddressRegionVO> matchRegions) {
     }
 
-    private record RegionScore(ErpAddressRegionVO region, int score) {
+    private record RegionScore(ErpAddressRegionVO region, int score, String pathKey) {
     }
 }
