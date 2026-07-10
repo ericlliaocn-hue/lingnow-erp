@@ -43,6 +43,7 @@ public class ShopOrderController {
     private final ErpProductCategoryService categoryService;
     private final ErpCustomerOrderService orderService;
     private final ErpCustomerOrderItemService orderItemService;
+    private final ErpCustomerAddressService customerAddressService;
     private final ErpAddressRegionService addressRegionService;
     private final SysFileService fileService;
 
@@ -134,6 +135,7 @@ public class ShopOrderController {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "客户不存在或已停用");
         }
         List<ErpCustomerOrderItem> items = buildItems(bo.getItems());
+        ReceiverSnapshot receiver = resolveReceiver(bo, account);
         BigDecimal totalQty = items.stream().map(item -> nvl(item.getQty())).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalAmount = items.stream().map(item -> nvl(item.getAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -147,14 +149,35 @@ public class ShopOrderController {
         order.setOrderTime(LocalDateTime.now());
         order.setTotalQty(totalQty);
         order.setTotalAmount(totalAmount);
-        order.setReceiverName(bo.getReceiverName());
-        order.setReceiverPhone(bo.getReceiverPhone());
-        order.setReceiverAddress(bo.getReceiverAddress());
+        order.setReceiverName(receiver.name());
+        order.setReceiverPhone(receiver.phone());
+        order.setReceiverAddress(receiver.address());
         order.setRemark(bo.getRemark());
         orderService.save(order);
         items.forEach(item -> item.setOrderId(order.getId()));
         orderItemService.saveBatch(items);
         return Result.success(order.getId());
+    }
+
+    private ReceiverSnapshot resolveReceiver(ShopOrderSubmitBO bo, ErpCustomerAccount account) {
+        if (bo.getAddressId() != null) {
+            ErpCustomerAddress address = customerAddressService.getById(bo.getAddressId());
+            if (address == null || !Objects.equals(address.getAccountId(), account.getId())) {
+                throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "收货地址不存在");
+            }
+            return new ReceiverSnapshot(address.getReceiverName(), address.getReceiverPhone(),
+                    StrUtil.blankToDefault(address.getFullAddress(), address.getDetailAddress()));
+        }
+        if (StrUtil.isBlank(bo.getReceiverName())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "收货人不能为空");
+        }
+        if (StrUtil.isBlank(bo.getReceiverPhone())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "联系电话不能为空");
+        }
+        if (StrUtil.isBlank(bo.getReceiverAddress())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "收货地址不能为空");
+        }
+        return new ReceiverSnapshot(bo.getReceiverName(), bo.getReceiverPhone(), bo.getReceiverAddress());
     }
 
     private ErpCustomerAccount currentAccount() {
@@ -324,5 +347,8 @@ public class ShopOrderController {
 
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private record ReceiverSnapshot(String name, String phone, String address) {
     }
 }

@@ -28,6 +28,17 @@
           {{ selectedPathNames.join(' / ') }}
         </div>
 
+        <div v-if="!keyword && availableInitials.length" class="letter-strip">
+          <button
+            v-for="letter in availableInitials"
+            :key="letter"
+            type="button"
+            @click="jumpToInitial(letter)"
+          >
+            {{ letter }}
+          </button>
+        </div>
+
         <div v-if="keyword" class="address-results">
           <div v-if="loading" class="address-empty">搜索中...</div>
           <template v-else>
@@ -46,11 +57,12 @@
         </div>
 
         <div v-else class="address-columns">
-          <div v-for="(column, columnIndex) in columns" :key="columnIndex" class="address-column">
+          <div v-for="(column, columnIndex) in columns" :key="columnIndex" ref="columnRefs" class="address-column">
             <button
               v-for="item in column"
               :key="item.code"
               type="button"
+              :data-initial="optionInitial(item.name)"
               :class="['address-option', selectedPath[columnIndex] === item.code ? 'active' : '']"
               @click="pickColumnOption(item, columnIndex)"
             >
@@ -86,9 +98,23 @@ const columns = ref<AddressRegionOption[][]>([])
 const selectedPath = ref<string[]>([...props.path])
 const selectedPathNames = ref<string[]>([...props.pathNames])
 const searchRef = ref<HTMLInputElement>()
+const columnRefs = ref<HTMLElement[]>([])
 let searchTimer: ReturnType<typeof window.setTimeout> | undefined
 
 const selectedLabel = computed(() => selectedPathNames.value.length ? selectedPathNames.value.join(' / ') : '选择省 / 市 / 区县 / 镇街 / 村社区')
+const activeColumnIndex = computed(() => Math.max(0, Math.min(selectedPath.value.length, columns.value.length - 1)))
+const availableInitials = computed(() => {
+  const records = columns.value[activeColumnIndex.value] || []
+  const initials = new Set(records.map(item => optionInitial(item.name)).filter(item => item !== '#'))
+  return ALPHABET.filter(item => initials.has(item))
+})
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+const PINYIN_BOUNDARIES = [
+  ['A', '阿'], ['B', '八'], ['C', '嚓'], ['D', '咑'], ['E', '鵝'], ['F', '发'], ['G', '旮'], ['H', '哈'],
+  ['J', '丌'], ['K', '咔'], ['L', '垃'], ['M', '妈'], ['N', '拿'], ['O', '噢'], ['P', '啪'], ['Q', '七'],
+  ['R', '然'], ['S', '撒'], ['T', '他'], ['W', '挖'], ['X', '昔'], ['Y', '压'], ['Z', '匝']
+] as const
 
 watch(() => props.path, value => {
   selectedPath.value = [...value]
@@ -204,6 +230,34 @@ function optionPathText(item: AddressRegionOption) {
   const names = item.pathNames?.length ? item.pathNames : [item.name]
   return names.join(' / ')
 }
+
+function jumpToInitial(letter: string) {
+  const column = columnRefs.value[activeColumnIndex.value]
+  const target = column?.querySelector(`[data-initial="${letter}"]`)
+  target?.scrollIntoView({ block: 'start' })
+}
+
+function optionInitial(name?: string) {
+  const first = String(name || '').trim().charAt(0)
+  if (!first) {
+    return '#'
+  }
+  if (/^[A-Za-z]$/.test(first)) {
+    return first.toUpperCase()
+  }
+  for (let index = PINYIN_BOUNDARIES.length - 1; index >= 0; index -= 1) {
+    const pair = PINYIN_BOUNDARIES[index]
+    if (!pair) {
+      continue
+    }
+    const letter = pair[0]
+    const boundary = pair[1]
+    if (first.localeCompare(boundary, 'zh-Hans-CN-u-co-pinyin') >= 0) {
+      return letter
+    }
+  }
+  return '#'
+}
 </script>
 
 <style scoped>
@@ -309,6 +363,23 @@ function optionPathText(item: AddressRegionOption) {
   background: #e6f2ef;
   font-size: 13px;
   font-weight: 700;
+}
+
+.letter-strip {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 16px 0;
+}
+
+.letter-strip button {
+  min-width: 24px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  color: var(--brand-teal);
+  background: #e6f2ef;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .address-results,

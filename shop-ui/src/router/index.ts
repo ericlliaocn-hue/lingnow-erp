@@ -10,6 +10,8 @@ import MineView from '@/views/MineView.vue'
 import OrderCreateView from '@/views/OrderCreateView.vue'
 import OrderListView from '@/views/OrderListView.vue'
 import OrderDetailView from '@/views/OrderDetailView.vue'
+import AddressListView from '@/views/AddressListView.vue'
+import AddressEditView from '@/views/AddressEditView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -22,6 +24,9 @@ const router = createRouter({
     { path: '/categories', name: 'categories', component: CategoryView },
     { path: '/cart', name: 'cart', component: CartView },
     { path: '/mine', name: 'mine', component: MineView },
+    { path: '/addresses', name: 'addresses', component: AddressListView, meta: { requiresAuth: true } },
+    { path: '/addresses/new', name: 'addressNew', component: AddressEditView, meta: { requiresAuth: true } },
+    { path: '/addresses/:id/edit', name: 'addressEdit', component: AddressEditView, meta: { requiresAuth: true } },
     { path: '/orders/new', name: 'orderCreate', component: OrderCreateView, meta: { requiresAuth: true } },
     { path: '/orders', name: 'orders', component: OrderListView, meta: { requiresAuth: true } },
     { path: '/orders/:id', name: 'orderDetail', component: OrderDetailView, meta: { requiresAuth: true } }

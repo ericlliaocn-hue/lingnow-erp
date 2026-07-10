@@ -51,6 +51,57 @@ export interface AddressRegionOption {
   pathNames?: string[]
 }
 
+export interface AddressParseResult {
+  contactName?: string
+  phone?: string
+  province?: string
+  city?: string
+  district?: string
+  street?: string
+  village?: string
+  regionPath?: string[]
+  regionPathNames?: string[]
+  contactCandidates?: string[]
+  detailAddress?: string
+  normalizedAddress?: string
+  confidence?: number
+  warnings?: string[]
+}
+
+export interface ShopAddress {
+  id: string
+  receiverName: string
+  receiverPhone: string
+  provinceCode?: string
+  provinceName?: string
+  cityCode?: string
+  cityName?: string
+  districtCode?: string
+  districtName?: string
+  streetCode?: string
+  streetName?: string
+  villageCode?: string
+  villageName?: string
+  regionPath?: string[]
+  regionPathNames?: string[]
+  detailAddress: string
+  fullAddress?: string
+  addressLabel?: string
+  defaultFlag?: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export interface ShopAddressPayload {
+  receiverName: string
+  receiverPhone: string
+  regionPath?: string[]
+  regionPathNames?: string[]
+  detailAddress: string
+  addressLabel?: string
+  defaultFlag?: boolean
+}
+
 export type CustomerOrderStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED'
 
 export interface CustomerOrderItem {
@@ -99,6 +150,7 @@ export interface OrderSubmitItem {
 }
 
 export interface OrderSubmitPayload {
+  addressId?: string
   receiverName?: string
   receiverPhone?: string
   receiverAddress?: string

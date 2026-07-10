@@ -1,9 +1,12 @@
 import request from '@/utils/request'
 import type {
+  AddressParseResult,
   AddressRegionOption,
   CustomerOrder,
   OrderSubmitPayload,
   PageResult,
+  ShopAddress,
+  ShopAddressPayload,
   ShopAttribute,
   ShopLoginVO,
   ShopProduct,
@@ -52,6 +55,38 @@ export function searchAddressRegions(keyword: string, limit = 20) {
     method: 'get',
     params: { keyword, limit }
   })
+}
+
+export function parseAddress(rawText: string) {
+  return request<AddressParseResult>({
+    url: '/address/parse',
+    method: 'post',
+    data: { rawText }
+  })
+}
+
+export function listAddresses(keyword?: string) {
+  return request<ShopAddress[]>({
+    url: '/addresses',
+    method: 'get',
+    params: { keyword }
+  })
+}
+
+export function getAddress(id: string) {
+  return request<ShopAddress>({ url: `/addresses/${id}`, method: 'get' })
+}
+
+export function createAddress(data: ShopAddressPayload) {
+  return request<ShopAddress>({ url: '/addresses', method: 'post', data })
+}
+
+export function updateAddress(id: string, data: ShopAddressPayload) {
+  return request<ShopAddress>({ url: `/addresses/${id}`, method: 'put', data })
+}
+
+export function setDefaultAddress(id: string) {
+  return request<ShopAddress>({ url: `/addresses/${id}/default`, method: 'post' })
 }
 
 export function uploadImage(file: File) {

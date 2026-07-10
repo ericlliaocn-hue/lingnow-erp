@@ -3,37 +3,30 @@
     <header class="topbar">
       <div class="topbar-inner">
         <div>
-          <h1>填写订单</h1>
-          <p>确认收货信息和商品备注</p>
+          <h1>确认订单</h1>
+          <p>确认地址、商品和留言</p>
         </div>
-        <button class="plain-button" @click="addItem()">加商品</button>
       </div>
     </header>
 
     <section class="page-inner">
-      <div class="card receiver-card">
-        <div class="card-title">收货信息</div>
-        <label class="field">
-          <span>收货人</span>
-          <input v-model.trim="form.receiverName" class="input" placeholder="请输入收货人姓名" />
-        </label>
-        <label class="field">
-          <span>联系电话</span>
-          <input v-model.trim="form.receiverPhone" class="input" inputmode="tel" placeholder="请输入联系电话" />
-        </label>
-        <label class="field">
-          <span>所在地区</span>
-          <AddressRegionPicker v-model:path="addressPath" v-model:path-names="addressPathNames" />
-        </label>
-        <label class="field">
-          <span>详细地址</span>
-          <textarea v-model.trim="addressDetail" class="textarea" placeholder="门牌号、楼栋、公司、房间号等；也可以粘贴完整地址"></textarea>
-          <small v-if="receiverAddressText" class="address-preview">完整地址：{{ receiverAddressText }}</small>
-        </label>
-        <label class="field">
-          <span>给商家留言</span>
-          <textarea v-model.trim="form.remark" class="textarea" placeholder="选填，备注订单信息"></textarea>
-        </label>
+      <div class="card receiver-card" @click="openAddressList">
+        <div class="card-title-row">
+          <span>收货地址</span>
+          <button type="button">{{ selectedAddress ? '更换' : '新增' }}</button>
+        </div>
+        <template v-if="selectedAddress">
+          <div class="receiver-title">
+            <strong>{{ selectedAddress.receiverName }}</strong>
+            <span>{{ selectedAddress.receiverPhone }}</span>
+          </div>
+          <p>{{ selectedAddress.fullAddress || selectedAddress.detailAddress }}</p>
+          <em v-if="selectedAddress.addressLabel">{{ selectedAddress.addressLabel }}</em>
+        </template>
+        <div v-else class="receiver-empty">
+          <strong>请选择收货地址</strong>
+          <p>新增或选择一个地址后再提交订单。</p>
+        </div>
       </div>
 
       <article v-for="(item, index) in items" :key="item.key" class="card order-item">
@@ -92,29 +85,35 @@
       </article>
 
       <div class="card summary">
-        <div><span>共 N 件</span><strong>{{ totalQty }} 件</strong></div>
+        <div><span>共 {{ totalQty }} 件</span><strong>{{ totalQty }} 件</strong></div>
         <div><span>合计</span><strong class="price">￥{{ totalAmount.toFixed(2) }}</strong></div>
+      </div>
+
+      <div class="card remark-card">
+        <label class="field">
+          <span>订单备注</span>
+          <textarea v-model.trim="form.remark" class="textarea" placeholder="选填，备注订单信息"></textarea>
+        </label>
       </div>
 
       <p v-if="error" class="error-text">{{ error }}</p>
       <div class="submit-bar">
-        <button class="secondary-button" @click="addItem()">继续加商品</button>
+        <div>
+          <span>合计</span>
+          <strong class="price">￥{{ totalAmount.toFixed(2) }}</strong>
+        </div>
         <button class="primary-button" :disabled="saving" @click="submit">{{ saving ? '提交中...' : '提交订单' }}</button>
       </div>
     </section>
-
-    <BottomNav />
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
+import { getAddress, listAddresses, listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
 import { displayShopLabel } from '@/utils/label'
-import type { OrderSubmitPayload, ShopAttribute, ShopProduct } from '@/types/shop'
-import AddressRegionPicker from './components/AddressRegionPicker.vue'
-import BottomNav from './components/BottomNav.vue'
+import type { OrderSubmitPayload, ShopAddress, ShopAttribute, ShopProduct } from '@/types/shop'
 import ProductPicker from './components/ProductPicker.vue'
 
 interface DraftItem {
@@ -126,26 +125,24 @@ interface DraftItem {
   remark: string
 }
 
+const SELECTED_ADDRESS_KEY = 'rs-checkout-address-id'
+const CHECKOUT_DRAFT_KEY = 'rs-checkout-draft'
+
 const route = useRoute()
 const router = useRouter()
 const products = ref<ShopProduct[]>([])
 const attributes = ref<ShopAttribute[]>([])
 const items = ref<DraftItem[]>([])
+const selectedAddress = ref<ShopAddress>()
 const saving = ref(false)
 const error = ref('')
-const addressPath = ref<string[]>([])
-const addressPathNames = ref<string[]>([])
-const addressDetail = ref('')
 const form = reactive({
-  receiverName: '',
-  receiverPhone: '',
   remark: ''
 })
 const productMap = computed(() => new Map(products.value.map(item => [item.id, item])))
 const attributeMap = computed(() => new Map(attributes.value.map(item => [item.id, item])))
 const totalQty = computed(() => items.value.reduce((sum, item) => sum + Number(item.qty || 0), 0))
 const totalAmount = computed(() => items.value.reduce((sum, item) => sum + itemAmount(item), 0))
-const receiverAddressText = computed(() => [addressPathNames.value.join(''), addressDetail.value.trim()].filter(Boolean).join(''))
 
 function createItem(productId = ''): DraftItem {
   return { key: `${Date.now()}-${Math.random()}`, productId, qty: 1, selectedOptions: {}, logoImageUrl: '', remark: '' }
@@ -211,6 +208,7 @@ function addItem(productId = '') {
 
 function removeItem(index: number) {
   items.value.splice(index, 1)
+  saveDraft()
 }
 
 async function uploadLogo(event: Event, item: DraftItem) {
@@ -237,14 +235,8 @@ async function uploadLogo(event: Event, item: DraftItem) {
 }
 
 function validate() {
-  if (!form.receiverName.trim()) {
-    return '请填写收货人'
-  }
-  if (!form.receiverPhone.trim()) {
-    return '请填写联系电话'
-  }
-  if (!receiverAddressText.value.trim()) {
-    return '请选择或填写收货地址'
+  if (!selectedAddress.value?.id) {
+    return '请选择收货地址'
   }
   const validItems = items.value.filter(item => item.productId && Number(item.qty || 0) > 0)
   if (validItems.length === 0) {
@@ -262,9 +254,10 @@ async function submit() {
     return
   }
   const payload: OrderSubmitPayload = {
-    receiverName: form.receiverName,
-    receiverPhone: form.receiverPhone,
-    receiverAddress: receiverAddressText.value,
+    addressId: selectedAddress.value?.id,
+    receiverName: selectedAddress.value?.receiverName,
+    receiverPhone: selectedAddress.value?.receiverPhone,
+    receiverAddress: selectedAddress.value?.fullAddress || selectedAddress.value?.detailAddress,
     remark: form.remark,
     items: items.value
       .filter(item => item.productId)
@@ -279,6 +272,7 @@ async function submit() {
   saving.value = true
   try {
     const id = await submitOrder(payload)
+    sessionStorage.removeItem(CHECKOUT_DRAFT_KEY)
     router.replace(`/orders/${id}`)
   } catch (err) {
     error.value = err instanceof Error ? err.message : '提交失败'
@@ -287,19 +281,79 @@ async function submit() {
   }
 }
 
-async function loadData() {
-  const [productRes, attributeRes] = await Promise.all([
-    listProducts({ current: 1, size: 1000 }),
-    listAttributes()
-  ])
-  products.value = productRes.records
-  attributes.value = attributeRes
+function routeProductIds() {
   const productIds = typeof route.query.productIds === 'string'
     ? route.query.productIds.split(',').map(item => item.trim()).filter(Boolean)
     : []
   const productId = typeof route.query.productId === 'string' ? route.query.productId : ''
-  const ids = productIds.length ? productIds : [productId].filter(Boolean)
+  return productIds.length ? productIds : [productId].filter(Boolean)
+}
+
+async function loadData() {
+  const [productRes, attributeRes, addressRecords] = await Promise.all([
+    listProducts({ current: 1, size: 1000 }),
+    listAttributes(),
+    listAddresses()
+  ])
+  products.value = productRes.records
+  attributes.value = attributeRes
+  const ids = routeProductIds()
   items.value = ids.length ? ids.map(id => createItem(id)) : [createItem()]
+  restoreDraft(ids)
+  await loadSelectedAddress(addressRecords)
+}
+
+async function loadSelectedAddress(addressRecords: ShopAddress[]) {
+  const storedId = sessionStorage.getItem(SELECTED_ADDRESS_KEY)
+  if (storedId) {
+    try {
+      selectedAddress.value = await getAddress(storedId)
+      return
+    } catch {
+      sessionStorage.removeItem(SELECTED_ADDRESS_KEY)
+    }
+  }
+  selectedAddress.value = addressRecords.find(item => item.defaultFlag) || addressRecords[0]
+  if (selectedAddress.value?.id) {
+    sessionStorage.setItem(SELECTED_ADDRESS_KEY, selectedAddress.value.id)
+  }
+}
+
+function openAddressList() {
+  saveDraft()
+  router.push({ path: '/addresses', query: { select: '1', redirect: route.fullPath } })
+}
+
+function saveDraft() {
+  const ids = routeProductIds()
+  sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({
+    productIds: ids,
+    remark: form.remark,
+    items: items.value
+  }))
+}
+
+function restoreDraft(ids: string[]) {
+  const raw = sessionStorage.getItem(CHECKOUT_DRAFT_KEY)
+  if (!raw) {
+    return
+  }
+  try {
+    const draft = JSON.parse(raw) as { productIds?: string[]; remark?: string; items?: DraftItem[] }
+    if ((draft.productIds || []).join(',') !== ids.join(',')) {
+      return
+    }
+    form.remark = draft.remark || ''
+    if (Array.isArray(draft.items) && draft.items.length) {
+      items.value = draft.items.map(item => ({
+        ...createItem(item.productId),
+        ...item,
+        selectedOptions: item.selectedOptions || {}
+      }))
+    }
+  } catch {
+    sessionStorage.removeItem(CHECKOUT_DRAFT_KEY)
+  }
 }
 
 onMounted(loadData)
@@ -312,22 +366,70 @@ onMounted(loadData)
 
 .receiver-card {
   border: 1px solid var(--border-soft);
+  cursor: pointer;
 }
 
-.address-preview {
-  display: block;
-  color: var(--brand-teal);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.card-title {
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-soft);
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
   color: var(--text-main);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.card-title-row button {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  color: var(--brand-teal);
+  background: #e6f2ef;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.receiver-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.receiver-title strong {
+  color: var(--text-main);
+  font-size: 17px;
+}
+
+.receiver-title span {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+
+.receiver-card p,
+.receiver-empty p {
+  margin: 8px 0 0;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.receiver-card em {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  color: var(--brand-brown);
+  background: var(--bg-cream-soft);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.receiver-empty strong {
+  color: var(--text-main);
+}
+
+.receiver-empty p {
+  color: var(--text-sub);
 }
 
 .item-head {
@@ -461,9 +563,33 @@ onMounted(loadData)
 }
 
 .submit-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.submit-bar > div {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 2px;
+}
+
+.submit-bar span {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+.submit-bar button {
+  width: 132px;
+  border-radius: var(--radius-pill);
 }
 </style>

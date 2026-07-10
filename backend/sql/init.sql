@@ -1163,6 +1163,39 @@ CREATE TABLE IF NOT EXISTS `erp_customer_order`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户H5订单';
 
+CREATE TABLE IF NOT EXISTS `erp_customer_address`
+(
+    `id`             bigint(20)   NOT NULL COMMENT '客户地址ID',
+    `customer_id`    bigint(20)   NOT NULL COMMENT '客户ID',
+    `account_id`     bigint(20)   NOT NULL COMMENT '客户账号ID',
+    `receiver_name`  varchar(64)  NOT NULL COMMENT '收货人',
+    `receiver_phone` varchar(32)  NOT NULL COMMENT '收货电话',
+    `province_code`  varchar(32)           DEFAULT NULL COMMENT '省编码',
+    `province_name`  varchar(64)           DEFAULT NULL COMMENT '省名称',
+    `city_code`      varchar(32)           DEFAULT NULL COMMENT '市编码',
+    `city_name`      varchar(64)           DEFAULT NULL COMMENT '市名称',
+    `district_code`  varchar(32)           DEFAULT NULL COMMENT '区县编码',
+    `district_name`  varchar(64)           DEFAULT NULL COMMENT '区县名称',
+    `street_code`    varchar(32)           DEFAULT NULL COMMENT '镇街编码',
+    `street_name`    varchar(128)          DEFAULT NULL COMMENT '镇街名称',
+    `village_code`   varchar(32)           DEFAULT NULL COMMENT '村社区编码',
+    `village_name`   varchar(128)          DEFAULT NULL COMMENT '村社区名称',
+    `detail_address` varchar(500) NOT NULL COMMENT '详细地址',
+    `full_address`   varchar(800)          DEFAULT NULL COMMENT '完整地址',
+    `address_label`  varchar(32)           DEFAULT NULL COMMENT '地址标签',
+    `default_flag`   tinyint(1)   NOT NULL DEFAULT '0' COMMENT '是否默认',
+    `create_time`    datetime              DEFAULT NULL,
+    `update_time`    datetime              DEFAULT NULL,
+    `create_by`      varchar(64)           DEFAULT NULL,
+    `update_by`      varchar(64)           DEFAULT NULL,
+    `del_flag`       tinyint(1)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `idx_customer_address_customer` (`customer_id`),
+    KEY `idx_customer_address_account` (`account_id`),
+    KEY `idx_customer_address_default` (`account_id`, `default_flag`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户H5收货地址';
+
 CREATE TABLE IF NOT EXISTS `erp_customer_order_item`
 (
     `id`                   bigint(20)    NOT NULL COMMENT '客户订单明细ID',

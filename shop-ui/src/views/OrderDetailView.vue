@@ -47,7 +47,7 @@
         </article>
 
         <div class="card summary">
-          <div><span>共 N 件</span><strong>{{ Number(order.totalQty || 0).toFixed(0) }} 件</strong></div>
+          <div><span>共 {{ Number(order.totalQty || 0).toFixed(0) }} 件</span><strong>{{ Number(order.totalQty || 0).toFixed(0) }} 件</strong></div>
           <div><span>合计</span><strong class="price">￥{{ money(order.totalAmount) }}</strong></div>
         </div>
       </template>

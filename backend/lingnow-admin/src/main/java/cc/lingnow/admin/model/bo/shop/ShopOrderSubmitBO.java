@@ -1,7 +1,6 @@
 package cc.lingnow.admin.model.bo.shop;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -11,11 +10,9 @@ import java.util.List;
 
 @Data
 public class ShopOrderSubmitBO {
-    @NotBlank(message = "收货人不能为空")
+    private Long addressId;
     private String receiverName;
-    @NotBlank(message = "联系电话不能为空")
     private String receiverPhone;
-    @NotBlank(message = "收货地址不能为空")
     private String receiverAddress;
     private String remark;
     @Valid
