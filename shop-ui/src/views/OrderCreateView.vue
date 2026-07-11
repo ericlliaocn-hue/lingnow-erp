@@ -32,7 +32,9 @@
         </div>
 
         <div v-if="productOf(item)" class="product-summary">
-          <img v-if="productOf(item)?.imageUrl" :src="productOf(item)?.imageUrl" alt="" />
+          <button v-if="productOf(item)?.imageUrl" class="summary-image-button" type="button" @click="previewImage(productOf(item)?.imageUrl)">
+            <img :src="productOf(item)?.imageUrl" alt="" />
+          </button>
           <div v-else class="summary-img-empty">荣时</div>
           <div class="product-summary-info">
             <strong>{{ productOf(item)?.name }}</strong>
@@ -66,8 +68,10 @@
           <input class="input file-input" type="file" accept="image/*" @change="uploadLogo($event, item)" />
         </label>
         <div v-if="item.logoImageUrl" class="logo-preview">
-          <img :src="item.logoImageUrl" alt="" />
-          <button class="remove-button" @click="item.logoImageUrl = ''">移除图片</button>
+          <button class="logo-image-button" type="button" @click="previewImage(item.logoImageUrl)">
+            <img :src="item.logoImageUrl" alt="" />
+          </button>
+          <button class="remove-button" @click="removeLogo(item)">移除图片</button>
         </div>
         <div class="line-total">小计：<strong class="price">￥{{ itemAmount(item).toFixed(2) }}</strong></div>
       </article>
@@ -93,6 +97,10 @@
         <button class="primary-button" :disabled="saving" @click="submit">{{ saving ? '提交中...' : '提交订单' }}</button>
       </div>
     </section>
+    <div v-if="previewImageUrl" class="image-viewer" @click="closeImagePreview">
+      <button type="button" class="image-viewer-close" @click.stop="closeImagePreview">关闭</button>
+      <img :src="previewImageUrl" alt="图片预览" @click.stop />
+    </div>
   </main>
 </template>
 
@@ -123,6 +131,7 @@ const items = ref<DraftItem[]>([])
 const selectedAddress = ref<ShopAddress>()
 const saving = ref(false)
 const error = ref('')
+const previewImageUrl = ref('')
 const form = reactive({
   remark: ''
 })
@@ -210,6 +219,22 @@ function removeItem(index: number) {
   saveDraft()
 }
 
+function previewImage(url?: string) {
+  if (!url) {
+    return
+  }
+  previewImageUrl.value = url
+}
+
+function closeImagePreview() {
+  previewImageUrl.value = ''
+}
+
+function removeLogo(item: DraftItem) {
+  item.logoImageUrl = ''
+  saveDraft()
+}
+
 async function uploadLogo(event: Event, item: DraftItem) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -228,6 +253,7 @@ async function uploadLogo(event: Event, item: DraftItem) {
   try {
     error.value = ''
     item.logoImageUrl = await uploadImage(file)
+    saveDraft()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '上传失败'
   }
@@ -463,13 +489,21 @@ onMounted(loadData)
   background: var(--bg-cream);
 }
 
-.product-summary img,
+.summary-image-button,
 .summary-img-empty {
   width: 72px;
   height: 72px;
   border-radius: var(--radius-sm);
-  object-fit: cover;
   background: #fff;
+}
+.summary-image-button {
+  padding: 0;
+  overflow: hidden;
+}
+.summary-image-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .summary-img-empty {
@@ -608,6 +642,17 @@ onMounted(loadData)
   object-fit: cover;
   border: 1px solid var(--border-line);
 }
+.logo-image-button {
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+.logo-image-button img {
+  width: 100%;
+  height: 100%;
+}
 
 .line-total {
   text-align: right;
@@ -662,5 +707,32 @@ onMounted(loadData)
 .submit-bar button {
   width: 132px;
   border-radius: var(--radius-pill);
+}
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.82);
+}
+.image-viewer img {
+  max-width: 100%;
+  max-height: 82vh;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+.image-viewer-close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 14px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 800;
 }
 </style>

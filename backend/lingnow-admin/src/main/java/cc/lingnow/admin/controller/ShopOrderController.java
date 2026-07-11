@@ -52,12 +52,22 @@ public class ShopOrderController {
                                                       @RequestParam(defaultValue = "20") Long size,
                                                       @RequestParam(required = false) String keyword) {
         QueryWrapper<ErpProduct> wrapper = new QueryWrapper<ErpProduct>()
-                .eq("status", CommonConstants.STATUS_NORMAL)
-                .orderByAsc("sort_order")
-                .orderByDesc("create_time");
+                .eq("status", CommonConstants.STATUS_NORMAL);
         if (StrUtil.isNotBlank(keyword)) {
-            wrapper.and(item -> item.like("code", keyword).or().like("name", keyword).or().like("barcode", keyword));
+            for (String token : searchTokens(keyword)) {
+                wrapper.and(item -> item
+                        .like("code", token)
+                        .or()
+                        .like("name", token)
+                        .or()
+                        .like("barcode", token)
+                        .or()
+                        .like("spec", token)
+                        .or()
+                        .like("attribute_text", token));
+            }
         }
+        applyProductSort(wrapper, keyword);
         Page<ErpProduct> page = productService.page(new Page<>(current, size), wrapper);
         List<ShopProductVO> records = page.getRecords().stream().map(this::toShopProductVO).toList();
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), records));
@@ -333,6 +343,51 @@ public class ShopOrderController {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "商品不存在或已停用");
         }
         return product;
+    }
+
+    private void applyProductSort(QueryWrapper<ErpProduct> wrapper, String keyword) {
+        if (StrUtil.isBlank(keyword)) {
+            wrapper.orderByAsc("sort_order").orderByDesc("create_time");
+            return;
+        }
+        wrapper.last("ORDER BY " + productRelevanceSql(keyword) + ", sort_order ASC, create_time DESC");
+    }
+
+    private String productRelevanceSql(String keyword) {
+        String token = searchTokens(keyword).isEmpty() ? keyword.trim() : searchTokens(keyword).get(0);
+        String exact = escapeSqlLiteral(token);
+        String prefixLike = escapeSqlLiteral(escapeSqlLike(token) + "%");
+        String containsLike = escapeSqlLiteral("%" + escapeSqlLike(token) + "%");
+        return "CASE " +
+                "WHEN code = '" + exact + "' OR barcode = '" + exact + "' THEN 0 " +
+                "WHEN name = '" + exact + "' THEN 1 " +
+                "WHEN name LIKE '" + prefixLike + "' ESCAPE '/' THEN 2 " +
+                "WHEN name LIKE '" + containsLike + "' ESCAPE '/' THEN 3 " +
+                "WHEN spec LIKE '" + containsLike + "' ESCAPE '/' OR attribute_text LIKE '" + containsLike + "' ESCAPE '/' THEN 4 " +
+                "WHEN code LIKE '" + containsLike + "' ESCAPE '/' OR barcode LIKE '" + containsLike + "' ESCAPE '/' THEN 5 " +
+                "ELSE 9 END";
+    }
+
+    private List<String> searchTokens(String keyword) {
+        if (StrUtil.isBlank(keyword)) {
+            return List.of();
+        }
+        return Arrays.stream(keyword.trim().split("\\s+"))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+    }
+
+    private String escapeSqlLiteral(String value) {
+        return value == null ? "" : value.replace("'", "''");
+    }
+
+    private String escapeSqlLike(String value) {
+        return value == null ? "" : value
+                .replace("/", "//")
+                .replace("%", "/%")
+                .replace("_", "/_");
     }
 
     private String nextOrderNo() {

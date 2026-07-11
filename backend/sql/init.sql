@@ -1644,8 +1644,8 @@ VALUES
 (2710, 2600, '库存余额', 1, 'DataAnalysis', '/erp/report/stock-balance', 'erp/report/stockBalance', 'erp:report:stock-balance', 171, 1, 1, 'N', NOW(), 0),
 (2720, 2600, '应收应付', 1, 'DataBoard', '/erp/report/partner-balance', 'erp/report/partnerBalance', 'erp:report:partner-balance', 172, 1, 1, 'N', NOW(), 0),
 (2730, 2600, '账户余额', 1, 'CreditCard', '/erp/report/account-balance', 'erp/report/accountBalance', 'erp:report:account-balance', 173, 1, 1, 'N', NOW(), 0),
-(2740, 2600, '员工业绩统计', 1, 'User', '/erp/report/employee-performance', 'erp/report/generic', 'erp:report:employee-performance', 174, 1, 1, 'N', NOW(), 0),
-(2750, 2600, '员工业绩提成', 1, 'Money', '/erp/report/employee-commission', 'erp/report/generic', 'erp:report:employee-performance', 175, 1, 1, 'N', NOW(), 0),
+(2740, 2600, '业务员业绩统计', 1, 'User', '/erp/report/employee-performance', 'erp/report/generic', 'erp:report:employee-performance', 174, 1, 1, 'N', NOW(), 0),
+(2750, 2600, '业务员业绩提成', 1, 'Money', '/erp/report/employee-commission', 'erp/report/generic', 'erp:report:employee-performance', 175, 1, 1, 'N', NOW(), 0),
 (2760, 2600, '商品收发汇总表', 1, 'Tickets', '/erp/report/stock-summary', 'erp/report/generic', 'erp:report:stock-summary', 176, 1, 1, 'N', NOW(), 0),
 (2770, 2600, '商品进销存变动统计', 1, 'Operation', '/erp/report/inventory-change', 'erp/report/generic', 'erp:report:inventory-change', 177, 1, 1, 'N', NOW(), 0),
 (2780, 2600, '经营汇总', 1, 'Histogram', '/erp/report/summary', 'erp/report/summary', 'erp:report:summary', 178, 1, 1, 'N', NOW(), 0);

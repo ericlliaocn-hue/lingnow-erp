@@ -56,7 +56,7 @@ public class ErpProductController {
     @GetMapping("/list")
     public Result<PageResult<ErpProductVO>> list(ErpProductQueryBO query) {
         StpAdminUtil.stpLogic.checkPermission("erp:product:list");
-        QueryWrapper<ErpProduct> wrapper = wrapper(query).orderByAsc("sort_order").orderByDesc("create_time");
+        QueryWrapper<ErpProduct> wrapper = applyProductSort(wrapper(query), query.getKeyword(), null);
         IPage<ErpProduct> page = productService.page(new Page<>(query.getCurrent(), query.getSize()), wrapper);
         List<ErpProductVO> records = page.getRecords().stream().map(this::toVO).toList();
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), records));
@@ -65,11 +65,7 @@ public class ErpProductController {
     @GetMapping("/options")
     public Result<List<ErpProductVO>> options(ErpProductQueryBO query) {
         StpAdminUtil.stpLogic.checkPermission("erp:product:options");
-        QueryWrapper<ErpProduct> wrapper = wrapper(query)
-                .eq("status", 1)
-                .orderByAsc("sort_order")
-                .orderByDesc("create_time")
-                .last("limit 50");
+        QueryWrapper<ErpProduct> wrapper = applyProductSort(wrapper(query).eq("status", 1), query.getKeyword(), 50);
         return Result.success(productService.list(wrapper).stream().map(this::toVO).toList());
     }
 
@@ -132,7 +128,7 @@ public class ErpProductController {
     @Log(title = "ERP商品", businessType = BusinessType.EXPORT, isSaveResponseData = false)
     public void export(ErpProductQueryBO query, HttpServletResponse response) throws Exception {
         StpAdminUtil.stpLogic.checkPermission("erp:product:export");
-        List<List<String>> rows = productService.list(wrapper(query).orderByAsc("sort_order").orderByDesc("create_time")).stream()
+        List<List<String>> rows = productService.list(applyProductSort(wrapper(query), query.getKeyword(), null)).stream()
                 .map(this::toVO)
                 .map(item -> List.of(
                         text(item.getCode()),
@@ -212,17 +208,73 @@ public class ErpProductController {
                 .eq(query.getBrandId() != null, "brand_id", query.getBrandId())
                 .eq(query.getStatus() != null, "status", query.getStatus());
         if (StrUtil.isNotBlank(query.getKeyword())) {
-            wrapper.and(item -> item
-                    .like("code", query.getKeyword())
-                    .or()
-                    .like("name", query.getKeyword())
-                    .or()
-                    .like("barcode", query.getKeyword()));
+            for (String token : searchTokens(query.getKeyword())) {
+                wrapper.and(item -> item
+                        .like("code", token)
+                        .or()
+                        .like("name", token)
+                        .or()
+                        .like("barcode", token)
+                        .or()
+                        .like("spec", token)
+                        .or()
+                        .like("attribute_text", token));
+            }
         }
         for (String attributeId : splitIds(query.getAttributeIds())) {
             wrapper.apply("FIND_IN_SET({0}, attribute_ids)", attributeId);
         }
         return wrapper;
+    }
+
+    private QueryWrapper<ErpProduct> applyProductSort(QueryWrapper<ErpProduct> wrapper, String keyword, Integer limit) {
+        if (StrUtil.isBlank(keyword)) {
+            wrapper.orderByAsc("sort_order").orderByDesc("create_time");
+            if (limit != null) {
+                wrapper.last("limit " + limit);
+            }
+            return wrapper;
+        }
+        String orderSql = "ORDER BY " + productRelevanceSql(keyword) + ", sort_order ASC, create_time DESC";
+        wrapper.last(limit == null ? orderSql : orderSql + " LIMIT " + limit);
+        return wrapper;
+    }
+
+    private String productRelevanceSql(String keyword) {
+        String token = searchTokens(keyword).isEmpty() ? keyword.trim() : searchTokens(keyword).get(0);
+        String exact = escapeSqlLiteral(token);
+        String prefixLike = escapeSqlLiteral(escapeSqlLike(token) + "%");
+        String containsLike = escapeSqlLiteral("%" + escapeSqlLike(token) + "%");
+        return "CASE " +
+                "WHEN code = '" + exact + "' OR barcode = '" + exact + "' THEN 0 " +
+                "WHEN name = '" + exact + "' THEN 1 " +
+                "WHEN name LIKE '" + prefixLike + "' ESCAPE '/' THEN 2 " +
+                "WHEN name LIKE '" + containsLike + "' ESCAPE '/' THEN 3 " +
+                "WHEN spec LIKE '" + containsLike + "' ESCAPE '/' OR attribute_text LIKE '" + containsLike + "' ESCAPE '/' THEN 4 " +
+                "WHEN code LIKE '" + containsLike + "' ESCAPE '/' OR barcode LIKE '" + containsLike + "' ESCAPE '/' THEN 5 " +
+                "ELSE 9 END";
+    }
+
+    private List<String> searchTokens(String keyword) {
+        if (StrUtil.isBlank(keyword)) {
+            return List.of();
+        }
+        return Arrays.stream(keyword.trim().split("\\s+"))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+    }
+
+    private String escapeSqlLiteral(String value) {
+        return value == null ? "" : value.replace("'", "''");
+    }
+
+    private String escapeSqlLike(String value) {
+        return value == null ? "" : value
+                .replace("/", "//")
+                .replace("%", "/%")
+                .replace("_", "/_");
     }
 
     private void ensureCodeUnique(String code, Long id) {

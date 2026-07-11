@@ -256,12 +256,16 @@
                     >
                       <div class="bill-logo-box" :class="{ 'has-image': !!row.logoImageUrl }">
                         <img v-if="row.logoImageUrl" :src="row.logoImageUrl" class="bill-logo-preview" />
+                        <div v-if="row.logoImageUrl" class="bill-logo-overlay">
+                          <el-button circle size="small" :icon="View" @click.stop.prevent="previewLogoImage(row)" />
+                        </div>
                         <div v-else class="bill-logo-placeholder">
                           <el-icon><UploadFilled /></el-icon>
                           <span>上传LOGO</span>
                         </div>
                       </div>
                     </el-upload>
+                    <el-button v-if="row.logoImageUrl" link type="primary" :icon="View" @click="previewLogoImage(row)">查看原图</el-button>
                     <el-button v-if="row.logoImageUrl && !readonly" link type="danger" @click="clearLogoImage(row)">删除</el-button>
                   </div>
                 </el-form-item>
@@ -544,6 +548,11 @@
         <el-button type="primary" :loading="quickEmployeeSaving" @click="submitQuickEmployee">确定</el-button>
       </template>
     </el-dialog>
+    <el-dialog v-model="logoPreviewOpen" title="LOGO图片预览" width="720px" append-to-body>
+      <div class="logo-preview-dialog">
+        <img v-if="logoPreviewUrl" :src="logoPreviewUrl" alt="LOGO图片预览" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -551,7 +560,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRefs, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Aim, Delete, FolderChecked, Minus, Plus, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { Aim, Delete, FolderChecked, Minus, Plus, RefreshRight, UploadFilled, View } from '@element-plus/icons-vue'
 import { addBill, getBill, nextBillNo, updateBill, updateProductionBill, type BillItem, type BillModule, type ErpBill } from '@/api/erp/bill'
 import { getProduct, productOptions, type ErpProduct } from '@/api/erp/product'
 import { addMaster, listMaster, type ErpMasterForm, type ErpMasterVO } from '@/api/erp/master'
@@ -661,6 +670,8 @@ const quickEmployeeOpen = ref(false)
 const quickEmployeeSaving = ref(false)
 const quickEmployeeFormRef = ref()
 const employeeDisableLoadingId = ref('')
+const logoPreviewOpen = ref(false)
+const logoPreviewUrl = ref('')
 const quickCustomerForm = reactive<ErpMasterForm>({
   code: '',
   name: '',
@@ -1496,6 +1507,11 @@ function clearLogoImage(row: BillItem) {
   row.logoImageUrl = ''
   saveSaleDraftNow()
 }
+function previewLogoImage(row: BillItem) {
+  if (!row.logoImageUrl) return
+  logoPreviewUrl.value = row.logoImageUrl
+  logoPreviewOpen.value = true
+}
 function calc() {
   form.value.items.forEach(row => {
     row.amount = Number(row.qty || 0) * Number(row.price || 0)
@@ -2317,6 +2333,7 @@ onBeforeUnmount(() => {
   display: block;
 }
 .bill-logo-box {
+  position: relative;
   width: 88px;
   height: 88px;
   border: 1px dashed var(--el-border-color);
@@ -2333,6 +2350,18 @@ onBeforeUnmount(() => {
   height: 88px;
   object-fit: cover;
 }
+.bill-logo-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.bill-logo-box.has-image:hover .bill-logo-overlay {
+  opacity: 1;
+}
 .bill-logo-placeholder {
   width: 100%;
   height: 100%;
@@ -2346,6 +2375,15 @@ onBeforeUnmount(() => {
 }
 .bill-logo-placeholder .el-icon {
   font-size: 22px;
+}
+.logo-preview-dialog {
+  display: flex;
+  justify-content: center;
+}
+.logo-preview-dialog img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
 }
 .product-option-text {
   display: flex;

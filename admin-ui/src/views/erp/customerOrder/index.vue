@@ -78,14 +78,44 @@
         <el-table :data="current.items || []" border>
           <el-table-column prop="productCode" label="编号" min-width="120" />
           <el-table-column prop="productName" label="商品" min-width="180" />
-          <el-table-column label="商品图片" width="110" align="center">
-            <template #default="{ row }"><img v-if="row.productImageUrl" :src="row.productImageUrl" class="item-img" /><span v-else>-</span></template>
+          <el-table-column label="商品图片" width="142" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.productImageUrl"
+                class="item-img"
+                :src="row.productImageUrl"
+                :preview-src-list="[row.productImageUrl]"
+                preview-teleported
+                fit="cover"
+              />
+              <span v-else>-</span>
+            </template>
           </el-table-column>
-          <el-table-column label="LOGO" width="110" align="center">
-            <template #default="{ row }"><img v-if="row.logoImageUrl" :src="row.logoImageUrl" class="item-img" /><span v-else>-</span></template>
+          <el-table-column label="LOGO" width="142" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.logoImageUrl"
+                class="item-img"
+                :src="row.logoImageUrl"
+                :preview-src-list="[row.logoImageUrl]"
+                preview-teleported
+                fit="cover"
+              />
+              <span v-else>-</span>
+            </template>
           </el-table-column>
-          <el-table-column prop="spec" label="规格" width="90" />
-          <el-table-column prop="optionAttributeText" label="属性" min-width="180" />
+          <el-table-column prop="spec" label="规格" width="72" />
+          <el-table-column label="属性" min-width="190">
+            <template #default="{ row }">
+              <div v-if="formatAttributeLines(row.optionAttributeText).length" class="attribute-lines">
+                <div v-for="(line, index) in formatAttributeLines(row.optionAttributeText)" :key="index" class="attribute-line">
+                  <span v-if="line.label">{{ line.label }}：</span>
+                  <strong>{{ line.value }}</strong>
+                </div>
+              </div>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="qty" label="数量" width="90" align="right" />
           <el-table-column prop="price" label="单价" width="100" align="right">
             <template #default="{ row }">{{ money(row.price) }}</template>
@@ -152,6 +182,7 @@ const paymentMethods = ['淘宝', '1688', '小红书', '微信', '支付宝']
 const queryParams = reactive<CustomerOrderQuery>({ current: 1, size: 10 })
 const confirmForm = reactive<CustomerOrderConfirmPayload>({ warehouseId: '', paidAmount: 0, accountId: '', paymentMethod: '', remark: '' })
 const confirmRules = { warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }] }
+type AttributeLine = { label: string, value: string }
 
 function getList() {
   loading.value = true
@@ -218,6 +249,16 @@ function statusTag(status: CustomerOrderStatus) {
 function money(value?: number) {
   return Number(value || 0).toFixed(2)
 }
+function formatAttributeLines(value?: string): AttributeLine[] {
+  return String(value || '')
+    .split(/\s*\/\s*|[；;]\s*/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .map(item => {
+      const match = item.match(/^([^:：]+)[:：]\s*(.+)$/)
+      return match ? { label: (match[1] || '').trim(), value: (match[2] || '').trim() } : { label: '', value: item }
+    })
+}
 onMounted(() => { loadOptions(); getList() })
 </script>
 
@@ -227,11 +268,24 @@ onMounted(() => { loadOptions(); getList() })
 .card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .detail-desc { margin-bottom: 16px; }
 .item-img {
-  width: 72px;
-  height: 72px;
+  width: 112px;
+  height: 112px;
   object-fit: cover;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;
+}
+.attribute-lines {
+  display: grid;
+  gap: 4px;
+  line-height: 1.35;
+}
+.attribute-line span {
+  color: var(--el-text-color-regular);
+  font-weight: 400;
+}
+.attribute-line strong {
+  color: var(--el-text-color-primary);
+  font-weight: 700;
 }
 @media print {
   :global(.el-overlay),

@@ -83,6 +83,7 @@ public class SchemaFixer implements CommandLineRunner {
         fixErpProductMenus();
         fixProductionMenus();
         fixCustomerOrderMenus();
+        fixEmployeeReportMenus();
         fixErpApprovalMenus();
         fixProductCostEditPermission();
         fixAdminRoleMenus();
@@ -333,6 +334,19 @@ public class SchemaFixer implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.error("修复客户订单菜单失败", e);
+        }
+    }
+
+    private void fixEmployeeReportMenus() {
+        try {
+            if (!checkTableExists("sys_menu")) {
+                log.info("表 sys_menu 不存在，跳过业务员报表菜单修复");
+                return;
+            }
+            jdbcTemplate.update("UPDATE sys_menu SET menu_name = '业务员业绩统计' WHERE menu_id = 2740 OR path = '/erp/report/employee-performance'");
+            jdbcTemplate.update("UPDATE sys_menu SET menu_name = '业务员业绩提成' WHERE menu_id = 2750 OR path = '/erp/report/employee-commission'");
+        } catch (Exception e) {
+            log.error("修复业务员报表菜单失败", e);
         }
     }
 

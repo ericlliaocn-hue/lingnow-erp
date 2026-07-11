@@ -104,20 +104,44 @@
         <el-table :data="printData.items || []" border>
           <el-table-column prop="productCode" label="商品编号" />
           <el-table-column prop="productName" label="商品名称" />
-          <el-table-column label="商品图片" width="128" align="center">
+          <el-table-column label="商品图片" width="156" align="center">
             <template #default="{ row }">
-              <img v-if="row.productImageUrl" :src="row.productImageUrl" class="print-item-image" />
+              <el-image
+                v-if="row.productImageUrl"
+                class="print-item-image"
+                :src="row.productImageUrl"
+                :preview-src-list="[row.productImageUrl]"
+                preview-teleported
+                fit="cover"
+              />
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column v-if="showPrintLogoColumn" label="LOGO图片" width="128" align="center">
+          <el-table-column v-if="showPrintLogoColumn" label="LOGO图片" width="156" align="center">
             <template #default="{ row }">
-              <img v-if="row.logoImageUrl" :src="row.logoImageUrl" class="print-item-image" />
+              <el-image
+                v-if="row.logoImageUrl"
+                class="print-item-image"
+                :src="row.logoImageUrl"
+                :preview-src-list="[row.logoImageUrl]"
+                preview-teleported
+                fit="cover"
+              />
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="spec" label="规格" width="84" show-overflow-tooltip />
-          <el-table-column prop="attributeText" label="类目选项" min-width="160" />
+          <el-table-column prop="spec" label="规格" width="72" show-overflow-tooltip />
+          <el-table-column label="类目选项" min-width="190">
+            <template #default="{ row }">
+              <div v-if="formatAttributeLines(row.attributeText).length" class="print-attribute-lines">
+                <div v-for="(line, index) in formatAttributeLines(row.attributeText)" :key="index" class="print-attribute-line">
+                  <span v-if="line.label">{{ line.label }}：</span>
+                  <strong>{{ line.value }}</strong>
+                </div>
+              </div>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="qty" label="数量" align="right" />
           <el-table-column v-if="!hideSalePrintFinancialFields" prop="price" label="单价" align="right" />
           <el-table-column v-if="!hideSalePrintFinancialFields" prop="finalAmount" label="折后金额" align="right" />
@@ -145,6 +169,7 @@ import { useUserStore } from '@/store/modules/user'
 import { downloadBlob } from '@/utils/download'
 
 type EmployeeOption = { userId: string, username?: string, nickname?: string, status?: number }
+type AttributeLine = { label: string, value: string }
 
 const route = useRoute()
 const router = useRouter()
@@ -300,6 +325,16 @@ function handleDelete() {
     .then(() => { ElMessage.success('删除成功'); getList() })
 }
 function doBrowserPrint() { window.print() }
+function formatAttributeLines(value?: string): AttributeLine[] {
+  return String(value || '')
+    .split(/\s*\/\s*|[；;]\s*/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .map(item => {
+      const match = item.match(/^([^:：]+)[:：]\s*(.+)$/)
+      return match ? { label: (match[1] || '').trim(), value: (match[2] || '').trim() } : { label: '', value: item }
+    })
+}
 function clearProductionFilters() {
   productionDateRange.value = []
   queryParams.value.employeeId = undefined
@@ -324,10 +359,23 @@ onMounted(initPage)
 .print-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 16px; margin-bottom: 16px; }
 .print-remark { margin-top: 14px; }
 .print-item-image {
-  width: 96px;
-  height: 96px;
+  width: 128px;
+  height: 128px;
   object-fit: cover;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;
+}
+.print-attribute-lines {
+  display: grid;
+  gap: 4px;
+  line-height: 1.35;
+}
+.print-attribute-line span {
+  color: var(--el-text-color-regular);
+  font-weight: 400;
+}
+.print-attribute-line strong {
+  color: var(--el-text-color-primary);
+  font-weight: 700;
 }
 </style>

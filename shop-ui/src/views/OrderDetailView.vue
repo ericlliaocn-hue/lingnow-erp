@@ -27,17 +27,26 @@
 
         <article v-for="item in order.items || []" :key="item.id || item.productId" class="card item-card">
           <div class="item-main">
-            <img v-if="item.productImageUrl" :src="item.productImageUrl" alt="" />
+            <button v-if="item.productImageUrl" class="item-image-button" type="button" @click="previewImage(item.productImageUrl)">
+              <img :src="item.productImageUrl" alt="" />
+            </button>
             <div v-else class="item-img-empty">荣时</div>
             <div>
               <strong>{{ item.productName }}</strong>
               <p v-if="item.spec">{{ item.spec }}</p>
-              <p v-if="item.optionAttributeText" class="attr-text">{{ displayAttributeText(item.optionAttributeText) }}</p>
+              <div v-if="formatAttributeLines(item.optionAttributeText).length" class="attr-lines">
+                <div v-for="(line, index) in formatAttributeLines(item.optionAttributeText)" :key="index" class="attr-line">
+                  <span v-if="line.label">{{ displayShopLabel(line.label) }}：</span>
+                  <strong>{{ displayShopLabel(line.value) }}</strong>
+                </div>
+              </div>
             </div>
           </div>
           <div v-if="item.logoImageUrl" class="logo-line">
             <span>Logo / 图案参考</span>
-            <img :src="item.logoImageUrl" alt="" />
+            <button class="logo-image-button" type="button" @click="previewImage(item.logoImageUrl)">
+              <img :src="item.logoImageUrl" alt="" />
+            </button>
           </div>
           <div class="item-total">
             <span>{{ Number(item.qty || 0).toFixed(0) }} × ￥{{ money(item.price) }}</span>
@@ -54,6 +63,10 @@
     </section>
 
     <BottomNav />
+    <div v-if="previewImageUrl" class="image-viewer" @click="closeImagePreview">
+      <button type="button" class="image-viewer-close" @click.stop="closeImagePreview">关闭</button>
+      <img :src="previewImageUrl" alt="图片预览" @click.stop />
+    </div>
   </main>
 </template>
 
@@ -69,17 +82,34 @@ const route = useRoute()
 const router = useRouter()
 const order = ref<CustomerOrder>()
 const loading = ref(false)
+const previewImageUrl = ref('')
+
+type AttributeLine = { label: string, value: string }
 
 function money(value?: number) {
   return Number(value || 0).toFixed(2)
 }
 
-function displayAttributeText(value?: string) {
+function formatAttributeLines(value?: string): AttributeLine[] {
   return String(value || '')
-    .split(/[\/,，]/)
-    .map(item => displayShopLabel(item))
+    .split(/\s*\/\s*|[；;]\s*/)
+    .map(item => item.trim())
     .filter(Boolean)
-    .join(' / ')
+    .map(item => {
+      const match = item.match(/^([^:：]+)[:：]\s*(.+)$/)
+      return match ? { label: (match[1] || '').trim(), value: (match[2] || '').trim() } : { label: '', value: item }
+    })
+}
+
+function previewImage(url?: string) {
+  if (!url) {
+    return
+  }
+  previewImageUrl.value = url
+}
+
+function closeImagePreview() {
+  previewImageUrl.value = ''
 }
 
 async function load() {
@@ -137,13 +167,21 @@ onMounted(load)
   gap: 10px;
 }
 
-.item-main img,
+.item-image-button,
 .item-img-empty {
   width: 82px;
   height: 82px;
   border-radius: var(--radius-sm);
-  object-fit: cover;
   background: var(--bg-muted);
+}
+.item-image-button {
+  padding: 0;
+  overflow: hidden;
+}
+.item-image-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .item-img-empty {
@@ -164,8 +202,20 @@ onMounted(load)
   font-size: 13px;
 }
 
-.attr-text {
+.attr-lines {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+}
+.attr-line span {
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 400;
+}
+.attr-line strong {
   color: var(--brand-brown-soft);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .logo-line {
@@ -175,10 +225,16 @@ onMounted(load)
   gap: 12px;
 }
 
-.logo-line img {
+.logo-image-button {
   width: 72px;
   height: 72px;
   border-radius: var(--radius-sm);
+  padding: 0;
+  overflow: hidden;
+}
+.logo-image-button img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   border: 1px solid var(--border-line);
 }
@@ -195,5 +251,32 @@ onMounted(load)
 
 .summary span {
   color: var(--text-sub);
+}
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.82);
+}
+.image-viewer img {
+  max-width: 100%;
+  max-height: 82vh;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+.image-viewer-close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 14px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 800;
 }
 </style>

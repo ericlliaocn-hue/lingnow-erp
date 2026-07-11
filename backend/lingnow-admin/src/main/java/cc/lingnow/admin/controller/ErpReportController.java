@@ -4,10 +4,13 @@ import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.admin.util.CsvExportUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.biz.user.entity.SysUser;
+import cc.lingnow.biz.user.service.SysUserService;
 import cc.lingnow.common.enums.ErrorCode;
 import cc.lingnow.common.exception.BusinessException;
 import cc.lingnow.common.vo.PageResult;
 import cc.lingnow.common.vo.Result;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -47,6 +50,7 @@ public class ErpReportController {
     private final ErpPartnerFlowService partnerFlowService;
     private final ErpAccountService accountService;
     private final ErpWarehouseService warehouseService;
+    private final SysUserService userService;
 
     @GetMapping("/stock-balance")
     public Result<PageResult<Map<String, Object>>> stockBalance(@RequestParam(defaultValue = "1") Long current,
@@ -267,22 +271,23 @@ public class ErpReportController {
     @GetMapping("/employee-performance")
     public Result<List<Map<String, Object>>> employeePerformance(LocalDate beginDate, LocalDate endDate) {
         StpAdminUtil.stpLogic.checkPermission("erp:report:employee-performance");
-        Map<Long, Map<String, Object>> rows = new HashMap<>();
+        Map<String, Map<String, Object>> rows = new HashMap<>();
         for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>()
                 .in("bill_type", List.of("SALE", "SALE_RETURN"))
                 .ge(beginDate != null, "bill_date", beginDate)
                 .le(endDate != null, "bill_date", endDate))) {
-            Long employeeId = bill.getEmployeeId() == null ? 0L : bill.getEmployeeId();
-            Map<String, Object> row = rows.computeIfAbsent(employeeId, id -> {
+            String employeeKey = employeeKey(bill);
+            Map<String, Object> row = rows.computeIfAbsent(employeeKey, key -> {
                 Map<String, Object> created = new HashMap<>();
-                created.put("employeeId", id);
-                created.put("employeeName", id == 0L ? "未指定业务员" : String.valueOf(id));
+                created.put("employeeId", bill.getEmployeeId());
+                created.put("employeeName", employeeDisplayName(bill));
                 created.put("saleAmount", BigDecimal.ZERO);
                 created.put("returnAmount", BigDecimal.ZERO);
                 created.put("netAmount", BigDecimal.ZERO);
                 created.put("commissionAmount", BigDecimal.ZERO);
                 return created;
             });
+            row.put("employeeName", preferEmployeeName(Objects.toString(row.get("employeeName"), ""), employeeDisplayName(bill)));
             if ("SALE".equals(bill.getBillType())) {
                 add(row, "saleAmount", bill.getPayableAmount());
                 add(row, "netAmount", bill.getPayableAmount());
@@ -374,8 +379,8 @@ public class ErpReportController {
             case "sale-analysis" -> new ReportExport("销售分析", trendColumns(), trend(beginDate, endDate).getData());
             case "business-profit" -> new ReportExport("经营利润", profitSummaryColumns(), List.of(businessProfit(beginDate, endDate).getData()));
             case "hot-products" -> new ReportExport("商品热销榜", hotProductColumns(), hotProducts(beginDate, endDate).getData());
-            case "employee-performance" -> new ReportExport("员工业绩统计", employeeColumns(true), employeePerformance(beginDate, endDate).getData());
-            case "employee-commission" -> new ReportExport("员工业绩提成", employeeColumns(false), employeePerformance(beginDate, endDate).getData());
+            case "employee-performance" -> new ReportExport("业务员业绩统计", employeeColumns(true), employeePerformance(beginDate, endDate).getData());
+            case "employee-commission" -> new ReportExport("业务员业绩提成", employeeColumns(false), employeePerformance(beginDate, endDate).getData());
             case "stock-summary" -> new ReportExport("商品收发汇总表", stockColumns(false), stockSummary(beginDate, endDate).getData());
             case "inventory-change" -> new ReportExport("商品进销存变动统计", stockColumns(true), inventoryChange(beginDate, endDate).getData());
             case "bill-detail" -> new ReportExport(("PURCHASE".equals(billType) ? "进货明细" : "销售明细"), billDetailColumns(),
@@ -525,7 +530,7 @@ public class ErpReportController {
             return String.valueOf(bill.getPartnerId());
         }
         if ("employee".equals(groupBy)) {
-            return String.valueOf(bill.getEmployeeId() == null ? 0L : bill.getEmployeeId());
+            return employeeKey(bill);
         }
         return bill.getBillType();
     }
@@ -552,9 +557,50 @@ public class ErpReportController {
             return partnerName(bill.getPartnerType(), bill.getPartnerId());
         }
         if ("employee".equals(groupBy)) {
-            return bill.getEmployeeId() == null ? "未指定业务员" : String.valueOf(bill.getEmployeeId());
+            return employeeDisplayName(bill);
         }
         return bill.getBillType();
+    }
+
+    private String employeeKey(ErpBill bill) {
+        if (bill.getEmployeeId() != null) {
+            return "ID:" + bill.getEmployeeId();
+        }
+        String name = StrUtil.trim(bill.getEmployeeName());
+        return StrUtil.isBlank(name) ? "NONE" : "NAME:" + name;
+    }
+
+    private String employeeDisplayName(ErpBill bill) {
+        if (bill == null) {
+            return "未指定业务员";
+        }
+        String name = StrUtil.trim(bill.getEmployeeName());
+        if (StrUtil.isNotBlank(name)) {
+            return name;
+        }
+        String userName = userDisplayName(bill.getEmployeeId());
+        return StrUtil.isBlank(userName) ? "未指定业务员" : userName;
+    }
+
+    private String preferEmployeeName(String current, String candidate) {
+        if (StrUtil.isBlank(candidate) || "未指定业务员".equals(candidate)) {
+            return StrUtil.isBlank(current) ? "未指定业务员" : current;
+        }
+        if (StrUtil.isBlank(current) || "未指定业务员".equals(current) || current.matches("\\d+")) {
+            return candidate;
+        }
+        return current;
+    }
+
+    private String userDisplayName(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        SysUser user = userService.getById(userId);
+        if (user == null) {
+            return String.valueOf(userId);
+        }
+        return StrUtil.isNotBlank(user.getNickname()) ? user.getNickname() : user.getUsername();
     }
 
     private String profitKey(String groupBy, ErpBill bill, ErpBillItem item) {

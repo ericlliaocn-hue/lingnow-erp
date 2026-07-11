@@ -140,7 +140,7 @@ const configs: Record<string, ReportConfig> = {
     ]
   },
   '/erp/report/employee-performance': {
-    title: '员工业绩统计',
+    title: '业务员业绩统计',
     loader: employeePerformance,
     columns: [
       { prop: 'employeeName', label: '业务员' },
@@ -151,7 +151,7 @@ const configs: Record<string, ReportConfig> = {
     ]
   },
   '/erp/report/employee-commission': {
-    title: '员工业绩提成',
+    title: '业务员业绩提成',
     loader: employeePerformance,
     columns: [
       { prop: 'employeeName', label: '业务员' },
