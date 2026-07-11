@@ -278,7 +278,7 @@
           <span>付款价格：{{ financialSummaryText(Number(form.paidAmount || 0).toFixed(2)) }}</span>
           <span>利润：{{ financialSummaryText(profitAmount) }}</span>
         </div>
-        <el-form-item label="备注"><el-input v-model="form.remark" :disabled="readonly" type="textarea" /></el-form-item>
+        <el-form-item :label="billRemarkLabel"><el-input v-model="form.remark" :disabled="readonly" type="textarea" /></el-form-item>
       </el-form>
     </el-card>
 
@@ -590,6 +590,7 @@ const title = computed(() => titleMap[module.value])
 const isProduction = computed(() => module.value === 'production')
 const isSaleLike = computed(() => module.value.startsWith('sale') || isProduction.value)
 const partnerLabel = computed(() => isSaleLike.value ? '客户' : '供应商')
+const billRemarkLabel = computed(() => isSaleLike.value ? '订单留言' : '备注')
 const showReceiver = computed(() => isSaleLike.value)
 const showEmployeeField = computed(() => isSaleLike.value)
 const showLogoUpload = computed(() => module.value === 'sale' || isProduction.value)

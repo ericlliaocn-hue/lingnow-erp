@@ -73,7 +73,7 @@
           <el-descriptions-item label="收货人">{{ current.receiverName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="电话">{{ current.receiverPhone || '-' }}</el-descriptions-item>
           <el-descriptions-item label="地址">{{ current.receiverAddress || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="备注" :span="3">{{ current.remark || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="订单留言" :span="3">{{ current.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
         <el-table :data="current.items || []" border>
           <el-table-column prop="productCode" label="编号" min-width="120" />
@@ -86,7 +86,6 @@
           </el-table-column>
           <el-table-column prop="spec" label="规格" width="90" />
           <el-table-column prop="optionAttributeText" label="属性" min-width="180" />
-          <el-table-column prop="remark" label="定制说明" min-width="180" />
           <el-table-column prop="qty" label="数量" width="90" align="right" />
           <el-table-column prop="price" label="单价" width="100" align="right">
             <template #default="{ row }">{{ money(row.price) }}</template>
@@ -118,7 +117,7 @@
             <el-option v-for="item in paymentMethods" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item label="订单留言">
           <el-input v-model="confirmForm.remark" type="textarea" />
         </el-form-item>
       </el-form>

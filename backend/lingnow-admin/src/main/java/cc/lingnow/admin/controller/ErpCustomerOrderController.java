@@ -9,6 +9,8 @@ import cc.lingnow.admin.service.ErpAuditService;
 import cc.lingnow.admin.util.StpAdminUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
+import cc.lingnow.biz.notification.service.SysUserNotificationService;
+import cc.lingnow.biz.role.service.SysRoleService;
 import cc.lingnow.biz.user.entity.SysUser;
 import cc.lingnow.biz.user.service.SysUserService;
 import cc.lingnow.common.annotation.Log;
@@ -33,6 +35,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/erp/customer-order")
@@ -50,6 +53,8 @@ public class ErpCustomerOrderController {
     private final ErpAccountService accountService;
     private final ErpAuditService auditService;
     private final SysUserService userService;
+    private final SysRoleService roleService;
+    private final SysUserNotificationService notificationService;
 
     @GetMapping("/list")
     public Result<PageResult<ErpCustomerOrderVO>> list(ErpCustomerOrderQueryBO query) {
@@ -152,6 +157,7 @@ public class ErpCustomerOrderController {
         List<ErpBillItem> billItems = orderItems.stream().map(item -> toBillItem(item, bill.getId(), bo.getWarehouseId())).toList();
         billItemService.saveBatch(billItems);
         auditService.auditBill(bill.getId());
+        notifyNewSaleBill(bill);
 
         orderService.update(new UpdateWrapper<ErpCustomerOrder>()
                 .eq("id", id)
@@ -161,6 +167,24 @@ public class ErpCustomerOrderController {
                 .set("confirm_time", LocalDateTime.now())
                 .set("confirm_by", currentUserName()));
         return Result.success(bill.getId());
+    }
+
+    private void notifyNewSaleBill(ErpBill bill) {
+        String content = bill.getBillNo() + " 已创建，请及时处理";
+        String actionUrl = "/erp/sale/list?billNo=" + bill.getBillNo();
+        for (SysUser user : userService.list(new QueryWrapper<SysUser>().eq("status", 1).eq("del_flag", 0).eq("internal_account", 0))) {
+            if (canReceiveSaleNotification(user)) {
+                notificationService.sendNotification(user.getUserId(), "新销售单", content, "warning", bill.getId(), "SALE", "ORDER", "OPEN", actionUrl);
+            }
+        }
+    }
+
+    private boolean canReceiveSaleNotification(SysUser user) {
+        if (userService.isSuperAdmin(user)) {
+            return true;
+        }
+        Set<String> permissions = roleService.selectPermissionsByUserId(user.getUserId());
+        return permissions.contains("*:*:*") || permissions.contains("erp:sale:list");
     }
 
     private ErpBillItem toBillItem(ErpCustomerOrderItem source, Long billId, Long warehouseId) {

@@ -95,7 +95,7 @@ onMounted(loadOrders)
 .profile-header {
   margin: -14px -14px 12px;
   padding: calc(18px + env(safe-area-inset-top)) 14px 18px;
-  background: linear-gradient(135deg, var(--brand-brown), var(--brand-teal));
+  background: var(--brand-teal);
 }
 
 .profile-card {

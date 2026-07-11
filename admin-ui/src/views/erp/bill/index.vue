@@ -122,7 +122,7 @@
           <el-table-column v-if="!hideSalePrintFinancialFields" prop="price" label="单价" align="right" />
           <el-table-column v-if="!hideSalePrintFinancialFields" prop="finalAmount" label="折后金额" align="right" />
         </el-table>
-        <div class="print-remark">备注：{{ printData.bill.remark || '' }}</div>
+        <div class="print-remark">{{ isSaleLike ? '订单留言' : '备注' }}：{{ printData.bill.remark || '' }}</div>
       </div>
       <template #footer>
         <el-button @click="printOpen = false">关闭</el-button>

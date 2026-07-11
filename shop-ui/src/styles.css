@@ -84,16 +84,18 @@ a {
   margin: 0 auto;
 }
 
-/* ===== 顶栏：统一暖色（替代原 ERP 蓝） ===== */
+/* ===== 顶栏 ===== */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 10;
   margin: -14px -14px 14px;
   padding: calc(14px + env(safe-area-inset-top)) 14px 12px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand-brown), var(--brand-teal));
-  box-shadow: 0 8px 18px rgba(122, 63, 24, 0.18);
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(255, 247, 235, 0.98);
+  box-shadow: 0 6px 16px rgba(71, 49, 31, 0.08);
+  backdrop-filter: blur(12px);
 }
 
 .topbar-inner {
@@ -113,7 +115,7 @@ a {
 
 .topbar p {
   margin: 4px 0 0;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-sub);
   font-size: 13px;
 }
 
@@ -125,8 +127,9 @@ a {
   min-height: 38px;
   padding: 0 12px;
   border-radius: var(--radius-sm);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.18);
+  color: var(--brand-teal);
+  background: #e6f2ef;
+  font-weight: 800;
 }
 
 .card {
@@ -305,18 +308,17 @@ a {
 /* ===== 通用骨架屏 ===== */
 .skeleton {
   border-radius: var(--radius);
-  background: linear-gradient(100deg, #efe9e2 20%, #faf7f3 40%, #efe9e2 60%);
-  background-size: 200% 100%;
+  background: #efe9e2;
   animation: skeleton-loading 1.2s ease-in-out infinite;
 }
 
 @keyframes skeleton-loading {
   0% {
-    background-position: 100% 0;
+    opacity: 0.55;
   }
 
   100% {
-    background-position: -100% 0;
+    opacity: 1;
   }
 }
 

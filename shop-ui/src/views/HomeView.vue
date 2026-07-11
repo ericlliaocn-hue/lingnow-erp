@@ -145,11 +145,11 @@ const hasMore = computed(() => products.value.length < total.value)
 const recommended = computed(() => products.value.filter(item => item.imageUrl).slice(0, 6))
 
 const bannerThemes = [
-  'linear-gradient(135deg, rgba(255,236,208,0.95), rgba(255,255,255,0.95))',
-  'linear-gradient(135deg, rgba(220,240,234,0.95), rgba(255,255,255,0.95))',
-  'linear-gradient(135deg, rgba(255,228,218,0.95), rgba(255,255,255,0.95))',
-  'linear-gradient(135deg, rgba(238,230,218,0.95), rgba(255,255,255,0.95))',
-  'linear-gradient(135deg, rgba(230,238,240,0.95), rgba(255,255,255,0.95))'
+  '#fff4e4',
+  '#e7f3ef',
+  '#fff0e8',
+  '#f1ebe2',
+  '#edf4f4'
 ]
 function bannerTheme(index: number) {
   return bannerThemes[index % bannerThemes.length]
@@ -217,9 +217,7 @@ onUnmounted(stopBannerAuto)
 <style scoped>
 .home-page {
   padding-top: calc(104px + env(safe-area-inset-top));
-  background:
-    linear-gradient(180deg, var(--bg-cream) 0, var(--bg-page) 240px),
-    var(--bg-page);
+  background: var(--bg-page);
 }
 
 .home-header {

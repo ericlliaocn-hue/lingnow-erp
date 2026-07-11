@@ -22,7 +22,7 @@
           <div class="detail-line"><span>收货人</span><strong>{{ order.receiverName || '-' }}</strong></div>
           <div class="detail-line"><span>联系电话</span><strong>{{ order.receiverPhone || '-' }}</strong></div>
           <div class="detail-block"><span>收货地址</span><p>{{ order.receiverAddress || '-' }}</p></div>
-          <div v-if="order.remark" class="detail-block"><span>给商家留言</span><p>{{ order.remark }}</p></div>
+          <div v-if="order.remark" class="detail-block"><span>订单留言</span><p>{{ order.remark }}</p></div>
         </div>
 
         <article v-for="item in order.items || []" :key="item.id || item.productId" class="card item-card">
@@ -39,7 +39,6 @@
             <span>Logo / 图案参考</span>
             <img :src="item.logoImageUrl" alt="" />
           </div>
-          <div v-if="item.remark" class="detail-block"><span>给商家留言</span><p>{{ item.remark }}</p></div>
           <div class="item-total">
             <span>{{ Number(item.qty || 0).toFixed(0) }} × ￥{{ money(item.price) }}</span>
             <strong class="price">￥{{ money(item.amount) }}</strong>

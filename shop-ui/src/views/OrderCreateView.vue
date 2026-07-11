@@ -1,14 +1,5 @@
 <template>
   <main class="page order-page">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <div>
-          <h1>确认订单</h1>
-          <p>确认地址、商品和留言</p>
-        </div>
-      </div>
-    </header>
-
     <section class="page-inner">
       <div class="card receiver-card" @click="openAddressList">
         <div class="card-title-row">
@@ -43,10 +34,15 @@
         <div v-if="productOf(item)" class="product-summary">
           <img v-if="productOf(item)?.imageUrl" :src="productOf(item)?.imageUrl" alt="" />
           <div v-else class="summary-img-empty">荣时</div>
-          <div>
+          <div class="product-summary-info">
             <strong>{{ productOf(item)?.name }}</strong>
             <p>{{ productSummary(productOf(item)) }}</p>
             <span class="price">￥{{ itemPrice(item).toFixed(2) }}</span>
+          </div>
+          <div class="qty-stepper" aria-label="数量">
+            <button type="button" @click="decreaseQty(item)">-</button>
+            <input v-model.number="item.qty" type="number" min="1" step="1" inputmode="numeric" @blur="normalizeQty(item)" />
+            <button type="button" @click="increaseQty(item)">+</button>
           </div>
         </div>
 
@@ -66,10 +62,6 @@
         </div>
 
         <label class="field">
-          <span>数量</span>
-          <input v-model.number="item.qty" class="input" type="number" min="1" step="1" inputmode="decimal" />
-        </label>
-        <label class="field">
           <span>Logo / 图案参考</span>
           <input class="input file-input" type="file" accept="image/*" @change="uploadLogo($event, item)" />
         </label>
@@ -77,23 +69,19 @@
           <img :src="item.logoImageUrl" alt="" />
           <button class="remove-button" @click="item.logoImageUrl = ''">移除图片</button>
         </div>
-        <label class="field">
-          <span>给商家留言</span>
-          <textarea v-model.trim="item.remark" class="textarea" placeholder="选填，说明定制需求"></textarea>
-        </label>
         <div class="line-total">小计：<strong class="price">￥{{ itemAmount(item).toFixed(2) }}</strong></div>
       </article>
+
+      <div class="card remark-card">
+        <label class="field">
+          <span>订单留言</span>
+          <textarea v-model.trim="form.remark" class="textarea" placeholder="选填，说明订单需求"></textarea>
+        </label>
+      </div>
 
       <div class="card summary">
         <div><span>共 {{ totalQty }} 件</span><strong>{{ totalQty }} 件</strong></div>
         <div><span>合计</span><strong class="price">￥{{ totalAmount.toFixed(2) }}</strong></div>
-      </div>
-
-      <div class="card remark-card">
-        <label class="field">
-          <span>订单备注</span>
-          <textarea v-model.trim="form.remark" class="textarea" placeholder="选填，备注订单信息"></textarea>
-        </label>
       </div>
 
       <p v-if="error" class="error-text">{{ error }}</p>
@@ -122,7 +110,6 @@ interface DraftItem {
   qty: number
   selectedOptions: Record<string, string>
   logoImageUrl: string
-  remark: string
 }
 
 const SELECTED_ADDRESS_KEY = 'rs-checkout-address-id'
@@ -145,7 +132,7 @@ const totalQty = computed(() => items.value.reduce((sum, item) => sum + Number(i
 const totalAmount = computed(() => items.value.reduce((sum, item) => sum + itemAmount(item), 0))
 
 function createItem(productId = ''): DraftItem {
-  return { key: `${Date.now()}-${Math.random()}`, productId, qty: 1, selectedOptions: {}, logoImageUrl: '', remark: '' }
+  return { key: `${Date.now()}-${Math.random()}`, productId, qty: 1, selectedOptions: {}, logoImageUrl: '' }
 }
 
 function productOf(item: DraftItem) {
@@ -196,6 +183,18 @@ function itemAmount(item: DraftItem) {
 
 function selectOption(item: DraftItem, groupId: string, optionId: string) {
   item.selectedOptions[groupId] = item.selectedOptions[groupId] === optionId ? '' : optionId
+}
+
+function normalizeQty(item: DraftItem) {
+  item.qty = Math.max(1, Math.floor(Number(item.qty || 1)))
+}
+
+function decreaseQty(item: DraftItem) {
+  item.qty = Math.max(1, Math.floor(Number(item.qty || 1)) - 1)
+}
+
+function increaseQty(item: DraftItem) {
+  item.qty = Math.max(1, Math.floor(Number(item.qty || 1)) + 1)
 }
 
 function onProductChange(item: DraftItem) {
@@ -265,8 +264,7 @@ async function submit() {
         productId: item.productId,
         optionAttributeIds: selectedOptionIds(item).join(','),
         logoImageUrl: item.logoImageUrl,
-        qty: Number(item.qty || 0),
-        remark: item.remark
+        qty: Number(item.qty || 0)
       }))
   }
   saving.value = true
@@ -456,7 +454,8 @@ onMounted(loadData)
 
 .product-summary {
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
   margin-bottom: 12px;
   padding: 10px;
@@ -485,6 +484,56 @@ onMounted(loadData)
   margin: 4px 0;
   color: var(--text-sub);
   font-size: 13px;
+}
+
+.product-summary-info {
+  min-width: 0;
+}
+
+.product-summary-info strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-main);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.qty-stepper {
+  display: grid;
+  grid-template-columns: 30px 42px 30px;
+  align-items: center;
+  min-width: 102px;
+  overflow: hidden;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.qty-stepper button,
+.qty-stepper input {
+  width: 100%;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  text-align: center;
+  font-weight: 800;
+}
+
+.qty-stepper button {
+  color: var(--brand-teal);
+}
+
+.qty-stepper input {
+  border-right: 1px solid var(--border-soft);
+  border-left: 1px solid var(--border-soft);
+  outline: none;
+}
+
+.qty-stepper input::-webkit-outer-spin-button,
+.qty-stepper input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
 }
 
 .attribute-group {
@@ -521,6 +570,28 @@ onMounted(loadData)
 
 .file-input {
   padding: 8px;
+}
+
+.file-input::file-selector-button {
+  min-height: 36px;
+  margin-right: 10px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  background: var(--brand-teal);
+  font-weight: 900;
+}
+
+.file-input::-webkit-file-upload-button {
+  min-height: 36px;
+  margin-right: 10px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  background: var(--brand-teal);
+  font-weight: 900;
 }
 
 .logo-preview {

@@ -99,7 +99,7 @@ const error = ref('')
 const mode = ref<AuthMode>(route.query.mode === 'register' ? 'register' : 'login')
 const heroImage = `${import.meta.env.BASE_URL}images/rs-hanger-hero.png`
 const loginBackgroundStyle = {
-  backgroundImage: `linear-gradient(180deg, rgba(25, 18, 14, 0.30) 0%, rgba(25, 18, 14, 0.14) 34%, rgba(25, 18, 14, 0.74) 100%), url(${heroImage})`
+  backgroundImage: `url(${heroImage})`
 }
 const loginForm = reactive({ username: '', password: '' })
 const registerForm = reactive({ name: '', phone: '', password: '', confirmPassword: '' })

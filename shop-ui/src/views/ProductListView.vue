@@ -190,9 +190,7 @@ onMounted(() => {
 
 <style scoped>
 .list-page {
-  background:
-    linear-gradient(180deg, var(--bg-cream) 0, var(--bg-page) 200px),
-    var(--bg-page);
+  background: var(--bg-page);
 }
 
 .list-header {

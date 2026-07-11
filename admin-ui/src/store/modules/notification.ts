@@ -51,13 +51,35 @@ export const useNotificationStore = defineStore('notification', () => {
     oscillator.stop(audioContext.currentTime + 0.18)
   }
 
+  function digitsForSpeech(value: string) {
+    const map: Record<string, string> = {
+      0: '零',
+      1: '一',
+      2: '二',
+      3: '三',
+      4: '四',
+      5: '五',
+      6: '六',
+      7: '七',
+      8: '八',
+      9: '九'
+    }
+    return value.split('').map(char => map[char] || char).join(' ')
+  }
+
+  function formatBillNoForSpeech(text: string) {
+    return text.replace(/\b[A-Z]{1,10}-(\d{6,12})-(\d{3,8})\b/g, (_, datePart, serialPart) => {
+      return `单号 ${digitsForSpeech(`${datePart}${serialPart}`)}`
+    })
+  }
+
   function speakNotification(data: any) {
     if (!voiceSettings.value.enabled) return
     const category = data.category || 'SYSTEM'
     if (category === 'ORDER' && !voiceSettings.value.orderEnabled) return
     if (category !== 'ORDER' && !voiceSettings.value.noticeEnabled) return
     if (category === 'ORDER') {
-      speakText(`有新的销售单，请及时处理。${data.content || ''}`)
+      speakText(`有新的销售单，请及时处理。${formatBillNoForSpeech(data.content || '')}`)
       return
     }
     speakText(`${data.title || '系统通知'}。${data.content || ''}`)
