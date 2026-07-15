@@ -189,11 +189,11 @@
                   filterable
                   remote
                   reserve-keyword
-                  :remote-method="(keyword: string) => loadRowProducts(row, keyword)"
+                  :remote-method="(keyword: string) => loadRowProducts(row, keyword, 'search')"
                   placeholder="搜索商品编号 / 名称 / 条码"
                   :disabled="readonly"
                   style="width: 100%"
-                  @visible-change="(visible: boolean) => visible && loadRowProducts(row)"
+                  @visible-change="(visible: boolean) => visible && loadRowProducts(row, '', 'visible')"
                   @change="productChanged(row)"
                 >
                   <el-option v-for="item in rowProductOptions(row)" :key="item.id" :label="`${item.code} ${item.name}`" :value="item.id">
@@ -254,18 +254,28 @@
                       :disabled="readonly"
                       :http-request="(options: any) => uploadLogoImage(row, options)"
                     >
-                      <div class="bill-logo-box" :class="{ 'has-image': !!row.logoImageUrl }">
-                        <img v-if="row.logoImageUrl" :src="row.logoImageUrl" class="bill-logo-preview" />
+                      <div class="bill-logo-box" :class="{ 'has-image': !!row.logoImageUrl, 'is-error': hasLogoImageLoadError(row) }">
+                        <img
+                          v-if="row.logoImageUrl"
+                          :src="normalizeLogoImageUrl(row.logoImageUrl)"
+                          class="bill-logo-preview"
+                          @load="clearLogoImageLoadError(row)"
+                          @error="markLogoImageLoadError(row)"
+                        />
                         <div v-if="row.logoImageUrl" class="bill-logo-overlay">
                           <el-button circle size="small" :icon="View" @click.stop.prevent="previewLogoImage(row)" />
                         </div>
-                        <div v-else class="bill-logo-placeholder">
+                        <div v-if="row.logoImageUrl && hasLogoImageLoadError(row)" class="bill-logo-error">
+                          <span>加载失败</span>
+                        </div>
+                        <div v-if="!row.logoImageUrl" class="bill-logo-placeholder">
                           <el-icon><UploadFilled /></el-icon>
                           <span>上传LOGO</span>
                         </div>
                       </div>
                     </el-upload>
-                    <el-button v-if="row.logoImageUrl" link type="primary" :icon="View" @click="previewLogoImage(row)">查看原图</el-button>
+                    <el-button v-if="row.logoImageUrl" link type="primary" :icon="View" @click="previewLogoImage(row)">预览</el-button>
+                    <el-button v-if="row.logoImageUrl" link type="primary" @click="openLogoImage(row)">打开原图</el-button>
                     <el-button v-if="row.logoImageUrl && !readonly" link type="danger" @click="clearLogoImage(row)">删除</el-button>
                   </div>
                 </el-form-item>
@@ -548,11 +558,15 @@
         <el-button type="primary" :loading="quickEmployeeSaving" @click="submitQuickEmployee">确定</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="logoPreviewOpen" title="LOGO图片预览" width="720px" append-to-body>
-      <div class="logo-preview-dialog">
-        <img v-if="logoPreviewUrl" :src="logoPreviewUrl" alt="LOGO图片预览" />
-      </div>
-    </el-dialog>
+    <el-image-viewer
+      v-if="logoPreviewOpen && logoPreviewUrl"
+      :url-list="[logoPreviewUrl]"
+      :initial-index="0"
+      :z-index="3000"
+      teleported
+      hide-on-click-modal
+      @close="closeLogoPreview"
+    />
   </div>
 </template>
 
@@ -709,7 +723,7 @@ const quickEmployeeRules = {
   username: [{ required: true, message: '账号不能为空', trigger: 'blur' }],
   password: [{ required: true, message: '密码不能为空', trigger: 'blur' }]
 }
-const paymentMethods = ['淘宝', '1688', '小红书', '微信', '支付宝']
+const paymentMethods = ['淘宝', '1688', '小红书', '微信', '支付宝', '银行卡']
 const readonly = computed(() => isProduction.value)
 const hideSaleFinancialFields = computed(() => false)
 const canEditLineAmount = computed(() => !hideSaleFinancialFields.value)
@@ -792,6 +806,7 @@ const attributeGroups = computed(() => uniqueById(attributes.value.filter(item =
 const showCostPrice = computed(() => isSaleLike.value)
 const currentUserName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '')
 let productOptionsRequestSeq = 0
+const PRODUCT_SEARCH_TOKEN_SEPARATOR = /[\s,，、;；|/]+/
 
 function loadOptions() {
   return Promise.all([
@@ -869,7 +884,7 @@ function saleDraftFormSnapshot(source: ErpBill = form.value) {
   const snapshot = JSON.parse(JSON.stringify(source || {})) as ErpBill
   snapshot.id = undefined
   snapshot.billType = undefined
-  snapshot.items = (snapshot.items || []).map(({ optionProducts, productOptionsRequestId, ...item }) => item)
+  snapshot.items = (snapshot.items || []).map(({ optionProducts, productOptionsRequestId, productOptionsKeyword, ...item }) => item)
   return snapshot
 }
 function hasSaleDraftContent(source: ErpBill = form.value) {
@@ -1096,15 +1111,40 @@ function prepareBillItem(row: BillItem) {
 function rowProductOptions(row: BillItem) {
   return Array.isArray(row.optionProducts) ? row.optionProducts : products.value
 }
-function loadRowProducts(row: BillItem, keyword = '') {
+function productSearchTokens(keyword = '') {
+  return keyword.trim().split(PRODUCT_SEARCH_TOKEN_SEPARATOR).map(item => item.trim()).filter(Boolean)
+}
+function normalizeProductSearchText(value = '') {
+  return value.normalize('NFKC').toLowerCase().replace(/[^0-9a-z\u4e00-\u9fa5]+/g, '')
+}
+function productMatchesKeyword(product: Partial<ErpProduct> | undefined, keyword = '') {
+  const tokens = productSearchTokens(keyword).map(normalizeProductSearchText).filter(Boolean)
+  if (!tokens.length) return true
+  const text = [
+    product?.code,
+    product?.name,
+    product?.barcode,
+    product?.spec,
+    product?.attributeText
+  ].filter(Boolean).join(' ')
+  const normalizedText = normalizeProductSearchText(text)
+  return tokens.every(token => normalizedText.includes(token))
+}
+function loadRowProducts(row: BillItem, keyword = '', source: 'search' | 'visible' | 'load' = 'load') {
+  const actualKeyword = source === 'visible' && row.productOptionsKeyword ? row.productOptionsKeyword : keyword
+  if (source === 'search') {
+    row.productOptionsKeyword = keyword
+  } else if (!actualKeyword) {
+    row.productOptionsKeyword = ''
+  }
   const requestId = ++productOptionsRequestSeq
   row.productOptionsRequestId = requestId
   const params = {
-    ...(keyword ? { keyword } : {})
+    ...(actualKeyword ? { keyword: actualKeyword } : {})
   }
   productOptions(params).then(async res => {
     if (row.productOptionsRequestId !== requestId) return
-    if (!keyword && row.productId && !res.some(item => String(item.id) === String(row.productId)) && row.productCode) {
+    if (!actualKeyword && row.productId && !res.some(item => String(item.id) === String(row.productId)) && row.productCode) {
       const selectedOptions = await productOptions({ keyword: row.productCode }).catch(() => [])
       if (row.productOptionsRequestId !== requestId) return
       res = uniqueProductsById([...selectedOptions, ...res])
@@ -1112,7 +1152,7 @@ function loadRowProducts(row: BillItem, keyword = '') {
     const current = rowProduct(row)
     const selected = rowSelectedProduct(row)
     const options = res.map(item => String(item.id) === String(row.productId || '') ? mergeProductOption(current, item) : item)
-    row.optionProducts = selected && !options.some(item => String(item.id) === String(selected.id))
+    row.optionProducts = selected && productMatchesKeyword(selected, actualKeyword) && !options.some(item => String(item.id) === String(selected.id))
       ? [selected, ...options]
       : options
     hydrateRowProductAttributesFromOptions(row)
@@ -1138,6 +1178,7 @@ function clearRowProduct(row: BillItem) {
   row.availableAttributeIds = ''
   row.availableAttributeText = ''
   row.productOptionsRequestId = undefined
+  row.productOptionsKeyword = ''
   row.optionAttributeIds = ''
   row.optionAttributeText = ''
   row.attributeText = ''
@@ -1505,12 +1546,37 @@ async function uploadLogoImage(row: BillItem, options: any) {
 }
 function clearLogoImage(row: BillItem) {
   row.logoImageUrl = ''
+  clearLogoImageLoadError(row)
   saveSaleDraftNow()
+}
+function normalizeLogoImageUrl(url?: string) {
+  if (!url) return ''
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url
+  }
+  return url.startsWith('/') ? url : `/${url}`
+}
+function hasLogoImageLoadError(row: BillItem) {
+  return Boolean((row as any).logoImageLoadError)
+}
+function markLogoImageLoadError(row: BillItem) {
+  ;(row as any).logoImageLoadError = true
+}
+function clearLogoImageLoadError(row: BillItem) {
+  ;(row as any).logoImageLoadError = false
 }
 function previewLogoImage(row: BillItem) {
   if (!row.logoImageUrl) return
-  logoPreviewUrl.value = row.logoImageUrl
+  logoPreviewUrl.value = normalizeLogoImageUrl(row.logoImageUrl)
   logoPreviewOpen.value = true
+}
+function closeLogoPreview() {
+  logoPreviewOpen.value = false
+  logoPreviewUrl.value = ''
+}
+function openLogoImage(row: BillItem) {
+  if (!row.logoImageUrl) return
+  window.open(normalizeLogoImageUrl(row.logoImageUrl), '_blank', 'noopener,noreferrer')
 }
 function calc() {
   form.value.items.forEach(row => {
@@ -2114,7 +2180,7 @@ function sanitizeBill() {
   form.value.items.forEach(syncRowSnapshot)
   return {
     ...form.value,
-    items: form.value.items.map(({ optionProducts, attributeSelections, purchasePrice, basePrice, availableAttributeIds, availableAttributeText, productOptionsRequestId, ...item }) => item)
+    items: form.value.items.map(({ optionProducts, attributeSelections, purchasePrice, basePrice, availableAttributeIds, availableAttributeText, productOptionsRequestId, productOptionsKeyword, ...item }) => item)
   } as ErpBill
 }
 function back() { router.push(`/erp/${module.value}/list`) }
@@ -2344,6 +2410,9 @@ onBeforeUnmount(() => {
 .bill-logo-box.has-image {
   border-style: solid;
 }
+.bill-logo-box.is-error {
+  border-color: var(--el-color-danger);
+}
 .bill-logo-preview {
   display: block;
   width: 88px;
@@ -2362,6 +2431,18 @@ onBeforeUnmount(() => {
 .bill-logo-box.has-image:hover .bill-logo-overlay {
   opacity: 1;
 }
+.bill-logo-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  background: var(--el-fill-color-lighter);
+  color: var(--el-color-danger);
+  font-size: 12px;
+  text-align: center;
+  line-height: 18px;
+}
 .bill-logo-placeholder {
   width: 100%;
   height: 100%;
@@ -2375,15 +2456,6 @@ onBeforeUnmount(() => {
 }
 .bill-logo-placeholder .el-icon {
   font-size: 22px;
-}
-.logo-preview-dialog {
-  display: flex;
-  justify-content: center;
-}
-.logo-preview-dialog img {
-  max-width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
 }
 .product-option-text {
   display: flex;
@@ -2534,5 +2606,93 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 18px;
   word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .bill-form-page {
+    min-width: 0;
+  }
+
+  .card-header,
+  .toolbar,
+  .totals,
+  .section-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .bill-form-title,
+  .card-actions {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .card-actions {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .section-title {
+    margin-bottom: 10px;
+  }
+
+  .toolbar {
+    margin-bottom: 10px;
+  }
+
+  .bill-item-card {
+    padding: 10px;
+  }
+
+  .bill-item-head,
+  .bill-item-product {
+    align-items: flex-start;
+  }
+
+  .bill-item-product {
+    flex-direction: column;
+  }
+
+  .bill-item-product-select {
+    width: 100%;
+  }
+
+  .bill-product-image,
+  .bill-product-placeholder {
+    width: 56px;
+    height: 56px;
+  }
+
+  .attribute-group-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bill-logo-field {
+    align-items: flex-start;
+  }
+
+  .address-contact-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .address-region-columns {
+    max-width: calc(100vw - 56px);
+  }
+
+  :global(.address-region-popper) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px);
+  }
+
+  .sale-draft-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sale-draft-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 </style>

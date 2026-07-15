@@ -53,6 +53,10 @@ export function employeePerformance(params: any) {
   return request<any[]>({ url: '/erp/report/employee-performance', method: 'get', params })
 }
 
+export function employeeSaleDetails(params: any) {
+  return request<Record<string, any>>({ url: '/erp/report/employee-performance/sale-details', method: 'get', params })
+}
+
 export function stockSummary(params: any) {
   return request<any[]>({ url: '/erp/report/stock-summary', method: 'get', params })
 }

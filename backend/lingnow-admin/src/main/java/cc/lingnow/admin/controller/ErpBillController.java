@@ -53,7 +53,7 @@ import java.util.Set;
 public class ErpBillController {
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
-    private static final Set<String> PAYMENT_METHODS = Set.of("淘宝", "1688", "小红书", "微信", "支付宝");
+    private static final Set<String> PAYMENT_METHODS = Set.of("淘宝", "1688", "小红书", "微信", "支付宝", "银行卡");
 
     private final ErpBillService billService;
     private final ErpBillItemService billItemService;

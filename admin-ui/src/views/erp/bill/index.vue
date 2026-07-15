@@ -42,7 +42,7 @@
       <template #header>
         <div class="card-header">
           <strong>{{ title }}</strong>
-          <div>
+          <div class="bill-header-actions" :class="{ 'is-mobile-hidden': isProduction }">
             <el-button v-if="!isProduction" type="primary" :icon="Plus" @click="goAdd" v-permission="`erp:${module}:add`">新增</el-button>
             <el-button type="success" :disabled="single" @click="goEdit" v-permission="`erp:${module}:edit`">{{ isProduction ? '维护' : '修改' }}</el-button>
             <el-button :disabled="single" @click="handleCopy" v-permission="copyPermission">复制</el-button>
@@ -377,5 +377,41 @@ onMounted(initPage)
 .print-attribute-line strong {
   color: var(--el-text-color-primary);
   font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .bill-page {
+    min-width: 0;
+  }
+
+  .table-wrapper {
+    height: auto;
+    min-height: 430px;
+  }
+
+  .card-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .card-header > div {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .bill-header-actions.is-mobile-hidden {
+    display: none;
+  }
+
+  .print-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .print-preview {
+    min-width: 760px;
+  }
 }
 </style>

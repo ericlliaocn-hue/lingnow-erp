@@ -93,4 +93,23 @@ function handleCurrentChange(val: number) {
 .pagination-container.hidden {
   display: none;
 }
+
+@media (max-width: 768px) {
+  .pagination-container {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 8px 0;
+  }
+
+  .pagination-container :deep(.el-pagination) {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .pagination-container :deep(.el-pagination__total),
+  .pagination-container :deep(.el-pagination__sizes),
+  .pagination-container :deep(.el-pagination__jump) {
+    display: none;
+  }
+}
 </style>

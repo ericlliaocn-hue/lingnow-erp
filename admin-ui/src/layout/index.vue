@@ -6,10 +6,10 @@
     <el-container class="layout-container">
       <!-- SIDEBAR -->
       <el-aside
-        v-if="navLayout !== 'horizontal'"
+        v-if="navLayout !== 'horizontal' || isMobile"
         :width="asideWidth"
         class="layout-aside"
-        :class="{ 'is-mini': isMini }"
+        :class="{ 'is-mini': isMini, 'is-mobile-open': isMobile && !isCollapsed }"
       >
         <div class="logo-container">
           <div class="logo-icon">
@@ -30,7 +30,7 @@
       <el-container>
         <el-header class="layout-header">
            <div class="header-left">
-              <div v-if="navLayout === 'vertical'" class="collapse-btn" @click="toggleCollapse">
+              <div v-if="navLayout === 'vertical' || isMobile" class="collapse-btn" @click="toggleCollapse">
                  <el-icon><component :is="isCollapsed ? 'Expand' : 'Fold'" /></el-icon>
               </div>
 
@@ -48,7 +48,7 @@
            </div>
 
            <!-- Horizontal Menu Area -->
-           <div v-if="navLayout === 'horizontal'" class="horizontal-nav-area">
+           <div v-if="navLayout === 'horizontal' && !isMobile" class="horizontal-nav-area">
                <NavMenu mode="horizontal" />
            </div>
 
@@ -132,7 +132,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
     Search, Bell, Setting, UserFilled, Expand, Fold
@@ -151,6 +151,7 @@ import 'dayjs/locale/zh-cn'
 import 'dayjs/locale/fr'
 
 const router = useRouter()
+const route = useRoute()
 const settingsStore = useSettingsStore()
 const notificationStore = useNotificationStore()
 const userStore = useUserStore()
@@ -169,6 +170,12 @@ watch(() => settingsStore.settings.language, (lang) => {
     dayjs.locale('en')
   }
 }, { immediate: true })
+
+watch(() => route.fullPath, () => {
+  if (isMobile.value) {
+    isCollapsed.value = true
+  }
+})
 
 const languageMap: Record<string, { flag: string; label: string }> = {
   'en': { flag: 'EN', label: 'English' },
@@ -218,6 +225,7 @@ const displayName = computed(() => userStore.userInfo?.nickname || userStore.use
 const userInitial = computed(() => displayName.value.trim().slice(0, 1).toUpperCase() || 'U')
 
 const asideWidth = computed(() => {
+    if (isMobile.value) return '280px'
     if (navLayout.value === 'mini') return '88px'
     return isCollapsed.value ? '88px' : '240px'
 })
@@ -236,6 +244,7 @@ const handleLogout = async () => {
 <style scoped>
 .layout-container {
   height: 100vh;
+  min-width: 0;
 }
 
 /* 移动端遮罩 */
@@ -267,12 +276,13 @@ const handleLogout = async () => {
   left: 0;
   top: 0;
   bottom: 0;
+  width: min(82vw, 280px) !important;
   z-index: 1000;
   transform: translateX(-100%);
   transition: transform 0.3s;
 }
 
-.mobile .layout-aside:not(.is-mini) {
+.mobile .layout-aside.is-mobile-open {
   transform: translateX(0);
 }
 
@@ -592,18 +602,39 @@ const handleLogout = async () => {
 
   /* Header 调整 */
   .layout-header {
-    padding-left: 16px;
+    padding: 0 10px;
     height: 64px;
     margin-bottom: 0 !important;
   }
 
-  .header-right {
+  .header-left {
+    min-width: 0;
     gap: 8px;
+  }
+
+  .header-right {
+    gap: 6px;
+  }
+
+  .icon-btn-wrapper,
+  .collapse-btn {
+    width: 38px;
+    height: 38px;
+    margin-left: 0;
+  }
+
+  .search-bar {
+    width: 38px;
+    height: 38px;
+    justify-content: center;
   }
 
   /* Main 内容区调整 */
   .layout-main {
-    padding: 20px 16px;
+    height: calc(100dvh - 64px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 !important;
   }
 
   /* Team 切换器隐藏 */

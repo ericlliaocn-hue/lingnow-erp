@@ -28,12 +28,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -44,6 +46,18 @@ import java.util.Objects;
 public class ErpProductController {
 
     private static final String COST_PRICE_EDIT_PERMISSION = "erp:product:cost:edit";
+    private static final String SEARCH_TOKEN_SEPARATOR = "[\\s,，、;；|/]+";
+    private static final String NORMALIZED_CODE_SEARCH_SQL = normalizedColumnSql("code");
+    private static final String NORMALIZED_NAME_SEARCH_SQL = normalizedColumnSql("name");
+    private static final String NORMALIZED_BARCODE_SEARCH_SQL = normalizedColumnSql("barcode");
+    private static final String NORMALIZED_SPEC_SEARCH_SQL = normalizedColumnSql("spec");
+    private static final String NORMALIZED_ATTRIBUTE_SEARCH_SQL = normalizedColumnSql("attribute_text");
+    private static final String NORMALIZED_PRODUCT_SEARCH_SQL = "CONCAT_WS('', " +
+            NORMALIZED_CODE_SEARCH_SQL + ", " +
+            NORMALIZED_NAME_SEARCH_SQL + ", " +
+            NORMALIZED_BARCODE_SEARCH_SQL + ", " +
+            NORMALIZED_SPEC_SEARCH_SQL + ", " +
+            NORMALIZED_ATTRIBUTE_SEARCH_SQL + ")";
 
     private final ErpProductService productService;
     private final ErpProductCategoryService categoryService;
@@ -209,16 +223,21 @@ public class ErpProductController {
                 .eq(query.getStatus() != null, "status", query.getStatus());
         if (StrUtil.isNotBlank(query.getKeyword())) {
             for (String token : searchTokens(query.getKeyword())) {
-                wrapper.and(item -> item
-                        .like("code", token)
-                        .or()
-                        .like("name", token)
-                        .or()
-                        .like("barcode", token)
-                        .or()
-                        .like("spec", token)
-                        .or()
-                        .like("attribute_text", token));
+                String normalizedToken = normalizeSearchToken(token);
+                wrapper.and(item -> {
+                    item.like("code", token)
+                            .or()
+                            .like("name", token)
+                            .or()
+                            .like("barcode", token)
+                            .or()
+                            .like("spec", token)
+                            .or()
+                            .like("attribute_text", token);
+                    if (StrUtil.isNotBlank(normalizedToken)) {
+                        item.or().apply(NORMALIZED_PRODUCT_SEARCH_SQL + " LIKE CONCAT('%', {0}, '%')", normalizedToken);
+                    }
+                });
             }
         }
         for (String attributeId : splitIds(query.getAttributeIds())) {
@@ -241,29 +260,85 @@ public class ErpProductController {
     }
 
     private String productRelevanceSql(String keyword) {
-        String token = searchTokens(keyword).isEmpty() ? keyword.trim() : searchTokens(keyword).get(0);
-        String exact = escapeSqlLiteral(token);
-        String prefixLike = escapeSqlLiteral(escapeSqlLike(token) + "%");
-        String containsLike = escapeSqlLiteral("%" + escapeSqlLike(token) + "%");
-        return "CASE " +
+        List<String> tokens = searchTokens(keyword);
+        List<String> normalizedTokens = tokens.stream()
+                .map(this::normalizeSearchToken)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+        String keywordText = keyword.trim();
+        String normalizedKeyword = normalizeSearchToken(keywordText);
+        String exact = escapeSqlLiteral(keywordText);
+        String prefixLike = escapeSqlLiteral(escapeSqlLike(keywordText) + "%");
+        String containsLike = escapeSqlLiteral("%" + escapeSqlLike(keywordText) + "%");
+        String normalizedExact = escapeSqlLiteral(normalizedKeyword);
+        String normalizedPrefixLike = escapeSqlLiteral(escapeSqlLike(normalizedKeyword) + "%");
+        String normalizedContainsLike = escapeSqlLiteral("%" + escapeSqlLike(normalizedKeyword) + "%");
+        List<String> sortItems = new ArrayList<>();
+        sortItems.add("CASE " +
                 "WHEN code = '" + exact + "' OR barcode = '" + exact + "' THEN 0 " +
+                (StrUtil.isNotBlank(normalizedKeyword) ? "WHEN " + NORMALIZED_CODE_SEARCH_SQL + " = '" + normalizedExact + "' OR " + NORMALIZED_BARCODE_SEARCH_SQL + " = '" + normalizedExact + "' THEN 0 " : "") +
                 "WHEN name = '" + exact + "' THEN 1 " +
+                (StrUtil.isNotBlank(normalizedKeyword) ? "WHEN " + NORMALIZED_NAME_SEARCH_SQL + " = '" + normalizedExact + "' THEN 1 " : "") +
                 "WHEN name LIKE '" + prefixLike + "' ESCAPE '/' THEN 2 " +
+                (StrUtil.isNotBlank(normalizedKeyword) ? "WHEN " + NORMALIZED_NAME_SEARCH_SQL + " LIKE '" + normalizedPrefixLike + "' ESCAPE '/' THEN 2 " : "") +
                 "WHEN name LIKE '" + containsLike + "' ESCAPE '/' THEN 3 " +
-                "WHEN spec LIKE '" + containsLike + "' ESCAPE '/' OR attribute_text LIKE '" + containsLike + "' ESCAPE '/' THEN 4 " +
-                "WHEN code LIKE '" + containsLike + "' ESCAPE '/' OR barcode LIKE '" + containsLike + "' ESCAPE '/' THEN 5 " +
-                "ELSE 9 END";
+                (StrUtil.isNotBlank(normalizedKeyword) ? "WHEN " + NORMALIZED_PRODUCT_SEARCH_SQL + " LIKE '" + normalizedContainsLike + "' ESCAPE '/' THEN 4 " : "") +
+                "WHEN spec LIKE '" + containsLike + "' ESCAPE '/' OR attribute_text LIKE '" + containsLike + "' ESCAPE '/' THEN 5 " +
+                "WHEN code LIKE '" + containsLike + "' ESCAPE '/' OR barcode LIKE '" + containsLike + "' ESCAPE '/' THEN 6 " +
+                "ELSE 9 END");
+        if (!normalizedTokens.isEmpty()) {
+            sortItems.add(allTokensInFieldSql(NORMALIZED_NAME_SEARCH_SQL, normalizedTokens));
+            sortItems.add(tokenScoreSql(NORMALIZED_NAME_SEARCH_SQL, normalizedTokens, 10) + " DESC");
+            sortItems.add(tokenScoreSql(NORMALIZED_CODE_SEARCH_SQL, normalizedTokens, 8) + " DESC");
+            sortItems.add(tokenScoreSql(NORMALIZED_BARCODE_SEARCH_SQL, normalizedTokens, 8) + " DESC");
+            sortItems.add(tokenScoreSql(NORMALIZED_SPEC_SEARCH_SQL, normalizedTokens, 4) + " DESC");
+            sortItems.add(tokenScoreSql(NORMALIZED_ATTRIBUTE_SEARCH_SQL, normalizedTokens, 2) + " DESC");
+        }
+        return String.join(", ", sortItems);
+    }
+
+    private String allTokensInFieldSql(String fieldSql, List<String> normalizedTokens) {
+        String condition = normalizedTokens.stream()
+                .map(token -> fieldSql + " LIKE '" + normalizedLike(token) + "' ESCAPE '/'")
+                .reduce((left, right) -> left + " AND " + right)
+                .orElse("1 = 1");
+        return "CASE WHEN " + condition + " THEN 0 ELSE 1 END";
+    }
+
+    private String tokenScoreSql(String fieldSql, List<String> normalizedTokens, int weight) {
+        return "(" + normalizedTokens.stream()
+                .map(token -> "CASE WHEN " + fieldSql + " LIKE '" + normalizedLike(token) + "' ESCAPE '/' THEN " + weight + " ELSE 0 END")
+                .reduce((left, right) -> left + " + " + right)
+                .orElse("0") + ")";
+    }
+
+    private String normalizedLike(String token) {
+        return "%" + escapeSqlLiteral(escapeSqlLike(token)) + "%";
+    }
+
+    private static String normalizedColumnSql(String column) {
+        return "REGEXP_REPLACE(LOWER(IFNULL(" + column + ", '')), '[^0-9a-z一-龥]+', '')";
     }
 
     private List<String> searchTokens(String keyword) {
         if (StrUtil.isBlank(keyword)) {
             return List.of();
         }
-        return Arrays.stream(keyword.trim().split("\\s+"))
+        return Arrays.stream(keyword.trim().split(SEARCH_TOKEN_SEPARATOR))
                 .map(String::trim)
                 .filter(StrUtil::isNotBlank)
                 .distinct()
                 .toList();
+    }
+
+    private String normalizeSearchToken(String value) {
+        if (StrUtil.isBlank(value)) {
+            return "";
+        }
+        return Normalizer.normalize(value, Normalizer.Form.NFKC)
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^0-9a-z\\u4e00-\\u9fa5]+", "");
     }
 
     private String escapeSqlLiteral(String value) {

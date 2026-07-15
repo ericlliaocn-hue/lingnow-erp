@@ -634,6 +634,177 @@ html.dark .el-alert__description {
   font-size: var(--el-font-size-small, 14px) !important;
 }
 
+@media (max-width: 768px) {
+  :root {
+    --app-spacing: 8px;
+    --card-padding: 10px;
+    --base-font-size: 14px;
+  }
+
+  body {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .app-container {
+    height: auto;
+    min-height: 100%;
+    padding: var(--app-spacing);
+    overflow: visible;
+  }
+
+  .el-card {
+    border-radius: 8px !important;
+  }
+
+  .search-wrapper {
+    margin-bottom: 8px !important;
+  }
+
+  .search-wrapper .el-card__body {
+    padding: 10px !important;
+  }
+
+  .search-wrapper .el-form--inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .search-wrapper .el-form--inline .el-form-item {
+    width: 100%;
+    margin: 0 !important;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .search-wrapper .el-form-item__label {
+    width: 64px !important;
+    height: auto;
+    justify-content: flex-end;
+    margin: 0;
+    line-height: 20px;
+  }
+
+  .search-wrapper .el-form-item__content {
+    width: 100%;
+    min-width: 0;
+    grid-column: 2;
+  }
+
+  .search-wrapper .el-input,
+  .search-wrapper .el-input-number,
+  .search-wrapper .el-select,
+  .search-wrapper .el-date-editor {
+    width: 100% !important;
+  }
+
+  .search-wrapper .el-form-item:last-child .el-form-item__content {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .el-button + .el-button {
+    margin-left: 0 !important;
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .card-header > div:last-child {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  html body .app-container .table-wrapper {
+    height: auto !important;
+    min-height: 420px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  .table-wrapper .el-card__body {
+    min-height: 360px;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    padding: 8px 8px 0 !important;
+  }
+
+  .table-wrapper .el-table {
+    min-width: 760px;
+  }
+
+  .table-wrapper .el-table__body-wrapper,
+  .table-wrapper .el-scrollbar__wrap {
+    overflow-x: auto;
+  }
+
+  .pagination-container {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 8px 0;
+  }
+
+  .el-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .el-row > [class*="el-col-"] {
+    max-width: 100%;
+    flex: 0 0 100%;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .el-form-item {
+    margin-bottom: 14px;
+  }
+
+  .el-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px);
+    margin: 8px auto !important;
+  }
+
+  .el-dialog__header,
+  .el-dialog__body,
+  .el-dialog__footer {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .el-dialog__body {
+    max-height: calc(100dvh - 150px);
+    overflow: auto;
+  }
+
+  .el-drawer {
+    width: min(92vw, 420px) !important;
+  }
+
+  .el-message-box {
+    width: calc(100vw - 24px) !important;
+    max-width: 420px;
+  }
+
+  .el-descriptions__body .el-descriptions__table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
 /* RTL 支持 */
 html[dir="rtl"],
 html.rtl {

@@ -30,19 +30,77 @@
       <div v-if="showChart" ref="chartRef" class="report-chart"></div>
       <el-table :data="rows" border empty-text="暂无报表数据">
         <el-table-column v-for="column in config.columns" :key="column.prop" :prop="column.prop" :label="column.label" :min-width="column.width || 120" :align="column.money || column.number ? 'right' : 'left'">
-          <template #default="{ row }">{{ formatValue(row[column.prop], column) }}</template>
+          <template #default="{ row }">
+            <el-button v-if="isEmployeeSaleAmountCell(column, row)" link type="primary" class="report-cell-link" @click="openEmployeeSaleDetails(row)">
+              {{ formatValue(row[column.prop], column) }}
+            </el-button>
+            <span v-else>{{ formatValue(row[column.prop], column) }}</span>
+          </template>
         </el-table-column>
       </el-table>
     </el-card>
+
+    <el-dialog v-model="employeeSaleDialog.open" :title="`${employeeSaleDialog.summary.employeeName || '-'} 销售额明细`" width="calc(100vw - 48px)" class="employee-sale-dialog" append-to-body>
+      <div v-loading="employeeSaleDialog.loading" class="employee-sale-detail">
+        <div class="employee-sale-summary">
+          <div class="summary-item">
+            <span>销售单数</span>
+            <strong>{{ formatNumber(employeeSaleDialog.summary.billCount) }}</strong>
+          </div>
+          <div class="summary-item">
+            <span>销售额合计</span>
+            <strong>{{ formatMoney(employeeSaleDialog.summary.saleAmount) }}</strong>
+          </div>
+          <div class="summary-item">
+            <span>订单金额合计</span>
+            <strong>{{ formatMoney(employeeSaleDialog.summary.orderAmount) }}</strong>
+          </div>
+          <div class="summary-item">
+            <span>成本合计</span>
+            <strong>{{ formatMoney(employeeSaleDialog.summary.costAmount) }}</strong>
+          </div>
+          <div class="summary-item">
+            <span>利润合计</span>
+            <strong>{{ formatMoney(employeeSaleDialog.summary.profitAmount) }}</strong>
+          </div>
+        </div>
+        <el-table :data="employeeSaleDialog.records" border max-height="520" empty-text="暂无销售单" class="employee-sale-table">
+          <el-table-column prop="billNo" label="单号" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="billDate" label="日期" width="112" />
+          <el-table-column prop="partnerName" label="客户" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="warehouseName" label="仓库" min-width="112" show-overflow-tooltip />
+          <el-table-column prop="paymentMethod" label="付款方式" width="92">
+            <template #default="{ row }">{{ row.paymentMethod || '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="orderAmount" label="订单金额" width="96" align="right">
+            <template #default="{ row }">{{ formatMoney(row.orderAmount) }}</template>
+          </el-table-column>
+          <el-table-column prop="saleAmount" label="销售额" width="96" align="right">
+            <template #default="{ row }">{{ formatMoney(row.saleAmount) }}</template>
+          </el-table-column>
+          <el-table-column prop="costAmount" label="成本" width="96" align="right">
+            <template #default="{ row }">{{ formatMoney(row.costAmount) }}</template>
+          </el-table-column>
+          <el-table-column prop="profitAmount" label="利润" width="96" align="right">
+            <template #default="{ row }">{{ formatMoney(row.profitAmount) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="72" align="center">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openSaleBill(row)">查看</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { billStat, businessProfit, employeePerformance, exportReport, hotProducts, inventoryChange, profitReport, stockSummary, trendReport } from '@/api/erp/report'
+import { billStat, businessProfit, employeePerformance, employeeSaleDetails, exportReport, hotProducts, inventoryChange, profitReport, stockSummary, trendReport } from '@/api/erp/report'
 import { downloadBlob } from '@/utils/download'
 
 interface ColumnConfig {
@@ -62,6 +120,7 @@ interface ReportConfig {
 }
 
 const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const rows = ref<any[]>([])
 const queryFormRef = ref()
@@ -69,6 +128,12 @@ const chartRef = ref<HTMLElement>()
 const dateRange = ref<string[]>([])
 const query = reactive({ groupBy: '' })
 let chart: echarts.ECharts | null = null
+const employeeSaleDialog = reactive({
+  open: false,
+  loading: false,
+  summary: {} as Record<string, any>,
+  records: [] as any[]
+})
 
 const configs: Record<string, ReportConfig> = {
   '/erp/report/sale-stat': {
@@ -241,9 +306,49 @@ function handleExport() {
 }
 
 function formatValue(value: any, column: ColumnConfig) {
-  if (column.money) return Number(value || 0).toFixed(2)
-  if (column.number) return Number(value || 0).toLocaleString()
+  if (column.money) return formatMoney(value)
+  if (column.number) return formatNumber(value)
   return value ?? ''
+}
+
+function formatMoney(value: any) {
+  return Number(value || 0).toFixed(2)
+}
+
+function formatNumber(value: any) {
+  return Number(value || 0).toLocaleString()
+}
+
+function isEmployeeSaleAmountCell(column: ColumnConfig, row: any) {
+  return route.path === '/erp/report/employee-performance' && column.prop === 'saleAmount' && Number(row.saleAmount || 0) !== 0
+}
+
+function openEmployeeSaleDetails(row: any) {
+  employeeSaleDialog.open = true
+  employeeSaleDialog.loading = true
+  employeeSaleDialog.summary = { employeeName: row.employeeName, saleAmount: row.saleAmount }
+  employeeSaleDialog.records = []
+  employeeSaleDetails({
+    employeeId: row.employeeId,
+    employeeName: row.employeeName,
+    ...buildDateParams()
+  }).then(res => {
+    employeeSaleDialog.summary = res.summary || {}
+    employeeSaleDialog.records = res.records || []
+  }).finally(() => employeeSaleDialog.loading = false)
+}
+
+function buildDateParams() {
+  if (dateRange.value?.length !== 2) return {}
+  return {
+    beginDate: dateRange.value[0],
+    endDate: dateRange.value[1]
+  }
+}
+
+function openSaleBill(row: any) {
+  if (!row.id) return
+  router.push(`/erp/sale/add?id=${row.id}`)
 }
 
 function chartSeries() {
@@ -301,4 +406,33 @@ onBeforeUnmount(() => {
 .search-wrapper { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .report-chart { height: 320px; margin-bottom: 16px; }
+.report-cell-link { padding: 0; height: auto; font-weight: 500; }
+.employee-sale-detail { min-height: 260px; }
+.employee-sale-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.summary-item {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--el-fill-color-lighter);
+}
+.summary-item span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.summary-item strong {
+  color: var(--el-text-color-primary);
+  font-size: 18px;
+}
+@media (max-width: 768px) {
+  .employee-sale-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 </style>

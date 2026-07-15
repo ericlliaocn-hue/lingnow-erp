@@ -23,6 +23,7 @@ export interface BillItem {
   availableAttributeIds?: string
   availableAttributeText?: string
   productOptionsRequestId?: number
+  productOptionsKeyword?: string
   unitId?: string
   unitName?: string
   warehouseId?: string

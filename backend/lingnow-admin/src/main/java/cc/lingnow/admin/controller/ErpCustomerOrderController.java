@@ -42,7 +42,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ErpCustomerOrderController {
 
-    private static final List<String> PAYMENT_METHODS = List.of("淘宝", "1688", "小红书", "微信", "支付宝");
+    private static final List<String> PAYMENT_METHODS = List.of("淘宝", "1688", "小红书", "微信", "支付宝", "银行卡");
 
     private final ErpCustomerOrderService orderService;
     private final ErpCustomerOrderItemService orderItemService;

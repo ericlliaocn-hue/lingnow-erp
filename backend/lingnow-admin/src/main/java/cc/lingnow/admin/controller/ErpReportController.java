@@ -271,12 +271,16 @@ public class ErpReportController {
     @GetMapping("/employee-performance")
     public Result<List<Map<String, Object>>> employeePerformance(LocalDate beginDate, LocalDate endDate) {
         StpAdminUtil.stpLogic.checkPermission("erp:report:employee-performance");
-        Map<String, Map<String, Object>> rows = new HashMap<>();
-        for (ErpBill bill : billService.list(new QueryWrapper<ErpBill>()
+        List<ErpBill> bills = billService.list(new QueryWrapper<ErpBill>()
                 .in("bill_type", List.of("SALE", "SALE_RETURN"))
                 .ge(beginDate != null, "bill_date", beginDate)
-                .le(endDate != null, "bill_date", endDate))) {
+                .le(endDate != null, "bill_date", endDate));
+        Map<String, BigDecimal> costAmounts = billCostAmounts(bills);
+        Map<String, Map<String, Object>> rows = new HashMap<>();
+        for (ErpBill bill : bills) {
             String employeeKey = employeeKey(bill);
+            BigDecimal paidAmount = amount(bill.getPaidAmount());
+            BigDecimal costAmount = costAmounts.getOrDefault(billCostKey(bill), BigDecimal.ZERO);
             Map<String, Object> row = rows.computeIfAbsent(employeeKey, key -> {
                 Map<String, Object> created = new HashMap<>();
                 created.put("employeeId", bill.getEmployeeId());
@@ -289,16 +293,51 @@ public class ErpReportController {
             });
             row.put("employeeName", preferEmployeeName(Objects.toString(row.get("employeeName"), ""), employeeDisplayName(bill)));
             if ("SALE".equals(bill.getBillType())) {
-                add(row, "saleAmount", bill.getPayableAmount());
-                add(row, "netAmount", bill.getPayableAmount());
-                add(row, "commissionAmount", bill.getPayableAmount().multiply(new BigDecimal("0.01")));
+                add(row, "saleAmount", paidAmount);
+                add(row, "netAmount", paidAmount);
+                add(row, "commissionAmount", paidAmount.subtract(costAmount));
             } else {
-                add(row, "returnAmount", bill.getPayableAmount());
-                add(row, "netAmount", bill.getPayableAmount().negate());
-                add(row, "commissionAmount", bill.getPayableAmount().multiply(new BigDecimal("-0.01")));
+                add(row, "returnAmount", paidAmount);
+                add(row, "netAmount", paidAmount.negate());
+                add(row, "commissionAmount", costAmount.subtract(paidAmount));
             }
         }
         return Result.success(sortAmount(rows.values().stream().toList(), "netAmount"));
+    }
+
+    @GetMapping("/employee-performance/sale-details")
+    public Result<Map<String, Object>> employeeSaleDetails(Long employeeId,
+                                                           String employeeName,
+                                                           LocalDate beginDate,
+                                                           LocalDate endDate) {
+        StpAdminUtil.stpLogic.checkPermission("erp:report:employee-performance");
+        QueryWrapper<ErpBill> wrapper = new QueryWrapper<ErpBill>()
+                .eq("bill_type", "SALE")
+                .eq(employeeId != null, "employee_id", employeeId)
+                .eq(employeeId == null && StrUtil.isNotBlank(employeeName), "employee_name", employeeName)
+                .ge(beginDate != null, "bill_date", beginDate)
+                .le(endDate != null, "bill_date", endDate)
+                .orderByDesc("bill_date")
+                .orderByDesc("create_time");
+        if (employeeId == null && StrUtil.isBlank(employeeName)) {
+            wrapper.isNull("employee_id").and(item -> item.isNull("employee_name").or().eq("employee_name", ""));
+        }
+        List<ErpBill> bills = billService.list(wrapper);
+        Map<String, BigDecimal> costAmounts = billCostAmounts(bills);
+        List<Map<String, Object>> records = bills.stream().map(bill -> employeeSaleDetailRow(bill, costAmounts)).toList();
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("employeeId", employeeId);
+        summary.put("employeeName", employeeDetailName(employeeId, employeeName, bills));
+        summary.put("billCount", records.size());
+        summary.put("orderAmount", records.stream().map(row -> amount(row.get("orderAmount"))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.put("saleAmount", records.stream().map(row -> amount(row.get("saleAmount"))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.put("paidAmount", records.stream().map(row -> amount(row.get("paidAmount"))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.put("costAmount", records.stream().map(row -> amount(row.get("costAmount"))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.put("profitAmount", records.stream().map(row -> amount(row.get("profitAmount"))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        Map<String, Object> result = new HashMap<>();
+        result.put("summary", summary);
+        result.put("records", records);
+        return Result.success(result);
     }
 
     @GetMapping("/stock-summary")
@@ -592,6 +631,35 @@ public class ErpReportController {
         return current;
     }
 
+    private Map<String, Object> employeeSaleDetailRow(ErpBill bill, Map<String, BigDecimal> costAmounts) {
+        BigDecimal costAmount = costAmounts.getOrDefault(billCostKey(bill), BigDecimal.ZERO);
+        BigDecimal paidAmount = amount(bill.getPaidAmount());
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", bill.getId());
+        row.put("billNo", bill.getBillNo());
+        row.put("billDate", bill.getBillDate());
+        row.put("partnerName", partnerName(bill.getPartnerType(), bill.getPartnerId()));
+        row.put("warehouseName", masterName(warehouseService.getById(bill.getWarehouseId())));
+        row.put("paymentMethod", bill.getPaymentMethod());
+        row.put("orderAmount", amount(bill.getPayableAmount()));
+        row.put("saleAmount", paidAmount);
+        row.put("paidAmount", paidAmount);
+        row.put("costAmount", costAmount);
+        row.put("profitAmount", paidAmount.subtract(costAmount));
+        return row;
+    }
+
+    private String employeeDetailName(Long employeeId, String employeeName, List<ErpBill> bills) {
+        String userName = userDisplayName(employeeId);
+        if (StrUtil.isNotBlank(userName)) {
+            return userName;
+        }
+        if (StrUtil.isNotBlank(employeeName)) {
+            return employeeName;
+        }
+        return bills.stream().findFirst().map(this::employeeDisplayName).orElse("未指定业务员");
+    }
+
     private String userDisplayName(Long userId) {
         if (userId == null) {
             return null;
@@ -649,6 +717,42 @@ public class ErpReportController {
                         .ge(beginDate != null, "operate_time", beginDate == null ? null : beginDate.atStartOfDay())
                         .lt(endDate != null, "operate_time", endDate == null ? null : endDate.plusDays(1).atStartOfDay()))
                 .stream().map(ErpFundFlow::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private Map<String, BigDecimal> billCostAmounts(List<ErpBill> bills) {
+        if (bills.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> billIds = bills.stream().map(ErpBill::getId).filter(Objects::nonNull).toList();
+        if (billIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> billTypes = bills.stream()
+                .filter(bill -> bill.getId() != null)
+                .collect(Collectors.toMap(ErpBill::getId, ErpBill::getBillType, (a, b) -> a));
+        List<ErpBillItem> items = billItemService.list(new QueryWrapper<ErpBillItem>().in("bill_id", billIds));
+        if (items.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> productIds = items.stream().map(ErpBillItem::getProductId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, BigDecimal> productCosts = productIds.isEmpty() ? Map.of() : productService.listByIds(productIds).stream()
+                .collect(Collectors.toMap(ErpProduct::getId, product -> amount(product.getPurchasePrice()), (a, b) -> a));
+        Map<String, BigDecimal> result = new HashMap<>();
+        for (ErpBillItem item : items) {
+            result.merge(
+                    billCostKey(billTypes.get(item.getBillId()), item.getBillId()),
+                    amount(item.getQty()).multiply(productCosts.getOrDefault(item.getProductId(), BigDecimal.ZERO)),
+                    BigDecimal::add);
+        }
+        return result;
+    }
+
+    private String billCostKey(ErpBill bill) {
+        return billCostKey(bill.getBillType(), bill.getId());
+    }
+
+    private String billCostKey(String billType, Long billId) {
+        return Objects.toString(billType, "") + ":" + Objects.toString(billId, "");
     }
 
     private void add(Map<String, Object> row, String key, BigDecimal amount) {
