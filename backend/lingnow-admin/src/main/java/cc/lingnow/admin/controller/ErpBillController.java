@@ -41,10 +41,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Tag(name = "ERP销售进货单")
 @RestController
@@ -63,6 +66,7 @@ public class ErpBillController {
     private final ErpWarehouseService warehouseService;
     private final ErpAccountService accountService;
     private final ErpUnitService unitService;
+    private final ErpProductAttributeService attributeService;
     private final ErpStockBalanceService stockBalanceService;
     private final ErpStockFlowService stockFlowService;
     private final ErpFundFlowService fundFlowService;
@@ -81,7 +85,8 @@ public class ErpBillController {
         check(module, "list");
         QueryWrapper<ErpBill> wrapper = billListWrapper(type, query, "production".equals(module));
         IPage<ErpBill> page = billService.page(new Page<>(query.getCurrent(), query.getSize()), wrapper);
-        List<ErpBillVO> records = page.getRecords().stream().map(item -> toVO(item, false)).toList();
+        boolean includeCost = "production".equals(module);
+        List<ErpBillVO> records = page.getRecords().stream().map(item -> toVO(item, false, includeCost)).toList();
         return Result.success(PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), records));
     }
 
@@ -98,7 +103,7 @@ public class ErpBillController {
         if ("production".equals(module)) {
             checkProductionVisible(bill);
         }
-        return Result.success(toVO(bill, true));
+        return Result.success(toVO(bill, true, "production".equals(module)));
     }
 
     @GetMapping("/{module:sale|sale-return|purchase|purchase-return}/export")
@@ -640,6 +645,10 @@ public class ErpBillController {
     }
 
     private ErpBillVO toVO(ErpBill bill, boolean withItems) {
+        return toVO(bill, withItems, false);
+    }
+
+    private ErpBillVO toVO(ErpBill bill, boolean withItems, boolean includeCost) {
         ErpBillVO vo = BeanUtil.copyProperties(bill, ErpBillVO.class);
         vo.setPartnerName("CUSTOMER".equals(bill.getPartnerType())
                 ? masterName(customerService.getById(bill.getPartnerId()))
@@ -648,10 +657,79 @@ public class ErpBillController {
         vo.setProductionUserName(StrUtil.isNotBlank(bill.getProductionUserName()) ? bill.getProductionUserName() : userDisplayName(bill.getProductionUserId()));
         vo.setWarehouseName(masterName(warehouseService.getById(bill.getWarehouseId())));
         vo.setAccountName(masterName(accountService.getById(bill.getAccountId())));
+        List<ErpBillItem> items = (withItems || includeCost)
+                ? billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", bill.getId()))
+                : List.of();
+        if (includeCost && "SALE".equals(bill.getBillType())) {
+            vo.setCostAmount(billCostAmount(items));
+        }
         if (withItems) {
-            vo.setItems(billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", bill.getId())).stream().map(this::itemVO).toList());
+            vo.setItems(items.stream().map(this::itemVO).toList());
         }
         return vo;
+    }
+
+    private BigDecimal billCostAmount(List<ErpBillItem> items) {
+        if (items.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        Map<Long, BigDecimal> productCosts = productCostMap(items);
+        Map<Long, BigDecimal> optionExtras = optionExtraAmountMap(items);
+        return items.stream()
+                .map(item -> itemCostAmount(item, productCosts, optionExtras))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private Map<Long, BigDecimal> productCostMap(List<ErpBillItem> items) {
+        List<Long> productIds = items.stream().map(ErpBillItem::getProductId).filter(Objects::nonNull).distinct().toList();
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+        return productService.listByIds(productIds).stream()
+                .collect(Collectors.toMap(ErpProduct::getId, product -> nvl(product.getPurchasePrice()), (a, b) -> a));
+    }
+
+    private Map<Long, BigDecimal> optionExtraAmountMap(List<ErpBillItem> items) {
+        List<Long> optionIds = items.stream()
+                .flatMap(item -> optionAttributeIds(item.getOptionAttributeIds()).stream())
+                .distinct()
+                .toList();
+        if (optionIds.isEmpty()) {
+            return Map.of();
+        }
+        return attributeService.listByIds(optionIds).stream()
+                .collect(Collectors.toMap(ErpProductAttribute::getId, item -> nvl(item.getExtraAmount()), (a, b) -> a));
+    }
+
+    private BigDecimal itemCostAmount(ErpBillItem item, Map<Long, BigDecimal> productCosts, Map<Long, BigDecimal> optionExtras) {
+        BigDecimal unitCost = productCosts.getOrDefault(item.getProductId(), BigDecimal.ZERO).add(itemOptionExtraAmount(item, optionExtras));
+        return nvl(item.getQty()).multiply(unitCost);
+    }
+
+    private BigDecimal itemOptionExtraAmount(ErpBillItem item, Map<Long, BigDecimal> optionExtras) {
+        return optionAttributeIds(item.getOptionAttributeIds()).stream()
+                .map(id -> optionExtras.getOrDefault(id, BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private List<Long> optionAttributeIds(String value) {
+        if (StrUtil.isBlank(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .map(this::parseLong)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private Long parseLong(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private String userDisplayName(Long userId) {

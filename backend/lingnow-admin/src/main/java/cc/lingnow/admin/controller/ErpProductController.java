@@ -34,10 +34,15 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Tag(name = "ERP商品")
 @RestController
@@ -47,6 +52,20 @@ public class ErpProductController {
 
     private static final String COST_PRICE_EDIT_PERMISSION = "erp:product:cost:edit";
     private static final String SEARCH_TOKEN_SEPARATOR = "[\\s,，、;；|/]+";
+    private static final int PRODUCT_OPTIONS_RESULT_LIMIT = 50;
+    private static final int PRODUCT_OPTIONS_CANDIDATE_LIMIT = 300;
+    private static final Pattern PRODUCT_SPEC_PATTERN = Pattern.compile("\\d+(?:\\.\\d+)?\\s*[*xX×]\\s*\\d+(?:\\.\\d+)?");
+    private static final Pattern PRODUCT_ALPHA_NUM_PATTERN = Pattern.compile("[a-zA-Z]*\\d[a-zA-Z0-9]*|[a-zA-Z]+\\d[a-zA-Z0-9]*");
+    private static final Pattern PRODUCT_NUMBER_PATTERN = Pattern.compile("\\d{2,}");
+    private static final Pattern PRODUCT_CHINESE_PATTERN = Pattern.compile("[\\u4e00-\\u9fa5]{2,}");
+    private static final List<String> PRODUCT_FEATURE_WORDS = List.of(
+            "奶白色", "原木色", "胡桃色", "咖啡色", "玫瑰金", "香槟金", "透明色",
+            "奶白", "白色", "黑色", "灰色", "红色", "粉色", "蓝色", "绿色", "黄色", "本色",
+            "八面", "四面", "圆头", "扁头", "宽肩", "窄肩", "防滑", "无痕", "加粗", "加厚",
+            "荷木", "榉木", "松木", "实木", "木质", "塑料", "植绒", "金属", "铝合金",
+            "女款", "男款", "童款", "儿童", "成人",
+            "衣架", "裤架", "裤夹", "裙架", "衣夹", "挂钩", "套装"
+    );
     private static final String NORMALIZED_CODE_SEARCH_SQL = normalizedColumnSql("code");
     private static final String NORMALIZED_NAME_SEARCH_SQL = normalizedColumnSql("name");
     private static final String NORMALIZED_BARCODE_SEARCH_SQL = normalizedColumnSql("barcode");
@@ -79,8 +98,14 @@ public class ErpProductController {
     @GetMapping("/options")
     public Result<List<ErpProductVO>> options(ErpProductQueryBO query) {
         StpAdminUtil.stpLogic.checkPermission("erp:product:options");
-        QueryWrapper<ErpProduct> wrapper = applyProductSort(wrapper(query).eq("status", 1), query.getKeyword(), 50);
-        return Result.success(productService.list(wrapper).stream().map(this::toVO).toList());
+        boolean hasKeyword = StrUtil.isNotBlank(query.getKeyword());
+        QueryWrapper<ErpProduct> wrapper = applyProductSort(wrapper(query).eq("status", 1), query.getKeyword(),
+                hasKeyword ? PRODUCT_OPTIONS_CANDIDATE_LIMIT : PRODUCT_OPTIONS_RESULT_LIMIT);
+        List<ErpProduct> products = productService.list(wrapper);
+        if (hasKeyword) {
+            products = sortProductOptions(products, query.getKeyword());
+        }
+        return Result.success(products.stream().limit(PRODUCT_OPTIONS_RESULT_LIMIT).map(this::toVO).toList());
     }
 
     @GetMapping("/{id}")
@@ -222,28 +247,28 @@ public class ErpProductController {
                 .eq(query.getBrandId() != null, "brand_id", query.getBrandId())
                 .eq(query.getStatus() != null, "status", query.getStatus());
         if (StrUtil.isNotBlank(query.getKeyword())) {
-            for (String token : searchTokens(query.getKeyword())) {
-                String normalizedToken = normalizeSearchToken(token);
-                wrapper.and(item -> {
-                    item.like("code", token)
-                            .or()
-                            .like("name", token)
-                            .or()
-                            .like("barcode", token)
-                            .or()
-                            .like("spec", token)
-                            .or()
-                            .like("attribute_text", token);
-                    if (StrUtil.isNotBlank(normalizedToken)) {
-                        item.or().apply(NORMALIZED_PRODUCT_SEARCH_SQL + " LIKE CONCAT('%', {0}, '%')", normalizedToken);
-                    }
-                });
-            }
+            applyProductKeywordCondition(wrapper, query.getKeyword());
         }
         for (String attributeId : splitIds(query.getAttributeIds())) {
             wrapper.apply("FIND_IN_SET({0}, attribute_ids)", attributeId);
         }
         return wrapper;
+    }
+
+    private void applyProductKeywordCondition(QueryWrapper<ErpProduct> wrapper, String keyword) {
+        List<ProductSearchFeature> features = productSearchFeatures(keyword);
+        if (features.isEmpty()) {
+            return;
+        }
+        wrapper.and(item -> {
+            for (int index = 0; index < features.size(); index++) {
+                ProductSearchFeature feature = features.get(index);
+                if (index > 0) {
+                    item.or();
+                }
+                item.apply(NORMALIZED_PRODUCT_SEARCH_SQL + " LIKE CONCAT('%', {0}, '%')", feature.normalized());
+            }
+        });
     }
 
     private QueryWrapper<ErpProduct> applyProductSort(QueryWrapper<ErpProduct> wrapper, String keyword, Integer limit) {
@@ -260,11 +285,8 @@ public class ErpProductController {
     }
 
     private String productRelevanceSql(String keyword) {
-        List<String> tokens = searchTokens(keyword);
-        List<String> normalizedTokens = tokens.stream()
-                .map(this::normalizeSearchToken)
-                .filter(StrUtil::isNotBlank)
-                .distinct()
+        List<String> normalizedTokens = productSearchFeatures(keyword).stream()
+                .map(ProductSearchFeature::normalized)
                 .toList();
         String keywordText = keyword.trim();
         String normalizedKeyword = normalizeSearchToken(keywordText);
@@ -321,6 +343,162 @@ public class ErpProductController {
         return "REGEXP_REPLACE(LOWER(IFNULL(" + column + ", '')), '[^0-9a-z一-龥]+', '')";
     }
 
+    private List<ErpProduct> sortProductOptions(List<ErpProduct> products, String keyword) {
+        List<ProductSearchFeature> features = productSearchFeatures(keyword);
+        if (features.isEmpty()) {
+            return products;
+        }
+        int minimumMatches = minimumProductFeatureMatches(features.size());
+        List<ScoredProduct> scoredProducts = products.stream()
+                .map(product -> new ScoredProduct(product, scoreProduct(product, features)))
+                .filter(item -> item.score().score() > 0 && item.score().matchedCount() >= minimumMatches)
+                .sorted(Comparator
+                        .comparingInt((ScoredProduct item) -> item.score().score()).reversed()
+                        .thenComparingInt(item -> sortOrderOf(item.product()))
+                        .thenComparing(ScoredProduct::createTimeText, Comparator.reverseOrder()))
+                .toList();
+        if (!scoredProducts.isEmpty()) {
+            return scoredProducts.stream().map(ScoredProduct::product).toList();
+        }
+        return products.stream()
+                .map(product -> new ScoredProduct(product, scoreProduct(product, features)))
+                .filter(item -> item.score().score() > 0)
+                .sorted(Comparator
+                        .comparingInt((ScoredProduct item) -> item.score().score()).reversed()
+                        .thenComparingInt(item -> sortOrderOf(item.product()))
+                        .thenComparing(ScoredProduct::createTimeText, Comparator.reverseOrder()))
+                .map(ScoredProduct::product)
+                .toList();
+    }
+
+    private int sortOrderOf(ErpProduct product) {
+        return product.getSortOrder() == null ? 0 : product.getSortOrder();
+    }
+
+    private ProductSearchScore scoreProduct(ErpProduct product, List<ProductSearchFeature> features) {
+        String code = normalizeSearchToken(product.getCode());
+        String name = normalizeSearchToken(product.getName());
+        String barcode = normalizeSearchToken(product.getBarcode());
+        String spec = normalizeSearchToken(product.getSpec());
+        String attribute = normalizeSearchToken(product.getAttributeText());
+        String fullText = code + name + barcode + spec + attribute;
+        int score = 0;
+        int matchedCount = 0;
+        for (ProductSearchFeature feature : features) {
+            String token = feature.normalized();
+            int tokenScore = 0;
+            if (code.equals(token) || barcode.equals(token)) {
+                tokenScore += 300;
+            } else {
+                if (code.contains(token) || barcode.contains(token)) {
+                    tokenScore += 80;
+                }
+                if (name.equals(token)) {
+                    tokenScore += 180;
+                } else if (name.contains(token)) {
+                    tokenScore += 70;
+                }
+                if (spec.contains(token)) {
+                    tokenScore += 55;
+                }
+                if (attribute.contains(token)) {
+                    tokenScore += 45;
+                }
+                if (fullText.contains(token)) {
+                    tokenScore += 20;
+                }
+            }
+            if (tokenScore > 0) {
+                matchedCount++;
+                score += tokenScore + Math.min(24, token.length() * 3);
+            }
+        }
+        if (matchedCount == features.size()) {
+            score += 240;
+        }
+        if (matchedCount >= 2) {
+            score += matchedCount * 40;
+        }
+        return new ProductSearchScore(score, matchedCount);
+    }
+
+    private int minimumProductFeatureMatches(int featureCount) {
+        if (featureCount <= 1) {
+            return 1;
+        }
+        return Math.max(2, (int) Math.ceil(featureCount * 0.6));
+    }
+
+    private List<ProductSearchFeature> productSearchFeatures(String keyword) {
+        if (StrUtil.isBlank(keyword)) {
+            return List.of();
+        }
+        List<ProductSearchFeature> features = new ArrayList<>();
+        Set<String> normalizedSet = new LinkedHashSet<>();
+        String normalizedText = Normalizer.normalize(keyword, Normalizer.Form.NFKC).trim();
+        for (String token : searchTokens(normalizedText)) {
+            addProductSearchFeature(features, normalizedSet, token);
+        }
+
+        Matcher specMatcher = PRODUCT_SPEC_PATTERN.matcher(normalizedText);
+        String textWithoutSpec = specMatcher.replaceAll(" ");
+        specMatcher.reset();
+        while (specMatcher.find()) {
+            String spec = specMatcher.group();
+            addProductSearchFeature(features, normalizedSet, spec);
+            addProductSearchFeature(features, normalizedSet, normalizeSearchToken(spec));
+        }
+
+        Matcher alphaNumMatcher = PRODUCT_ALPHA_NUM_PATTERN.matcher(normalizedText);
+        while (alphaNumMatcher.find()) {
+            addProductSearchFeature(features, normalizedSet, alphaNumMatcher.group());
+        }
+
+        Matcher numberMatcher = PRODUCT_NUMBER_PATTERN.matcher(normalizeSearchToken(normalizedText));
+        while (numberMatcher.find()) {
+            addProductSearchFeature(features, normalizedSet, numberMatcher.group());
+        }
+
+        Matcher chineseMatcher = PRODUCT_CHINESE_PATTERN.matcher(textWithoutSpec);
+        while (chineseMatcher.find()) {
+            addChineseProductFeatures(features, normalizedSet, chineseMatcher.group());
+        }
+        return features;
+    }
+
+    private void addChineseProductFeatures(List<ProductSearchFeature> features, Set<String> normalizedSet, String chunk) {
+        String normalizedChunk = normalizeSearchToken(chunk);
+        boolean matchedWord = false;
+        for (String word : PRODUCT_FEATURE_WORDS) {
+            String normalizedWord = normalizeSearchToken(word);
+            if (normalizedChunk.contains(normalizedWord)) {
+                addProductSearchFeature(features, normalizedSet, word);
+                matchedWord = true;
+            }
+        }
+        if (!matchedWord || normalizedChunk.length() <= 4) {
+            addProductSearchFeature(features, normalizedSet, chunk);
+        }
+    }
+
+    private void addProductSearchFeature(List<ProductSearchFeature> features, Set<String> normalizedSet, String raw) {
+        String normalized = normalizeSearchToken(raw);
+        if (!isUsefulProductSearchFeature(normalized) || !normalizedSet.add(normalized)) {
+            return;
+        }
+        features.add(new ProductSearchFeature(raw.trim(), normalized));
+    }
+
+    private boolean isUsefulProductSearchFeature(String normalized) {
+        if (StrUtil.isBlank(normalized)) {
+            return false;
+        }
+        if (normalized.matches(".*\\d.*")) {
+            return normalized.length() >= 2;
+        }
+        return normalized.length() >= 2;
+    }
+
     private List<String> searchTokens(String keyword) {
         if (StrUtil.isBlank(keyword)) {
             return List.of();
@@ -330,6 +508,18 @@ public class ErpProductController {
                 .filter(StrUtil::isNotBlank)
                 .distinct()
                 .toList();
+    }
+
+    private record ProductSearchFeature(String raw, String normalized) {
+    }
+
+    private record ProductSearchScore(int score, int matchedCount) {
+    }
+
+    private record ScoredProduct(ErpProduct product, ProductSearchScore score) {
+        private String createTimeText() {
+            return product.getCreateTime() == null ? "" : product.getCreateTime().toString();
+        }
     }
 
     private String normalizeSearchToken(String value) {

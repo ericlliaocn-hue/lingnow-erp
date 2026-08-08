@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +51,7 @@ public class ErpReportController {
     private final ErpPartnerFlowService partnerFlowService;
     private final ErpAccountService accountService;
     private final ErpWarehouseService warehouseService;
+    private final ErpProductAttributeService attributeService;
     private final SysUserService userService;
 
     @GetMapping("/stock-balance")
@@ -183,12 +185,13 @@ public class ErpReportController {
             return Result.success(List.of());
         }
         List<Long> saleIds = new ArrayList<>(billMap.keySet());
+        List<ErpBillItem> items = billItemService.list(new QueryWrapper<ErpBillItem>().in("bill_id", saleIds));
+        Map<Long, BigDecimal> productCosts = productCostMap(items);
+        Map<Long, BigDecimal> optionExtras = optionExtraAmountMap(items);
         Map<String, Map<String, Object>> rows = new HashMap<>();
-        for (ErpBillItem item : billItemService.list(new QueryWrapper<ErpBillItem>().in("bill_id", saleIds))) {
+        for (ErpBillItem item : items) {
             ErpBill bill = billMap.get(item.getBillId());
-            BigDecimal costAmount = stockFlowService.list(new QueryWrapper<ErpStockFlow>()
-                            .eq("source_bill_id", bill.getId()).eq("source_bill_type", bill.getBillType()).eq("product_id", item.getProductId()))
-                    .stream().map(ErpStockFlow::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal costAmount = itemCostAmount(item, productCosts, optionExtras);
             String key = profitKey(groupBy, bill, item);
             Map<String, Object> row = rows.computeIfAbsent(key, k -> baseProfitRow(groupBy, bill, item));
             add(row, "saleAmount", item.getFinalAmount());
@@ -734,17 +737,68 @@ public class ErpReportController {
         if (items.isEmpty()) {
             return Map.of();
         }
-        List<Long> productIds = items.stream().map(ErpBillItem::getProductId).filter(Objects::nonNull).distinct().toList();
-        Map<Long, BigDecimal> productCosts = productIds.isEmpty() ? Map.of() : productService.listByIds(productIds).stream()
-                .collect(Collectors.toMap(ErpProduct::getId, product -> amount(product.getPurchasePrice()), (a, b) -> a));
+        Map<Long, BigDecimal> productCosts = productCostMap(items);
+        Map<Long, BigDecimal> optionExtras = optionExtraAmountMap(items);
         Map<String, BigDecimal> result = new HashMap<>();
         for (ErpBillItem item : items) {
             result.merge(
                     billCostKey(billTypes.get(item.getBillId()), item.getBillId()),
-                    amount(item.getQty()).multiply(productCosts.getOrDefault(item.getProductId(), BigDecimal.ZERO)),
+                    itemCostAmount(item, productCosts, optionExtras),
                     BigDecimal::add);
         }
         return result;
+    }
+
+    private Map<Long, BigDecimal> productCostMap(List<ErpBillItem> items) {
+        List<Long> productIds = items.stream().map(ErpBillItem::getProductId).filter(Objects::nonNull).distinct().toList();
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+        return productService.listByIds(productIds).stream()
+                .collect(Collectors.toMap(ErpProduct::getId, product -> amount(product.getPurchasePrice()), (a, b) -> a));
+    }
+
+    private Map<Long, BigDecimal> optionExtraAmountMap(List<ErpBillItem> items) {
+        List<Long> optionIds = items.stream()
+                .flatMap(item -> optionAttributeIds(item.getOptionAttributeIds()).stream())
+                .distinct()
+                .toList();
+        if (optionIds.isEmpty()) {
+            return Map.of();
+        }
+        return attributeService.listByIds(optionIds).stream()
+                .collect(Collectors.toMap(ErpProductAttribute::getId, item -> amount(item.getExtraAmount()), (a, b) -> a));
+    }
+
+    private BigDecimal itemCostAmount(ErpBillItem item, Map<Long, BigDecimal> productCosts, Map<Long, BigDecimal> optionExtras) {
+        BigDecimal unitCost = productCosts.getOrDefault(item.getProductId(), BigDecimal.ZERO).add(itemOptionExtraAmount(item, optionExtras));
+        return amount(item.getQty()).multiply(unitCost);
+    }
+
+    private BigDecimal itemOptionExtraAmount(ErpBillItem item, Map<Long, BigDecimal> optionExtras) {
+        return optionAttributeIds(item.getOptionAttributeIds()).stream()
+                .map(id -> optionExtras.getOrDefault(id, BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private List<Long> optionAttributeIds(String value) {
+        if (StrUtil.isBlank(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .map(this::parseLong)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private Long parseLong(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private String billCostKey(ErpBill bill) {

@@ -21,15 +21,13 @@
             <el-option v-for="item in customerOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="isProduction" label="日期">
+        <el-form-item v-if="showMonthFilter" label="月份">
           <el-date-picker
-            v-model="productionDateRange"
-            type="daterange"
+            v-model="billMonth"
+            type="month"
             value-format="YYYY-MM-DD"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            style="width: 240px"
+            placeholder="请选择月份"
+            style="width: 180px"
           />
         </el-form-item>
         <el-form-item>
@@ -58,7 +56,7 @@
         <el-table-column prop="billDate" label="日期" width="120" />
         <el-table-column prop="partnerName" :label="partnerLabel" min-width="160" />
         <el-table-column prop="warehouseName" label="仓库" min-width="120" />
-        <el-table-column prop="payableAmount" :label="isProduction ? '成本' : '应收/应付'" min-width="110" align="right" />
+        <el-table-column :prop="isProduction ? 'costAmount' : 'payableAmount'" :label="isProduction ? '成本' : '应收/应付'" min-width="110" align="right" />
         <el-table-column prop="paymentMethod" label="付款方式" min-width="110">
           <template #default="{ row }">{{ row.paymentMethod || '-' }}</template>
         </el-table-column>
@@ -183,6 +181,7 @@ const module = computed<BillModule>(() => {
 const titleMap: Record<BillModule, string> = { sale: '销售单', 'sale-return': '销售退货单', purchase: '进货单', 'purchase-return': '进货退货单', production: '生产单' }
 const title = computed(() => titleMap[module.value])
 const isProduction = computed(() => module.value === 'production')
+const showMonthFilter = computed(() => module.value === 'sale' || isProduction.value)
 const isSaleLike = computed(() => module.value.startsWith('sale') || isProduction.value)
 const partnerLabel = computed(() => isSaleLike.value ? '客户' : '供应商')
 const showReceiver = computed(() => isSaleLike.value)
@@ -202,7 +201,7 @@ const printData = ref<Record<string, any>>({})
 const customerOptions = ref<ErpMasterVO[]>([])
 const employeeUsers = ref<EmployeeOption[]>([])
 const activeRoles = ref<Role[]>([])
-const productionDateRange = ref<[string, string] | []>([])
+const billMonth = ref('')
 const state = reactive({ queryParams: { current: 1, size: 10 } as BillQuery })
 const { queryParams } = toRefs(state)
 const canDeleteSelected = computed(() => selected.value.length > 0)
@@ -223,27 +222,41 @@ function getList() {
 }
 function handleQuery() {
   queryParams.value.current = 1
-  applyProductionDateRange()
+  applyMonthFilter()
   getList()
 }
 function resetQuery() {
   queryFormRef.value?.resetFields()
-  productionDateRange.value = []
+  resetMonthFilter()
   queryParams.value.beginDate = undefined
   queryParams.value.endDate = undefined
   queryParams.value.employeeId = undefined
   queryParams.value.partnerId = undefined
   handleQuery()
 }
-function applyProductionDateRange() {
-  if (!isProduction.value) {
+function resetMonthFilter() {
+  billMonth.value = showMonthFilter.value ? currentMonthValue() : ''
+}
+function applyMonthFilter() {
+  if (!showMonthFilter.value || !billMonth.value) {
     queryParams.value.beginDate = undefined
     queryParams.value.endDate = undefined
     return
   }
-  const range = productionDateRange.value
-  queryParams.value.beginDate = range?.[0] || undefined
-  queryParams.value.endDate = range?.[1] || undefined
+  queryParams.value.beginDate = monthStart(billMonth.value)
+  queryParams.value.endDate = monthEnd(billMonth.value)
+}
+function currentMonthValue() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+}
+function monthStart(value: string) {
+  return `${value.slice(0, 7)}-01`
+}
+function monthEnd(value: string) {
+  const [year, month] = value.slice(0, 7).split('-').map(Number)
+  const lastDay = new Date(year, month, 0).getDate()
+  return `${value.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`
 }
 function loadProductionFilterOptions() {
   if (!isProduction.value) {
@@ -336,11 +349,10 @@ function formatAttributeLines(value?: string): AttributeLine[] {
     })
 }
 function clearProductionFilters() {
-  productionDateRange.value = []
+  resetMonthFilter()
   queryParams.value.employeeId = undefined
   queryParams.value.partnerId = undefined
-  queryParams.value.beginDate = undefined
-  queryParams.value.endDate = undefined
+  applyMonthFilter()
 }
 function initPage() {
   clearProductionFilters()

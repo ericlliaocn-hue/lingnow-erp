@@ -27,6 +27,7 @@ public class ErpBillVO {
     private String receiverAddress;
     private BigDecimal totalQty;
     private BigDecimal totalAmount;
+    private BigDecimal costAmount;
     private BigDecimal discountAmount;
     private BigDecimal otherAmount;
     private BigDecimal payableAmount;

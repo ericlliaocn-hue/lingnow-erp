@@ -798,7 +798,7 @@ const itemQtyRules = [{
 }]
 const totalQty = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.qty || 0), 0).toFixed(2))
 const totalAmount = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2))
-const costAmount = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.purchasePrice || 0), 0).toFixed(2))
+const costAmount = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.qty || 0) * lineCostPrice(row), 0).toFixed(2))
 const payableAmount = computed(() => (Number(totalAmount.value) - Number(form.value.discountAmount || 0) + Number(form.value.otherAmount || 0)).toFixed(2))
 const profitAmount = computed(() => (Number(form.value.paidAmount || 0) - Number(costAmount.value)).toFixed(2))
 const categoryTree = computed(() => buildTree(categories.value))
@@ -1284,7 +1284,7 @@ function lineAmountText(row: BillItem) {
   return canViewFinancialSummary.value ? Number(row.amount || 0).toFixed(2) : '-'
 }
 function costPriceText(row: BillItem) {
-  return row.purchasePrice === undefined || row.purchasePrice === null ? '-' : Number(row.purchasePrice || 0).toFixed(2)
+  return row.purchasePrice === undefined || row.purchasePrice === null ? '-' : lineCostPrice(row).toFixed(2)
 }
 function employeeLabel(user: EmployeeOption) {
   return user.nickname || user.username || String(user.userId)
@@ -1508,6 +1508,9 @@ function attributeExtraAmount(row: BillItem) {
   if (!selectedIds.length) return 0
   const byId = new Map(attributes.value.map(item => [String(item.id), item]))
   return selectedIds.reduce((sum, id) => sum + Number(byId.get(id)?.extraAmount || 0), 0)
+}
+function lineCostPrice(row: BillItem) {
+  return Number(row.purchasePrice || 0) + attributeExtraAmount(row)
 }
 function baseLinePrice(row: BillItem) {
   if (row.basePrice !== undefined && row.basePrice !== null) {

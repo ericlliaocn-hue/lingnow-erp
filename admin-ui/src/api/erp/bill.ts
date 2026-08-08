@@ -57,6 +57,7 @@ export interface ErpBill {
   receiverAddress?: string
   totalQty?: number
   totalAmount?: number
+  costAmount?: number
   discountAmount?: number
   otherAmount?: number
   payableAmount?: number
