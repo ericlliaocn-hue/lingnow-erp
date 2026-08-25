@@ -34,7 +34,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @RestController
@@ -48,6 +50,8 @@ public class ErpCustomerOrderController {
     private final ErpCustomerOrderItemService orderItemService;
     private final ErpBillService billService;
     private final ErpBillItemService billItemService;
+    private final ErpProductService productService;
+    private final ErpProductAttributeService attributeService;
     private final ErpBillNoRuleService billNoRuleService;
     private final ErpWarehouseService warehouseService;
     private final ErpAccountService accountService;
@@ -188,6 +192,8 @@ public class ErpCustomerOrderController {
     }
 
     private ErpBillItem toBillItem(ErpCustomerOrderItem source, Long billId, Long warehouseId) {
+        BigDecimal attributeExtraAmount = optionExtraAmount(source.getOptionAttributeIds());
+        ErpProduct product = productService.getById(source.getProductId());
         ErpBillItem item = new ErpBillItem();
         item.setBillId(billId);
         item.setProductId(source.getProductId());
@@ -206,6 +212,9 @@ public class ErpCustomerOrderController {
         item.setUnitId(source.getUnitId());
         item.setWarehouseId(warehouseId);
         item.setQty(nvl(source.getQty()));
+        item.setBasePrice(nvl(source.getPrice()).subtract(attributeExtraAmount));
+        item.setAttributeExtraAmount(attributeExtraAmount);
+        item.setCostPrice(product == null ? BigDecimal.ZERO : nvl(product.getPurchasePrice()));
         item.setPrice(nvl(source.getPrice()));
         item.setAmount(nvl(source.getAmount()));
         item.setDiscountRate(new BigDecimal("100"));
@@ -213,6 +222,32 @@ public class ErpCustomerOrderController {
         item.setFinalAmount(nvl(source.getAmount()));
         item.setRemark(source.getRemark());
         return item;
+    }
+
+    private BigDecimal optionExtraAmount(String value) {
+        if (StrUtil.isBlank(value)) {
+            return BigDecimal.ZERO;
+        }
+        List<Long> ids = Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .map(this::parseLong)
+                .filter(Objects::nonNull)
+                .toList();
+        if (ids.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return attributeService.listByIds(ids).stream()
+                .map(item -> nvl(item.getExtraAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private Long parseLong(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private ErpCustomerOrder requireOrder(Long id) {

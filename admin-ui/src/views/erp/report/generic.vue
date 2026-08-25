@@ -1,9 +1,18 @@
 <template>
-  <div class="app-container report-generic-page" v-loading="loading">
+  <div class="app-container report-generic-page notranslate" translate="no" v-loading="loading">
     <el-card shadow="never" class="search-wrapper">
       <el-form :inline="true" :model="query" ref="queryFormRef">
         <el-form-item label="日期" prop="dateRange">
-          <el-date-picker v-model="dateRange" type="daterange" value-format="YYYY-MM-DD" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" />
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            :editable="false"
+            popper-class="report-date-picker-popper notranslate"
+          />
         </el-form-item>
         <el-form-item v-if="config.groupOptions?.length" label="维度">
           <el-select v-model="query.groupBy" style="width: 150px">
@@ -28,7 +37,7 @@
         </div>
       </template>
       <div v-if="showChart" ref="chartRef" class="report-chart"></div>
-      <el-table :data="rows" border empty-text="暂无报表数据">
+      <el-table :key="tableVersion" :data="rows" :row-key="reportRowKey" border empty-text="暂无报表数据">
         <el-table-column v-for="column in config.columns" :key="column.prop" :prop="column.prop" :label="column.label" :min-width="column.width || 120" :align="column.money || column.number ? 'right' : 'left'">
           <template #default="{ row }">
             <el-button v-if="isEmployeeSaleAmountCell(column, row)" link type="primary" class="report-cell-link" @click="openEmployeeSaleDetails(row)">
@@ -125,9 +134,11 @@ const loading = ref(false)
 const rows = ref<any[]>([])
 const queryFormRef = ref()
 const chartRef = ref<HTMLElement>()
-const dateRange = ref<string[]>([])
+const dateRange = ref<[string, string] | []>([])
+const tableVersion = ref(0)
 const query = reactive({ groupBy: '' })
 let chart: echarts.ECharts | null = null
+let loadRequestId = 0
 const employeeSaleDialog = reactive({
   open: false,
   loading: false,
@@ -272,22 +283,45 @@ function stockColumns(): ColumnConfig[] {
   ]
 }
 
-function loadData() {
+async function loadData() {
+  const requestId = ++loadRequestId
   loading.value = true
   const params = buildParams()
-  config.value.loader(params)
-    .then(async res => {
-      rows.value = Array.isArray(res) ? res : [res]
-      await nextTick()
-      renderChart()
-    })
-    .finally(() => loading.value = false)
+  try {
+    const res = await config.value.loader(params)
+    if (requestId !== loadRequestId) return
+    rows.value = Array.isArray(res) ? res : [res]
+    tableVersion.value += 1
+    await nextTick()
+    if (requestId !== loadRequestId) return
+    renderChart()
+  } finally {
+    if (requestId === loadRequestId) loading.value = false
+  }
 }
 
 function resetQuery() {
-  dateRange.value = []
+  dateRange.value = shouldUseDefaultMonth() ? currentMonthRange() : []
   query.groupBy = config.value.params?.groupBy || ''
   loadData()
+}
+
+function shouldUseDefaultMonth(path = route.path) {
+  return path === '/erp/report/employee-performance' || path === '/erp/report/employee-commission'
+}
+
+function currentMonthRange(): [string, string] {
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return [formatLocalDate(firstDay), formatLocalDate(lastDay)]
+}
+
+function formatLocalDate(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function buildParams() {
@@ -359,6 +393,12 @@ function chartLabel(row: any) {
   return row.date || row.groupName || row.productName || row.employeeName || row.warehouseName || ''
 }
 
+function reportRowKey(row: any) {
+  return [row.id, row.employeeId, row.groupKey, row.productId, row.warehouseId, row.billNo, row.date, chartLabel(row)]
+    .filter(value => value !== undefined && value !== null && value !== '')
+    .join('|')
+}
+
 function renderChart() {
   if (!showChart.value || !chartRef.value) {
     chart?.dispose()
@@ -389,10 +429,16 @@ function resizeChart() {
 
 watch(() => route.path, () => {
   query.groupBy = config.value.params?.groupBy || ''
+  if (shouldUseDefaultMonth() && dateRange.value.length !== 2) {
+    dateRange.value = currentMonthRange()
+  }
   loadData()
 })
 onMounted(() => {
   query.groupBy = config.value.params?.groupBy || ''
+  if (shouldUseDefaultMonth()) {
+    dateRange.value = currentMonthRange()
+  }
   loadData()
   window.addEventListener('resize', resizeChart)
 })

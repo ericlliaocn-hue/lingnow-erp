@@ -28,6 +28,7 @@ public class ErpBillSaveBO {
     private BigDecimal discountAmount;
     private BigDecimal otherAmount;
     private BigDecimal paidAmount;
+    private Boolean sample;
     private String paymentMethod;
     private String remark;
     private String attachmentUrl;

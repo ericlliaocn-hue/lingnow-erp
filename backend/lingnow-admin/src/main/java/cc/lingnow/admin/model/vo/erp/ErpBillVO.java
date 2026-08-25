@@ -32,6 +32,8 @@ public class ErpBillVO {
     private BigDecimal otherAmount;
     private BigDecimal payableAmount;
     private BigDecimal paidAmount;
+    private Boolean sample;
+    private BigDecimal profitCostAmount;
     private String paymentMethod;
     private BigDecimal debtAmount;
     private Integer auditStatus;
@@ -72,6 +74,9 @@ public class ErpBillVO {
         private String unitName;
         private Long warehouseId;
         private BigDecimal qty;
+        private BigDecimal basePrice;
+        private BigDecimal attributeExtraAmount;
+        private BigDecimal costPrice;
         private BigDecimal price;
         private BigDecimal amount;
         private BigDecimal discountRate;

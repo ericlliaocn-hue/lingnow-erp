@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container bill-form-page">
+  <div class="app-container bill-form-page notranslate" translate="no">
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
@@ -135,6 +135,11 @@
             </el-form-item>
           </el-col>
           <el-col :span="6"><el-form-item label="付款金额"><el-input-number v-model="form.paidAmount" :disabled="readonly" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col v-if="module === 'sale'" :span="6">
+            <el-form-item label="是否为样品">
+              <el-switch v-model="form.sample" :disabled="readonly" inline-prompt active-text="是" inactive-text="否" />
+            </el-form-item>
+          </el-col>
           <el-col :span="6"><el-form-item label="整单优惠"><el-input-number v-model="form.discountAmount" :disabled="readonly" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="其他费用"><el-input-number v-model="form.otherAmount" :disabled="readonly" :min="0" :precision="2" style="width: 100%" /></el-form-item></el-col>
         </el-row>
@@ -730,7 +735,7 @@ const canEditLineAmount = computed(() => !hideSaleFinancialFields.value)
 const canViewFinancialSummary = computed(() => !hideSaleFinancialFields.value)
 const paymentRequired = computed(() => Number(form.value.paidAmount || 0) > 0)
 const state = reactive({
-  form: { billDate: new Date().toISOString().slice(0, 10), partnerId: '', warehouseId: '', paymentMethod: '', paidAmount: 0, discountAmount: 0, otherAmount: 0, items: [] } as ErpBill,
+  form: { billDate: new Date().toISOString().slice(0, 10), partnerId: '', warehouseId: '', paymentMethod: '', paidAmount: 0, sample: false, discountAmount: 0, otherAmount: 0, items: [] } as ErpBill,
   rules: {
     billDate: [{ required: true, message: '日期不能为空', trigger: 'change' }],
     partnerId: [{ required: true, message: '往来单位不能为空', trigger: 'change' }],
@@ -798,9 +803,10 @@ const itemQtyRules = [{
 }]
 const totalQty = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.qty || 0), 0).toFixed(2))
 const totalAmount = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2))
-const costAmount = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.qty || 0) * lineCostPrice(row), 0).toFixed(2))
+const calculatedCostAmount = computed(() => form.value.items.reduce((sum, row) => sum + Number(row.qty || 0) * lineCostPrice(row), 0))
+const costAmount = computed(() => (form.value.sample ? 0 : Number(form.value.profitCostAmount ?? calculatedCostAmount.value)).toFixed(2))
 const payableAmount = computed(() => (Number(totalAmount.value) - Number(form.value.discountAmount || 0) + Number(form.value.otherAmount || 0)).toFixed(2))
-const profitAmount = computed(() => (Number(form.value.paidAmount || 0) - Number(costAmount.value)).toFixed(2))
+const profitAmount = computed(() => (form.value.sample ? 0 : Number(form.value.paidAmount || 0) - Number(costAmount.value)).toFixed(2))
 const categoryTree = computed(() => buildTree(categories.value))
 const attributeGroups = computed(() => uniqueById(attributes.value.filter(item => String(item.parentId || '0') === '0' && item.status === 1)))
 const showCostPrice = computed(() => isSaleLike.value)
@@ -856,7 +862,7 @@ async function loadData() {
   const id = route.query.id as string
   if (id) {
     getBill(module.value, id).then(res => {
-      form.value = { ...res, employeeId: res.employeeId ? String(res.employeeId) : '', productionUserId: res.productionUserId ? String(res.productionUserId) : '', productionUserName: res.productionUserName || '', items: (res.items || []).map(prepareBillItem) }
+      form.value = { ...res, sample: Boolean(res.sample), employeeId: res.employeeId ? String(res.employeeId) : '', productionUserId: res.productionUserId ? String(res.productionUserId) : '', productionUserName: res.productionUserName || '', items: (res.items || []).map(prepareBillItem) }
       form.value.items.forEach(row => {
         loadRowProducts(row)
         hydrateRowProductSnapshot(row)
@@ -898,6 +904,7 @@ function hasSaleDraftContent(source: ErpBill = form.value) {
     source.receiverAddress ||
     source.paymentMethod ||
     source.remark ||
+    source.sample ||
     Number(source.paidAmount || 0) > 0 ||
     Number(source.discountAmount || 0) > 0 ||
     Number(source.otherAmount || 0) > 0 ||
@@ -1099,6 +1106,9 @@ function addRow() {
   loadRowProducts(row)
 }
 function prepareBillItem(row: BillItem) {
+  if (row.costPrice !== undefined && row.costPrice !== null) {
+    row.purchasePrice = Number(row.costPrice)
+  }
   row.attributeSelections = attributeSelectionsFromIds(row.optionAttributeIds)
   row.availableAttributeIds = row.availableAttributeIds || attributeGroupIdsFromOptionIds(row.optionAttributeIds)
   if (!row.categoryLevel1Id && row.categoryLevel2Id) {
@@ -1171,6 +1181,8 @@ function clearRowProduct(row: BillItem) {
   row.unitId = undefined
   row.unitName = undefined
   row.purchasePrice = 0
+  row.costPrice = undefined
+  row.attributeExtraAmount = undefined
   row.basePrice = undefined
   row.price = 0
   row.amount = 0
@@ -1203,6 +1215,7 @@ async function productChanged(row: BillItem) {
   row.spec = product.spec
   row.unitId = product.unitId
   row.purchasePrice = Number(product.purchasePrice || 0)
+  row.costPrice = row.purchasePrice
   row.basePrice = isSaleLike.value ? Number(product.salePrice || 0) : Number(product.purchasePrice || 0)
   row.price = row.basePrice
   applyProductDefaultCategory(row, product)
@@ -1410,7 +1423,7 @@ function hydrateRowProductSnapshot(row: BillItem) {
     row.spec = product.spec || row.spec
     row.unitId = product.unitId || row.unitId
     row.unitName = product.unitName || row.unitName
-    if (showCostPrice.value) {
+    if (showCostPrice.value && (row.costPrice === undefined || row.costPrice === null)) {
       row.purchasePrice = Number(product.purchasePrice || 0)
     }
     if (row.basePrice === undefined || row.basePrice === null) {
@@ -1510,7 +1523,7 @@ function attributeExtraAmount(row: BillItem) {
   return selectedIds.reduce((sum, id) => sum + Number(byId.get(id)?.extraAmount || 0), 0)
 }
 function lineCostPrice(row: BillItem) {
-  return Number(row.purchasePrice || 0) + attributeExtraAmount(row)
+  return Number(row.costPrice ?? row.purchasePrice ?? 0)
 }
 function baseLinePrice(row: BillItem) {
   if (row.basePrice !== undefined && row.basePrice !== null) {
@@ -2181,9 +2194,11 @@ function missingRequiredFields() {
 }
 function sanitizeBill() {
   form.value.items.forEach(syncRowSnapshot)
+  const bill = { ...form.value }
+  delete bill.profitCostAmount
   return {
-    ...form.value,
-    items: form.value.items.map(({ optionProducts, attributeSelections, purchasePrice, basePrice, availableAttributeIds, availableAttributeText, productOptionsRequestId, productOptionsKeyword, ...item }) => item)
+    ...bill,
+    items: form.value.items.map(({ optionProducts, attributeSelections, purchasePrice, basePrice, attributeExtraAmount, costPrice, availableAttributeIds, availableAttributeText, productOptionsRequestId, productOptionsKeyword, ...item }) => item)
   } as ErpBill
 }
 function back() { router.push(`/erp/${module.value}/list`) }

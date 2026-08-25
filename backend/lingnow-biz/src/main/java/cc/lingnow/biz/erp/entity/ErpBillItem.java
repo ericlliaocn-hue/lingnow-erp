@@ -38,6 +38,9 @@ public class ErpBillItem extends BaseEntity implements Serializable {
     private Long unitId;
     private Long warehouseId;
     private BigDecimal qty;
+    private BigDecimal basePrice;
+    private BigDecimal attributeExtraAmount;
+    private BigDecimal costPrice;
     private BigDecimal price;
     private BigDecimal amount;
     private BigDecimal discountRate;

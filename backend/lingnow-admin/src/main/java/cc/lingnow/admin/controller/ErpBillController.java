@@ -184,6 +184,7 @@ public class ErpBillController {
         rollbackBillIfAudited(old);
         ErpBill bill = buildBill(type, bo);
         bill.setId(old.getId());
+        bill.setProfitCostAmount(old.getProfitCostAmount());
         if (bill.getEmployeeId() == null) {
             bill.setEmployeeId(old.getEmployeeId());
         }
@@ -256,6 +257,7 @@ public class ErpBillController {
         copy.setApprovalSubmitBy(null);
         copy.setApprovalSubmitTime(null);
         copy.setApprovalFinishTime(null);
+        copy.setProfitCostAmount(null);
         billService.save(copy);
 
         List<ErpBillItem> sourceItems = billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", source.getId()));
@@ -547,7 +549,7 @@ public class ErpBillController {
     }
 
     private ErpBill buildBill(String type, ErpBillSaveBO bo) {
-        List<ErpBillItem> items = buildItems(null, bo.getWarehouseId(), bo.getItems());
+        List<ErpBillItem> items = buildItems(type, null, bo.getWarehouseId(), bo.getItems());
         BigDecimal totalQty = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal itemDiscount = BigDecimal.ZERO;
@@ -578,6 +580,7 @@ public class ErpBillController {
         bill.setOtherAmount(otherAmount);
         bill.setPayableAmount(payable);
         bill.setPaidAmount(paidAmount);
+        bill.setSample(type.equals("SALE") && Boolean.TRUE.equals(bo.getSample()));
         bill.setDebtAmount(payable.subtract(paidAmount));
         bill.setPaymentStatus(paymentStatus(payable, paidAmount));
         bill.setAuditStatus(0);
@@ -587,11 +590,11 @@ public class ErpBillController {
     }
 
     private void saveItems(ErpBill bill, List<ErpBillSaveBO.Item> sourceItems) {
-        List<ErpBillItem> items = buildItems(bill.getId(), bill.getWarehouseId(), sourceItems);
+        List<ErpBillItem> items = buildItems(bill.getBillType(), bill.getId(), bill.getWarehouseId(), sourceItems);
         billItemService.saveBatch(items);
     }
 
-    private List<ErpBillItem> buildItems(Long billId, Long defaultWarehouseId, List<ErpBillSaveBO.Item> sourceItems) {
+    private List<ErpBillItem> buildItems(String billType, Long billId, Long defaultWarehouseId, List<ErpBillSaveBO.Item> sourceItems) {
         List<ErpBillItem> items = new ArrayList<>();
         for (ErpBillSaveBO.Item source : sourceItems) {
             ErpProduct product = productService.getById(source.getProductId());
@@ -600,6 +603,9 @@ public class ErpBillController {
             }
             BigDecimal qty = nvl(source.getQty());
             BigDecimal price = nvl(source.getPrice());
+            BigDecimal attributeExtraAmount = billType != null && billType.startsWith("SALE")
+                    ? optionExtraAmount(source.getOptionAttributeIds())
+                    : BigDecimal.ZERO;
             if (qty.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "数量必须大于0");
             }
@@ -632,6 +638,9 @@ public class ErpBillController {
             item.setUnitId(product.getUnitId());
             item.setWarehouseId(source.getWarehouseId() == null ? defaultWarehouseId : source.getWarehouseId());
             item.setQty(qty);
+            item.setBasePrice(price.subtract(attributeExtraAmount));
+            item.setAttributeExtraAmount(attributeExtraAmount);
+            item.setCostPrice(nvl(product.getPurchasePrice()));
             item.setPrice(price);
             item.setAmount(amount);
             item.setDiscountRate(rate);
@@ -661,7 +670,9 @@ public class ErpBillController {
                 ? billItemService.list(new QueryWrapper<ErpBillItem>().eq("bill_id", bill.getId()))
                 : List.of();
         if (includeCost && "SALE".equals(bill.getBillType())) {
-            vo.setCostAmount(billCostAmount(items));
+            vo.setCostAmount(Boolean.TRUE.equals(bill.getSample())
+                    ? BigDecimal.ZERO
+                    : bill.getProfitCostAmount() == null ? billCostAmount(items) : bill.getProfitCostAmount());
         }
         if (withItems) {
             vo.setItems(items.stream().map(this::itemVO).toList());
@@ -674,9 +685,8 @@ public class ErpBillController {
             return BigDecimal.ZERO;
         }
         Map<Long, BigDecimal> productCosts = productCostMap(items);
-        Map<Long, BigDecimal> optionExtras = optionExtraAmountMap(items);
         return items.stream()
-                .map(item -> itemCostAmount(item, productCosts, optionExtras))
+                .map(item -> itemCostAmount(item, productCosts))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -689,26 +699,20 @@ public class ErpBillController {
                 .collect(Collectors.toMap(ErpProduct::getId, product -> nvl(product.getPurchasePrice()), (a, b) -> a));
     }
 
-    private Map<Long, BigDecimal> optionExtraAmountMap(List<ErpBillItem> items) {
-        List<Long> optionIds = items.stream()
-                .flatMap(item -> optionAttributeIds(item.getOptionAttributeIds()).stream())
-                .distinct()
-                .toList();
-        if (optionIds.isEmpty()) {
-            return Map.of();
-        }
-        return attributeService.listByIds(optionIds).stream()
-                .collect(Collectors.toMap(ErpProductAttribute::getId, item -> nvl(item.getExtraAmount()), (a, b) -> a));
-    }
-
-    private BigDecimal itemCostAmount(ErpBillItem item, Map<Long, BigDecimal> productCosts, Map<Long, BigDecimal> optionExtras) {
-        BigDecimal unitCost = productCosts.getOrDefault(item.getProductId(), BigDecimal.ZERO).add(itemOptionExtraAmount(item, optionExtras));
+    private BigDecimal itemCostAmount(ErpBillItem item, Map<Long, BigDecimal> productCosts) {
+        BigDecimal unitCost = item.getCostPrice() == null
+                ? productCosts.getOrDefault(item.getProductId(), BigDecimal.ZERO)
+                : item.getCostPrice();
         return nvl(item.getQty()).multiply(unitCost);
     }
 
-    private BigDecimal itemOptionExtraAmount(ErpBillItem item, Map<Long, BigDecimal> optionExtras) {
-        return optionAttributeIds(item.getOptionAttributeIds()).stream()
-                .map(id -> optionExtras.getOrDefault(id, BigDecimal.ZERO))
+    private BigDecimal optionExtraAmount(String optionIds) {
+        List<Long> ids = optionAttributeIds(optionIds);
+        if (ids.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return attributeService.listByIds(ids).stream()
+                .map(item -> nvl(item.getExtraAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

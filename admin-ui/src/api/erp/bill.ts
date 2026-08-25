@@ -30,6 +30,8 @@ export interface BillItem {
   qty: number
   purchasePrice?: number
   basePrice?: number
+  attributeExtraAmount?: number
+  costPrice?: number
   price: number
   amount?: number
   discountRate?: number
@@ -62,6 +64,8 @@ export interface ErpBill {
   otherAmount?: number
   payableAmount?: number
   paidAmount?: number
+  sample?: boolean
+  profitCostAmount?: number
   paymentMethod?: string
   debtAmount?: number
   auditStatus?: number

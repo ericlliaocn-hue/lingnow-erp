@@ -43,6 +43,8 @@ public class ErpBill extends BaseEntity implements Serializable {
     private BigDecimal otherAmount;
     private BigDecimal payableAmount;
     private BigDecimal paidAmount;
+    private Boolean sample;
+    private BigDecimal profitCostAmount;
     private String paymentMethod;
     private BigDecimal debtAmount;
     private Integer auditStatus;
