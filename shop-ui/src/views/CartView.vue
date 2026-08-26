@@ -20,6 +20,15 @@
         <div class="cart-info">
           <h2 @click="goDetail(item.productId)">{{ item.productName }}</h2>
           <p>{{ item.spec || '多规格可选' }}</p>
+          <p class="main-product-line"><strong>主商品</strong><span>× {{ item.qty }}</span></p>
+          <div v-if="item.optionAttributeText" class="configured-options">
+            <span class="configuration-label">每件商品配置</span>
+            <p v-for="part in configurationParts(item.optionAttributeText)" :key="part">
+              <span>{{ part }}</span><b>× {{ item.qty }}</b>
+            </p>
+          </div>
+          <p v-if="item.basePrice <= 0" class="price-warning">销售价未维护，暂不能提交订单</p>
+          <p v-else class="price-detail">基础价 ￥{{ money(item.basePrice) }}<template v-if="item.attributeExtraAmount > 0"> ＋ 选配 ￥{{ money(item.attributeExtraAmount) }}</template></p>
           <div class="cart-price-row">
             <strong>{{ priceLabel(item.price) }}</strong>
             <span v-if="item.price > 0" class="line-subtotal">小计 ￥{{ money(item.price * item.qty) }}</span>
@@ -41,7 +50,7 @@
         <span>合计</span>
         <strong>{{ cart.totalAmount > 0 ? `￥${money(cart.totalAmount)}` : '询价' }}</strong>
       </div>
-      <button type="button" @click="checkout">去填写订单</button>
+      <button type="button" :disabled="hasInvalidPrice" @click="checkout">{{ hasInvalidPrice ? '存在未维护价格' : '去填写订单' }}</button>
     </footer>
 
     <BottomNav />
@@ -49,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { priceLabel } from '@/utils/label'
@@ -56,6 +66,7 @@ import BottomNav from './components/BottomNav.vue'
 
 const router = useRouter()
 const cart = useCartStore()
+const hasInvalidPrice = computed(() => cart.items.some(item => Number(item.basePrice || 0) <= 0))
 
 function money(value?: number) {
   return Number(value || 0).toFixed(2)
@@ -65,9 +76,13 @@ function goDetail(id: string) {
   router.push(`/products/${id}`)
 }
 
+function configurationParts(value?: string) {
+  return (value || '').split('/').map(item => item.trim()).filter(Boolean)
+}
+
 function checkout() {
-  const productIds = cart.items.map(item => item.productId).join(',')
-  router.push(productIds ? { path: '/orders/new', query: { productIds } } : '/home')
+  if (hasInvalidPrice.value) return
+  router.push(cart.items.length ? '/orders/new?fromCart=1' : '/home')
 }
 </script>
 
@@ -173,6 +188,16 @@ function checkout() {
   font-size: 12px;
 }
 
+.main-product-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 7px; color: var(--text-main) !important; background: var(--bg-cream-soft); }
+.main-product-line strong { font-size: 12px; }
+.main-product-line span { color: var(--brand-brown); font-weight: 800; }
+.configured-options { display: grid; gap: 4px; margin: 7px 0; padding: 7px 8px; border-radius: 7px; color: var(--brand-teal); background: #f2f8f6; }
+.configuration-label { font-size: 11px; font-weight: 800; }
+.configured-options p { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; color: var(--text-sub); line-height: 1.45; }
+.configured-options b { flex: none; color: var(--brand-teal); }
+.price-detail { color: var(--text-sub) !important; font-size: 11px !important; }
+.price-warning { color: #9b2c2c !important; font-weight: 800; }
+
 .cart-price-row {
   display: flex;
   align-items: baseline;
@@ -272,4 +297,6 @@ function checkout() {
   background: var(--brand-orange);
   font-weight: 900;
 }
+
+.cart-bar button:disabled { opacity: .55; }
 </style>

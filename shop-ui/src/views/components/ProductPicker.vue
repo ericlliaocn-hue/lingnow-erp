@@ -27,7 +27,7 @@
             v-for="item in filtered"
             :key="item.id"
             type="button"
-            :class="['picker-option', item.id === modelValue ? 'active' : '']"
+            :class="['picker-option', String(item.id) === String(modelValue) ? 'active' : '']"
             @click="pick(item)"
           >
             <img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" />
@@ -61,7 +61,7 @@ const visible = ref(false)
 const keyword = ref('')
 const searchRef = ref<HTMLInputElement>()
 
-const selected = computed(() => props.products.find(item => item.id === props.modelValue))
+const selected = computed(() => props.products.find(item => String(item.id) === String(props.modelValue)))
 const selectedLabel = computed(() => {
   if (!selected.value) return '请选择商品'
   const name = selected.value.name
@@ -85,7 +85,7 @@ function close() {
   visible.value = false
 }
 function pick(item: ShopProduct) {
-  emit('update:modelValue', item.id)
+  emit('update:modelValue', String(item.id))
   close()
 }
 

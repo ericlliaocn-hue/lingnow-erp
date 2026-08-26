@@ -7,11 +7,28 @@ export interface PageResult<T> {
 
 export interface ShopLoginVO {
   token: string
-  accountId: string
-  customerId: string
   username: string
   nickname?: string
-  customerName?: string
+  permissions?: string[]
+}
+
+export interface ShopCustomer {
+  id: string
+  code?: string
+  name: string
+  contact?: string
+  phone?: string
+  address?: string
+}
+
+export interface ShopCategory {
+  id: string
+  code?: string
+  name: string
+  parentId?: string
+  attributeIds?: string
+  sortOrder?: number
+  status?: number
 }
 
 export interface ShopRegisterPayload {
@@ -27,6 +44,8 @@ export interface ShopProduct {
   name: string
   spec?: string
   imageUrl?: string
+  categoryId?: string
+  categoryName?: string
   attributeIds?: string
   attributeText?: string
   salePrice?: number
@@ -150,6 +169,7 @@ export interface OrderSubmitItem {
 }
 
 export interface OrderSubmitPayload {
+  customerId: string
   addressId?: string
   receiverName?: string
   receiverPhone?: string

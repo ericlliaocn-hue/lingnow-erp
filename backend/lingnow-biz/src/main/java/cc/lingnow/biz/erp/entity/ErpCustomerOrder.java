@@ -28,6 +28,9 @@ public class ErpCustomerOrder extends BaseEntity implements Serializable {
     private String customerName;
     private Long accountId;
     private String accountName;
+    private Long employeeId;
+    private String employeeName;
+    private String source;
     private String status;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime orderTime;

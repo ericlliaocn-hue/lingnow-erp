@@ -8,27 +8,28 @@
     </header>
 
     <section class="page-inner category-layout">
+      <CustomerPicker class="customer-row" />
       <aside class="category-menu">
         <button
           v-for="item in categories"
-          :key="item.value"
-          :class="{ active: activeCategory === item.value }"
+          :key="item.id"
+          :class="{ active: activeCategory === item.id }"
           type="button"
-          @click="activeCategory = item.value"
+          @click="selectCategory(item.id)"
         >
-          {{ item.label }}
+          {{ item.name }}
         </button>
       </aside>
 
       <section class="category-content">
         <div class="category-banner">
           <span>{{ activeCategoryLabel }}</span>
-          <strong>{{ filteredProducts.length }} 件商品</strong>
+          <strong>{{ products.length }} 件商品</strong>
         </div>
 
         <div v-if="loading" class="empty">加载中...</div>
-        <div v-else-if="filteredProducts.length === 0" class="empty">这个分类暂时没有商品</div>
-        <article v-for="item in filteredProducts" :key="item.id" class="category-product">
+        <div v-else-if="products.length === 0" class="empty">这个分类暂时没有商品</div>
+        <article v-for="item in products" :key="item.id" class="category-product">
           <img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" />
           <div v-else class="image-empty">荣时</div>
           <div>
@@ -37,12 +38,14 @@
             <strong>{{ priceLabel(item.salePrice) }}</strong>
             <div class="product-btns">
               <button type="button" class="detail-btn" @click="goDetail(item)">看详情</button>
-              <button type="button" class="cart-btn" @click="addToCart(item)">加入购物车</button>
+              <button type="button" class="cart-btn" @click="configure(item)">选规格</button>
             </div>
           </div>
         </article>
       </section>
     </section>
+
+    <ProductConfigurator :open="Boolean(configuringProduct)" :product="configuringProduct" @close="configuringProduct = null" @confirm="addConfigured" />
 
     <BottomNav />
   </main>
@@ -51,59 +54,58 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { listProducts } from '@/api/shop'
+import { listCategories, listProducts } from '@/api/shop'
 import { useCartStore } from '@/stores/cart'
 import { priceLabel } from '@/utils/label'
-import type { ShopProduct } from '@/types/shop'
+import type { ShopCategory, ShopProduct } from '@/types/shop'
 import BottomNav from './components/BottomNav.vue'
-
-type CategoryValue = 'all' | 'hanger' | 'pants' | 'wood' | 'custom'
+import CustomerPicker from './components/CustomerPicker.vue'
+import ProductConfigurator, { type ProductConfiguration } from './components/ProductConfigurator.vue'
 
 const router = useRouter()
 const cart = useCartStore()
 const loading = ref(false)
 const products = ref<ShopProduct[]>([])
-const activeCategory = ref<CategoryValue>('all')
-const categories = [
-  { label: '全部商品', value: 'all' },
-  { label: '衣架', value: 'hanger' },
-  { label: '裤架', value: 'pants' },
-  { label: '木质系列', value: 'wood' },
-  { label: '配件', value: 'custom' }
-] as const
+const categoryRecords = ref<ShopCategory[]>([])
+const activeCategory = ref('all')
+const configuringProduct = ref<ShopProduct | null>(null)
+const categories = computed(() => [{ id: 'all', name: '全部商品' } as ShopCategory, ...categoryRecords.value])
 
-const activeCategoryLabel = computed(() => categories.find(item => item.value === activeCategory.value)?.label || '全部商品')
-const filteredProducts = computed(() => products.value.filter(item => matchesCategory(item, activeCategory.value)))
-
-function matchesCategory(item: ShopProduct, category: CategoryValue) {
-  if (category === 'all') return true
-  const text = `${item.name || ''} ${item.spec || ''} ${item.attributeText || ''}`
-  if (category === 'hanger') return /衣架|女款|男款|网红|宽肩/.test(text)
-  if (category === 'pants') return /裤架|裤夹/.test(text)
-  if (category === 'wood') return /木|荷木|橡胶木|榉木/.test(text)
-  if (category === 'custom') return /配件|裤夹|夹|钩|肩托|胶粒|标识/.test(text)
-  return true
-}
+const activeCategoryLabel = computed(() => categories.value.find(item => item.id === activeCategory.value)?.name || '全部商品')
 
 function goDetail(item: ShopProduct) {
   router.push(`/products/${item.id}`)
 }
 
-function addToCart(item: ShopProduct) {
-  cart.addProduct(item)
+function configure(item: ShopProduct) {
+  configuringProduct.value = item
 }
 
-async function loadData() {
+function addConfigured(configuration: ProductConfiguration) {
+  if (!configuringProduct.value) return
+  cart.addConfigured(configuringProduct.value, configuration, configuration.qty)
+  configuringProduct.value = null
+}
+
+async function loadProducts() {
   loading.value = true
   try {
-    const res = await listProducts({ current: 1, size: 200 })
+    const res = await listProducts({ current: 1, size: 500, categoryId: activeCategory.value === 'all' ? undefined : activeCategory.value })
     products.value = res.records
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadData)
+async function selectCategory(id: string) {
+  activeCategory.value = id
+  await loadProducts()
+}
+
+onMounted(async () => {
+  categoryRecords.value = await listCategories()
+  await loadProducts()
+})
 </script>
 
 <style scoped>
@@ -135,6 +137,8 @@ onMounted(loadData)
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 10px;
 }
+
+.customer-row { grid-column: 1 / -1; }
 
 .category-menu {
   position: sticky;

@@ -8,7 +8,12 @@ export interface CartItem {
   productName: string
   productImageUrl?: string
   spec?: string
+  basePrice: number
+  attributeExtraAmount: number
   price: number
+  optionAttributeIds: string
+  optionAttributeText: string
+  logoImageUrl?: string
   qty: number
 }
 
@@ -23,20 +28,34 @@ export const useCartStore = defineStore('cart', {
     totalAmount: (state) => state.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0)
   },
   actions: {
-    addProduct(product: ShopProduct, qty = 1) {
+    addConfigured(product: ShopProduct, configuration: {
+      optionAttributeIds?: string
+      optionAttributeText?: string
+      attributeExtraAmount?: number
+      logoImageUrl?: string
+    }, qty = 1) {
       const productId = String(product.id)
-      const current = this.items.find(item => item.productId === productId)
+      const optionAttributeIds = configuration.optionAttributeIds || ''
+      const signature = `${productId}|${optionAttributeIds}|${configuration.logoImageUrl || ''}`
+      const current = this.items.find(item => item.key === signature)
       if (current) {
         current.qty += qty
       } else {
+        const basePrice = Number(product.salePrice || 0)
+        const attributeExtraAmount = Number(configuration.attributeExtraAmount || 0)
         this.items.push({
-          key: `${Date.now()}-${productId}`,
+          key: signature,
           productId,
           productCode: product.code,
           productName: product.name,
           productImageUrl: product.imageUrl,
           spec: product.spec,
-          price: Number(product.salePrice || 0),
+          basePrice,
+          attributeExtraAmount,
+          price: basePrice + attributeExtraAmount,
+          optionAttributeIds,
+          optionAttributeText: configuration.optionAttributeText || '',
+          logoImageUrl: configuration.logoImageUrl,
           qty
         })
       }
@@ -67,7 +86,13 @@ function readCart(): CartItem[] {
   if (!raw) return []
   try {
     const records = JSON.parse(raw) as CartItem[]
-    return Array.isArray(records) ? records.filter(item => item.productId && item.productName) : []
+    return Array.isArray(records) ? records.filter(item => item.productId && item.productName).map(item => ({
+      ...item,
+      basePrice: Number(item.basePrice ?? item.price ?? 0),
+      attributeExtraAmount: Number(item.attributeExtraAmount || 0),
+      optionAttributeIds: item.optionAttributeIds || '',
+      optionAttributeText: item.optionAttributeText || ''
+    })) : []
   } catch (err) {
     localStorage.removeItem(CART_KEY)
     return []

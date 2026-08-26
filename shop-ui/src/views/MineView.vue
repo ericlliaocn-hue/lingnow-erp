@@ -16,7 +16,6 @@
         <p>保存收货信息，查看每一笔购买记录。</p>
         <div class="login-actions">
           <RouterLink to="/login">登录</RouterLink>
-          <RouterLink to="/login?mode=register">注册</RouterLink>
         </div>
       </div>
 

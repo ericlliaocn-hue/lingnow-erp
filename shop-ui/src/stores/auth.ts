@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import { login as loginApi, logout as logoutApi, me, register as registerApi } from '@/api/shop'
-import type { ShopLoginVO, ShopRegisterPayload } from '@/types/shop'
+import { login as loginApi, logout as logoutApi, me } from '@/api/shop'
+import type { ShopLoginVO } from '@/types/shop'
 
-const TOKEN_KEY = 'token-shop'
-const USER_KEY = 'shop-user'
+const TOKEN_KEY = 'token-sales-h5'
+const USER_KEY = 'sales-h5-user'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -14,11 +14,6 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(username: string, password: string) {
       const data = await loginApi({ username, password })
-      this.setSession(data)
-      return data
-    },
-    async register(payload: ShopRegisterPayload) {
-      const data = await registerApi(payload)
       this.setSession(data)
       return data
     },
@@ -44,6 +39,8 @@ export const useAuthStore = defineStore('auth', {
       this.userLoaded = false
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
+      localStorage.removeItem('sales-customer-id')
+      localStorage.removeItem('sales-customer-name')
     }
   }
 })

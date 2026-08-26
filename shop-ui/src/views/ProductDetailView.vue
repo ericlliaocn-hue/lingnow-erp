@@ -85,6 +85,7 @@
         <button class="action-btn buy" type="button" @click="buyNow">立即购买</button>
       </div>
     </footer>
+    <ProductConfigurator :open="configOpen" :product="product" @close="configOpen = false" @confirm="addConfigured" />
   </main>
 </template>
 
@@ -95,6 +96,7 @@ import { getProduct } from '@/api/shop'
 import { useCartStore } from '@/stores/cart'
 import { priceLabel, productTags } from '@/utils/label'
 import type { ShopProduct } from '@/types/shop'
+import ProductConfigurator, { type ProductConfiguration } from './components/ProductConfigurator.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,6 +104,7 @@ const cart = useCartStore()
 const product = ref<ShopProduct | null>(null)
 const loading = ref(false)
 const qty = ref(1)
+const configOpen = ref(false)
 
 const tags = computed(() => (product.value ? productTags(product.value) : []))
 const materialText = computed(() => {
@@ -131,14 +134,18 @@ function changeQty(delta: number) {
 }
 
 function addToCart() {
-  if (!product.value) return
-  cart.addProduct(product.value, qty.value)
-  qty.value = 1
+  configOpen.value = true
 }
 
 function buyNow() {
+  configOpen.value = true
+}
+
+function addConfigured(configuration: ProductConfiguration) {
   if (!product.value) return
-  router.push({ path: '/orders/new', query: { productId: product.value.id } })
+  cart.addConfigured(product.value, configuration, configuration.qty)
+  configOpen.value = false
+  router.push('/cart')
 }
 
 function goBack() {
@@ -155,6 +162,7 @@ async function loadProduct() {
   loading.value = true
   try {
     product.value = await getProduct(id)
+    configOpen.value = true
   } catch {
     product.value = null
   } finally {

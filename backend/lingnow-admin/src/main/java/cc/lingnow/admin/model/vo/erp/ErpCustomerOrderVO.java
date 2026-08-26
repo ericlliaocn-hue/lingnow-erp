@@ -14,6 +14,9 @@ public class ErpCustomerOrderVO {
     private String customerName;
     private Long accountId;
     private String accountName;
+    private Long employeeId;
+    private String employeeName;
+    private String source;
     private String status;
     private LocalDateTime orderTime;
     private BigDecimal totalQty;

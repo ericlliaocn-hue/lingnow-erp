@@ -1,6 +1,7 @@
 <template>
   <main class="page order-page">
     <section class="page-inner">
+      <CustomerPicker @change="onCustomerChange" />
       <div class="card receiver-card" @click="openAddressList">
         <div class="card-title-row">
           <span>收货地址</span>
@@ -37,6 +38,7 @@
           </button>
           <div v-else class="summary-img-empty">荣时</div>
           <div class="product-summary-info">
+            <span class="main-product-tag">主商品 × {{ item.qty }}</span>
             <strong>{{ productOf(item)?.name }}</strong>
             <p>{{ productSummary(productOf(item)) }}</p>
             <span class="price">￥{{ itemPrice(item).toFixed(2) }}</span>
@@ -49,18 +51,24 @@
         </div>
 
         <div v-for="group in attributeGroups(item)" :key="group.id" class="attribute-group">
-          <div class="attribute-title">{{ displayShopLabel(group.name) }}</div>
+          <div class="attribute-title">{{ displayShopLabel(group.name) }} <small>每件商品配置</small></div>
           <div class="attribute-options">
             <button
               v-for="option in group.options"
               :key="option.id"
               type="button"
-              :class="['option-button', item.selectedOptions[group.id] === option.id ? 'active' : '']"
-              @click="selectOption(item, group.id, option.id)"
+              :class="['option-button', item.selectedOptions[String(group.id)] === String(option.id) ? 'active' : '']"
+              @click="selectOption(item, String(group.id), String(option.id))"
             >
               {{ displayShopLabel(option.name) }}<span v-if="Number(option.extraAmount || 0) > 0"> +￥{{ money(option.extraAmount) }}</span>
             </button>
           </div>
+        </div>
+
+        <div v-if="productOf(item)" class="composition-summary">
+          <div><strong>本次购买</strong><span>配置数量跟随主商品</span></div>
+          <p><span>{{ productOf(item)?.name }}</span><b>× {{ item.qty }}</b></p>
+          <p v-for="part in selectedConfiguration(item)" :key="part"><span>{{ part }}</span><b>× {{ item.qty }}</b></p>
         </div>
 
         <label class="field">
@@ -109,8 +117,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAddress, listAddresses, listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
 import { displayShopLabel } from '@/utils/label'
-import type { OrderSubmitPayload, ShopAddress, ShopAttribute, ShopProduct } from '@/types/shop'
+import type { OrderSubmitPayload, ShopAddress, ShopAttribute, ShopCustomer, ShopProduct } from '@/types/shop'
 import ProductPicker from './components/ProductPicker.vue'
+import CustomerPicker from './components/CustomerPicker.vue'
+import { useCartStore } from '@/stores/cart'
 
 interface DraftItem {
   key: string
@@ -125,6 +135,7 @@ const CHECKOUT_DRAFT_KEY = 'rs-checkout-draft'
 
 const route = useRoute()
 const router = useRouter()
+const cart = useCartStore()
 const products = ref<ShopProduct[]>([])
 const attributes = ref<ShopAttribute[]>([])
 const items = ref<DraftItem[]>([])
@@ -135,8 +146,8 @@ const previewImageUrl = ref('')
 const form = reactive({
   remark: ''
 })
-const productMap = computed(() => new Map(products.value.map(item => [item.id, item])))
-const attributeMap = computed(() => new Map(attributes.value.map(item => [item.id, item])))
+const productMap = computed(() => new Map(products.value.map(item => [String(item.id), item])))
+const attributeMap = computed(() => new Map(attributes.value.map(item => [String(item.id), item])))
 const totalQty = computed(() => items.value.reduce((sum, item) => sum + Number(item.qty || 0), 0))
 const totalAmount = computed(() => items.value.reduce((sum, item) => sum + itemAmount(item), 0))
 
@@ -145,7 +156,7 @@ function createItem(productId = ''): DraftItem {
 }
 
 function productOf(item: DraftItem) {
-  return productMap.value.get(item.productId)
+  return productMap.value.get(String(item.productId))
 }
 
 function productSummary(product?: ShopProduct) {
@@ -179,6 +190,14 @@ function selectedOptionIds(item: DraftItem) {
   return Object.values(item.selectedOptions).filter(Boolean)
 }
 
+function selectedConfiguration(item: DraftItem) {
+  return attributeGroups(item).map(group => {
+    const optionId = item.selectedOptions[String(group.id)]
+    const option = group.options.find(record => String(record.id) === String(optionId || ''))
+    return option ? `${displayShopLabel(group.name)}：${displayShopLabel(option.name)}` : ''
+  }).filter(Boolean)
+}
+
 function itemPrice(item: DraftItem) {
   const product = productOf(item)
   const basePrice = Number(product?.salePrice || 0)
@@ -191,7 +210,9 @@ function itemAmount(item: DraftItem) {
 }
 
 function selectOption(item: DraftItem, groupId: string, optionId: string) {
-  item.selectedOptions[groupId] = item.selectedOptions[groupId] === optionId ? '' : optionId
+  const normalizedGroupId = String(groupId)
+  const normalizedOptionId = String(optionId)
+  item.selectedOptions[normalizedGroupId] = item.selectedOptions[normalizedGroupId] === normalizedOptionId ? '' : normalizedOptionId
 }
 
 function normalizeQty(item: DraftItem) {
@@ -267,6 +288,10 @@ function validate() {
   if (validItems.length === 0) {
     return '请至少选择一个商品并填写数量'
   }
+  const invalidPriceItem = validItems.find(item => Number(productOf(item)?.salePrice || 0) <= 0)
+  if (invalidPriceItem) {
+    return `${productOf(invalidPriceItem)?.name || '所选商品'}销售价未维护，请先在商品管理中补全`
+  }
   if (items.value.some(item => item.productId && Number(item.qty || 0) <= 0)) {
     return '商品数量必须大于 0'
   }
@@ -274,11 +299,17 @@ function validate() {
 }
 
 async function submit() {
+  const customerId = localStorage.getItem('sales-customer-id') || ''
+  if (!customerId) {
+    error.value = '请先选择客户'
+    return
+  }
   error.value = validate()
   if (error.value) {
     return
   }
   const payload: OrderSubmitPayload = {
+    customerId,
     addressId: selectedAddress.value?.id,
     receiverName: selectedAddress.value?.receiverName,
     receiverPhone: selectedAddress.value?.receiverPhone,
@@ -296,6 +327,7 @@ async function submit() {
   saving.value = true
   try {
     const id = await submitOrder(payload)
+    cart.clear()
     sessionStorage.removeItem(CHECKOUT_DRAFT_KEY)
     router.replace(`/orders/${id}`)
   } catch (err) {
@@ -306,6 +338,9 @@ async function submit() {
 }
 
 function routeProductIds() {
+  if (route.query.fromCart === '1') {
+    return cart.items.map(item => item.productId)
+  }
   const productIds = typeof route.query.productIds === 'string'
     ? route.query.productIds.split(',').map(item => item.trim()).filter(Boolean)
     : []
@@ -314,17 +349,34 @@ function routeProductIds() {
 }
 
 async function loadData() {
-  const [productRes, attributeRes, addressRecords] = await Promise.all([
+  const [productRes, attributeRes] = await Promise.all([
     listProducts({ current: 1, size: 1000 }),
-    listAttributes(),
-    listAddresses()
+    listAttributes()
   ])
   products.value = productRes.records
   attributes.value = attributeRes
   const ids = routeProductIds()
-  items.value = ids.length ? ids.map(id => createItem(id)) : [createItem()]
-  restoreDraft(ids)
-  await loadSelectedAddress(addressRecords)
+  if (route.query.fromCart === '1' && cart.items.length) {
+    items.value = cart.items.map(record => {
+      const selectedOptions: Record<string, string> = {}
+      splitIds(record.optionAttributeIds).forEach(optionId => {
+        const option = attributes.value.find(item => String(item.id) === String(optionId))
+        if (option?.parentId) selectedOptions[String(option.parentId)] = String(optionId)
+      })
+      return { ...createItem(record.productId), qty: record.qty, selectedOptions, logoImageUrl: record.logoImageUrl || '' }
+    })
+  } else {
+    items.value = ids.length ? ids.map(id => createItem(id)) : [createItem()]
+  }
+  if (route.query.fromCart !== '1') restoreDraft(ids)
+  if (localStorage.getItem('sales-customer-id')) {
+    await loadSelectedAddress(await listAddresses())
+  }
+}
+
+async function onCustomerChange(_customer: ShopCustomer) {
+  selectedAddress.value = undefined
+  await loadSelectedAddress(await listAddresses())
 }
 
 async function loadSelectedAddress(addressRecords: ShopAddress[]) {
@@ -344,6 +396,10 @@ async function loadSelectedAddress(addressRecords: ShopAddress[]) {
 }
 
 function openAddressList() {
+  if (!localStorage.getItem('sales-customer-id')) {
+    error.value = '请先选择客户'
+    return
+  }
   saveDraft()
   router.push({ path: '/addresses', query: { select: '1', redirect: route.fullPath } })
 }
@@ -524,6 +580,8 @@ onMounted(loadData)
   min-width: 0;
 }
 
+.main-product-tag { display: inline-flex; margin-bottom: 4px; padding: 2px 7px; border-radius: var(--radius-pill); color: var(--brand-teal); background: #e6f2ef; font-size: 11px; font-weight: 800; }
+
 .product-summary-info strong {
   display: -webkit-box;
   overflow: hidden;
@@ -579,6 +637,16 @@ onMounted(loadData)
   color: var(--text-sub);
   font-size: 13px;
 }
+
+.attribute-title small { margin-left: 4px; color: var(--brand-teal); font-size: 11px; font-weight: 400; }
+
+.composition-summary { margin-bottom: 12px; padding: 10px; border: 1px solid #c8dfd9; border-radius: var(--radius-sm); background: #f2f8f6; }
+.composition-summary > div, .composition-summary p { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.composition-summary > div { margin-bottom: 6px; }
+.composition-summary > div strong { color: var(--text-main); font-size: 13px; }
+.composition-summary > div span { color: var(--brand-teal); font-size: 11px; }
+.composition-summary p { margin: 0; padding: 5px 0; border-top: 1px dashed #d2e4df; color: var(--text-sub); font-size: 12px; }
+.composition-summary b { flex: none; color: var(--brand-teal); }
 
 .attribute-options {
   display: flex;

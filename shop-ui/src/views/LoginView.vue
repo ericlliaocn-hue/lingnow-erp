@@ -4,23 +4,17 @@
       <div class="form-side">
         <div class="form-head">
           <p class="eyebrow">荣时衣架</p>
-          <h1>{{ mode === 'login' ? '登录账号' : '注册账号' }}</h1>
+          <h1>业务员登录</h1>
         </div>
 
-        <div class="mode-tabs" aria-label="账号操作">
-          <button type="button" :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button>
-          <button type="button" :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</button>
-        </div>
-
-        <form v-if="mode === 'login'" class="auth-form" @submit.prevent="submitLogin">
+        <form class="auth-form" @submit.prevent="submitLogin">
           <label class="field">
-            <span>手机号</span>
+            <span>ERP账号</span>
             <input
               v-model.trim="loginForm.username"
               class="input"
               autocomplete="username"
-              inputmode="tel"
-              placeholder="请输入手机号"
+              placeholder="请输入ERP账号"
             />
           </label>
           <label class="field">
@@ -37,48 +31,7 @@
           <button class="primary-button" type="submit" :disabled="loading">{{ loading ? '登录中...' : '登录' }}</button>
         </form>
 
-        <form v-else class="auth-form" @submit.prevent="submitRegister">
-          <label class="field">
-            <span>昵称</span>
-            <input v-model.trim="registerForm.name" class="input" autocomplete="nickname" placeholder="请输入昵称" />
-          </label>
-          <label class="field">
-            <span>手机号</span>
-            <input
-              v-model.trim="registerForm.phone"
-              class="input"
-              autocomplete="tel"
-              inputmode="tel"
-              placeholder="请输入手机号"
-            />
-          </label>
-          <label class="field">
-            <span>设置密码</span>
-            <input
-              v-model="registerForm.password"
-              class="input"
-              type="password"
-              autocomplete="new-password"
-              placeholder="请输入 6-32 位密码"
-            />
-          </label>
-          <label class="field">
-            <span>确认密码</span>
-            <input
-              v-model="registerForm.confirmPassword"
-              class="input"
-              type="password"
-              autocomplete="new-password"
-              placeholder="请再次输入密码"
-            />
-          </label>
-          <p v-if="error" class="form-error">{{ error }}</p>
-          <button class="primary-button" type="submit" :disabled="loading">{{ loading ? '注册中...' : '注册并进入' }}</button>
-        </form>
-
-        <button class="switch-link" type="button" @click="switchMode(mode === 'login' ? 'register' : 'login')">
-          {{ mode === 'login' ? '还没有账号，立即注册' : '已有账号，返回登录' }}
-        </button>
+        <p class="switch-link">使用现有ERP业务员账号登录</p>
       </div>
     </section>
   </main>
@@ -89,48 +42,34 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-type AuthMode = 'login' | 'register'
-
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
-const mode = ref<AuthMode>(route.query.mode === 'register' ? 'register' : 'login')
 const heroImage = `${import.meta.env.BASE_URL}images/rs-hanger-hero.png`
 const loginBackgroundStyle = {
   backgroundImage: `url(${heroImage})`
 }
 const loginForm = reactive({ username: '', password: '' })
-const registerForm = reactive({ name: '', phone: '', password: '', confirmPassword: '' })
-
-function switchMode(value: AuthMode) {
-  mode.value = value
-  error.value = ''
-}
 
 function redirectAfterAuth() {
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/home'
   router.replace(redirect)
 }
 
-function validatePhone(phone: string) {
-  return /^1\d{10}$/.test(phone)
-}
-
 /** 把后端原始报错包装成友好文案，避免 ERP 内部话术外露 */
 function friendlyError(action: string, err: unknown) {
   const raw = err instanceof Error ? err.message : ''
-  if (/不存在|未注册|找不到/.test(raw)) return '账号不存在，请先注册'
-  if (/密码|credential/i.test(raw)) return '手机号或密码不正确'
-  if (/已注册|已存在|duplicate/i.test(raw)) return '该手机号已注册，请直接登录'
+  if (/不存在|未注册|找不到/.test(raw)) return 'ERP账号不存在'
+  if (/密码|credential/i.test(raw)) return '账号或密码不正确'
   return raw || `${action}失败，请稍后重试`
 }
 
 async function submitLogin() {
   error.value = ''
-  if (!validatePhone(loginForm.username)) {
-    error.value = '请输入正确的手机号'
+  if (!loginForm.username) {
+    error.value = '请输入ERP账号'
     return
   }
   if (!loginForm.password) {
@@ -148,34 +87,6 @@ async function submitLogin() {
   }
 }
 
-async function submitRegister() {
-  error.value = ''
-  if (!registerForm.name) {
-    error.value = '请输入昵称'
-    return
-  }
-  if (!validatePhone(registerForm.phone)) {
-    error.value = '请输入正确的手机号'
-    return
-  }
-  if (registerForm.password.length < 6 || registerForm.password.length > 32) {
-    error.value = '密码长度需为 6-32 位'
-    return
-  }
-  if (registerForm.password !== registerForm.confirmPassword) {
-    error.value = '两次输入的密码不一致'
-    return
-  }
-  loading.value = true
-  try {
-    await auth.register({ ...registerForm })
-    redirectAfterAuth()
-  } catch (err) {
-    error.value = friendlyError('注册', err)
-  } finally {
-    loading.value = false
-  }
-}
 </script>
 
 <style scoped>

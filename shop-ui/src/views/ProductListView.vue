@@ -31,13 +31,13 @@
       <section class="category-strip" aria-label="商品分类">
         <button
           v-for="item in categories"
-          :key="item.value"
-          :class="['category-pill', activeCategory === item.value ? 'active' : '']"
+          :key="item.id"
+          :class="['category-pill', activeCategory === item.id ? 'active' : '']"
           type="button"
-          @click="activeCategory = item.value"
+          @click="activeCategory = item.id"
         >
-          <span>{{ item.label }}</span>
-          <small>{{ categoryCount(item.value) }}</small>
+          <span>{{ item.name }}</span>
+          <small>{{ categoryCount(item.id) }}</small>
         </button>
       </section>
 
@@ -88,54 +88,56 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { listProducts } from '@/api/shop'
+import { listCategories, listProducts } from '@/api/shop'
 import { useAuthStore } from '@/stores/auth'
-import { useCartStore } from '@/stores/cart'
 import { priceLabel, productSubtitle, productTags } from '@/utils/label'
-import type { ShopProduct } from '@/types/shop'
+import type { ShopCategory, ShopProduct } from '@/types/shop'
 import BottomNav from './components/BottomNav.vue'
-
-type CategoryValue = 'all' | 'hanger' | 'pants' | 'wood' | 'custom'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const cart = useCartStore()
 const searchInputRef = ref<HTMLInputElement>()
 const keyword = ref('')
 const current = ref(1)
-const size = 20
+const size = 500
 const total = ref(0)
 const loading = ref(false)
 const products = ref<ShopProduct[]>([])
-const activeCategory = ref<CategoryValue>('all')
-const categories = [
-  { label: '全部', value: 'all' },
-  { label: '衣架', value: 'hanger' },
-  { label: '裤架', value: 'pants' },
-  { label: '木质', value: 'wood' },
-  { label: '配件', value: 'custom' }
-] as const
+const activeCategory = ref('all')
+const categoryRecords = ref<ShopCategory[]>([])
+const categories = computed(() => [{ id: 'all', name: '全部' } as ShopCategory, ...categoryRecords.value])
 
 const hasMore = computed(() => products.value.length < total.value)
-const visibleProducts = computed(() => products.value.filter(item => matchesCategory(item, activeCategory.value)))
+const visibleProducts = computed(() => {
+  if (activeCategory.value === 'all') return products.value
+  const ids = descendantCategoryIds(activeCategory.value)
+  return products.value.filter(item => item.categoryId && ids.has(item.categoryId))
+})
 
-function categoryLabel(value: CategoryValue) {
-  return categories.find(item => item.value === value)?.label || '全部商品'
+function categoryLabel(value: string) {
+  return categories.value.find(item => item.id === value)?.name || '全部商品'
 }
 
-function matchesCategory(item: ShopProduct, category: CategoryValue) {
-  if (category === 'all') return true
-  const text = `${item.name || ''} ${item.spec || ''} ${item.attributeText || ''}`
-  if (category === 'hanger') return /衣架|女款|男款|网红|宽肩/.test(text)
-  if (category === 'pants') return /裤架|裤夹/.test(text)
-  if (category === 'wood') return /木|荷木|橡胶木|榉木/.test(text)
-  if (category === 'custom') return /配件|裤夹|夹|钩|肩托|胶粒|标识/.test(text)
-  return true
+function descendantCategoryIds(rootId: string) {
+  const ids = new Set([rootId])
+  let changed = true
+  while (changed) {
+    changed = false
+    categoryRecords.value.forEach(item => {
+      if (item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
+        ids.add(item.id)
+        changed = true
+      }
+    })
+  }
+  return ids
 }
 
-function categoryCount(category: CategoryValue) {
-  return products.value.filter(item => matchesCategory(item, category)).length
+function categoryCount(category: string) {
+  if (category === 'all') return products.value.length
+  const ids = descendantCategoryIds(category)
+  return products.value.filter(item => item.categoryId && ids.has(item.categoryId)).length
 }
 
 async function fetchList(reset = false) {
@@ -171,7 +173,7 @@ function goDetail(id: string) {
 }
 
 function addToCart(item: ShopProduct) {
-  cart.addProduct(item)
+  router.push(`/products/${item.id}`)
 }
 
 function goMine() {
@@ -179,12 +181,11 @@ function goMine() {
 }
 
 onMounted(() => {
-  // 从首页金刚区带入的预选分类
-  const queryCategory = String(route.query.category || '') as CategoryValue
-  if (['hanger', 'pants', 'wood', 'custom'].includes(queryCategory)) {
-    activeCategory.value = queryCategory
-  }
-  fetchList(true)
+  Promise.all([listCategories(), fetchList(true)]).then(([records]) => {
+    categoryRecords.value = records
+    const queryCategory = String(route.query.category || '')
+    if (categoryRecords.value.some(item => item.id === queryCategory)) activeCategory.value = queryCategory
+  })
 })
 </script>
 

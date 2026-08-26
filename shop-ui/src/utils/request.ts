@@ -4,7 +4,7 @@ import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
 
 const service = axios.create({
-  baseURL: '/admin-api/shop-api',
+  baseURL: '/admin-api',
   timeout: 12000,
   transformResponse: [
     function (data) {
@@ -23,20 +23,16 @@ const service = axios.create({
 })
 
 service.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token-shop')
+  const token = localStorage.getItem('token-sales-h5')
   if (token) {
     if (!config.headers) {
       config.headers = new axios.AxiosHeaders()
     }
     if (typeof config.headers.set === 'function') {
-      config.headers.set('token-shop', token)
-      config.headers.set('satoken-shop', token)
       config.headers.set('token-admin', token)
       config.headers.set('satoken', token)
       config.headers.set('Authorization', token)
     } else {
-      config.headers['token-shop'] = token
-      config.headers['satoken-shop'] = token
       config.headers['token-admin'] = token
       config.headers['satoken'] = token
       config.headers['Authorization'] = token

@@ -10,6 +10,7 @@ import java.util.List;
 
 @Data
 public class ShopOrderSubmitBO {
+    private Long customerId;
     private Long addressId;
     private String receiverName;
     private String receiverPhone;

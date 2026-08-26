@@ -14,6 +14,7 @@
     </header>
 
     <section class="page-inner home-content">
+      <CustomerPicker />
       <!-- Banner 轮播 -->
       <section v-if="banners.length" class="banner-section">
         <div class="banner-track" :style="{ transform: `translateX(-${bannerIndex * 100}%)` }">
@@ -123,13 +124,12 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { listProducts } from '@/api/shop'
-import { useCartStore } from '@/stores/cart'
 import { priceLabel, productSubtitle, productTags } from '@/utils/label'
 import type { ShopProduct } from '@/types/shop'
 import BottomNav from './components/BottomNav.vue'
+import CustomerPicker from './components/CustomerPicker.vue'
 
 const router = useRouter()
-const cart = useCartStore()
 const current = ref(1)
 const size = 20
 const total = ref(0)
@@ -204,7 +204,7 @@ function goSearch() {
 }
 
 function addToCart(item: ShopProduct) {
-  cart.addProduct(item)
+  router.push(`/products/${item.id}`)
 }
 
 onMounted(async () => {

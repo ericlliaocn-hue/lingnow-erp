@@ -1138,8 +1138,11 @@ CREATE TABLE IF NOT EXISTS `erp_customer_order`
     `order_no`         varchar(64)    NOT NULL COMMENT '客户订单号',
     `customer_id`      bigint(20)     NOT NULL COMMENT '客户ID',
     `customer_name`    varchar(128)            DEFAULT NULL COMMENT '客户名称快照',
-    `account_id`       bigint(20)     NOT NULL COMMENT '客户账号ID',
+    `account_id`       bigint(20)              DEFAULT NULL COMMENT '客户账号ID（客户自助下单时使用）',
     `account_name`     varchar(64)             DEFAULT NULL COMMENT '下单账号快照',
+    `employee_id`      bigint(20)              DEFAULT NULL COMMENT '下单业务员ID',
+    `employee_name`    varchar(64)             DEFAULT NULL COMMENT '下单业务员快照',
+    `source`           varchar(32)             DEFAULT NULL COMMENT '订单来源 CUSTOMER_H5/SALES_H5',
     `status`           varchar(32)    NOT NULL DEFAULT 'PENDING' COMMENT '状态 PENDING/CONFIRMED/CANCELLED',
     `order_time`       datetime       NOT NULL COMMENT '下单时间',
     `total_qty`        decimal(18, 4) NOT NULL DEFAULT '0.0000' COMMENT '总数量',
@@ -1164,6 +1167,7 @@ CREATE TABLE IF NOT EXISTS `erp_customer_order`
     UNIQUE KEY `uk_customer_order_no` (`order_no`, `del_flag`),
     KEY `idx_customer_order_customer` (`customer_id`),
     KEY `idx_customer_order_account` (`account_id`),
+    KEY `idx_customer_order_employee` (`employee_id`),
     KEY `idx_customer_order_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户H5订单';
@@ -1172,7 +1176,7 @@ CREATE TABLE IF NOT EXISTS `erp_customer_address`
 (
     `id`             bigint(20)   NOT NULL COMMENT '客户地址ID',
     `customer_id`    bigint(20)   NOT NULL COMMENT '客户ID',
-    `account_id`     bigint(20)   NOT NULL COMMENT '客户账号ID',
+    `account_id`     bigint(20)            DEFAULT NULL COMMENT '客户账号ID（客户自助维护时使用）',
     `receiver_name`  varchar(64)  NOT NULL COMMENT '收货人',
     `receiver_phone` varchar(32)  NOT NULL COMMENT '收货电话',
     `province_code`  varchar(32)           DEFAULT NULL COMMENT '省编码',

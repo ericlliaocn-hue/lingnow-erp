@@ -139,8 +139,10 @@ public class ErpCustomerOrderController {
         bill.setPartnerType("CUSTOMER");
         bill.setWarehouseId(bo.getWarehouseId());
         bill.setAccountId(bo.getAccountId());
-        bill.setEmployeeId(bo.getEmployeeId() == null ? currentUserId() : bo.getEmployeeId());
-        bill.setEmployeeName(StrUtil.blankToDefault(bo.getEmployeeName(), userDisplayName(bill.getEmployeeId())));
+        Long sourceEmployeeId = order.getEmployeeId() == null ? currentUserId() : order.getEmployeeId();
+        bill.setEmployeeId(bo.getEmployeeId() == null ? sourceEmployeeId : bo.getEmployeeId());
+        bill.setEmployeeName(StrUtil.blankToDefault(bo.getEmployeeName(),
+                StrUtil.blankToDefault(order.getEmployeeName(), userDisplayName(bill.getEmployeeId()))));
         bill.setReceiverName(order.getReceiverName());
         bill.setReceiverPhone(order.getReceiverPhone());
         bill.setReceiverAddress(order.getReceiverAddress());
