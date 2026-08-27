@@ -5,14 +5,13 @@
         <div class="product-head">
           <img v-if="product.imageUrl" :src="product.imageUrl" alt="" />
           <div>
-            <span class="product-role">主商品 · 独立选配</span>
             <h2>{{ product.name }}</h2>
             <p>{{ product.spec || '按下列选项配置' }}</p>
             <div v-if="priceValid" class="price-breakdown">
               <span>基础价 ￥{{ basePrice.toFixed(2) }}</span>
               <strong>合计 ￥{{ totalAmount.toFixed(2) }}</strong>
             </div>
-            <strong v-else class="price-warning">销售价未维护</strong>
+            <strong v-else class="price-warning">询价</strong>
           </div>
         </div>
         <button type="button" class="close" @click="close">×</button>
@@ -22,7 +21,6 @@
         <section class="purchase-summary">
           <div class="summary-heading">
             <strong>本次购买</strong>
-            <span>主商品与选配数量独立</span>
           </div>
           <div class="summary-line main-line">
             <span>{{ product.name }}</span>
@@ -37,10 +35,7 @@
 
         <section v-for="group in groups" :key="group.id" class="configuration-card option-group-card">
           <div class="configuration-head">
-            <div>
-              <strong>{{ displayShopLabel(group.name) }}</strong>
-              <span>每个子项可单独填写数量</span>
-            </div>
+            <strong>{{ displayShopLabel(group.name) }}</strong>
           </div>
           <div class="option-quantity-list">
             <div v-for="option in group.options" :key="option.id" :class="['option-quantity-row', optionQty(option.id) > 0 ? 'active' : '']">
@@ -141,7 +136,7 @@ const optionExtraTotal = computed(() => selectedOptions.value.reduce((sum, item)
 const totalAmount = computed(() => basePrice.value * totalQty.value + optionExtraTotal.value)
 const confirmButtonText = computed(() => {
   if (uploading.value) return '图片上传中'
-  if (!priceValid.value) return '销售价未维护，暂不能加入'
+  if (!priceValid.value) return '询价商品暂不可加入'
   return `加入 ${totalQty.value} 件主商品 · ￥${totalAmount.value.toFixed(2)}`
 })
 
@@ -226,7 +221,6 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .config-sheet header { position: relative; padding: 16px; border-bottom: 1px solid var(--border-soft); }
 .product-head { display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: center; }
 .product-head img { width: 76px; height: 76px; object-fit: contain; border-radius: var(--radius); background: var(--bg-muted); }
-.product-role { display: inline-flex; margin-bottom: 4px; padding: 2px 7px; border-radius: 999px; color: var(--brand-teal); background: #e6f2ef; font-size: 11px; font-weight: 800; }
 .product-head h2 { margin: 0; padding-right: 30px; font-size: 17px; }
 .product-head p { margin: 5px 0; color: var(--text-sub); font-size: 12px; }
 .price-breakdown { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; }
@@ -239,8 +233,6 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .summary-heading, .summary-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .summary-heading { margin-bottom: 9px; }
 .summary-heading strong { color: var(--text-main); font-size: 14px; }
-.summary-heading span { color: var(--brand-teal); font-size: 11px; font-weight: 800; }
-.summary-heading span.invalid, .quantity-warning { color: #b54708; }
 .summary-line { padding: 6px 0; border-top: 1px dashed #d2e4df; font-size: 13px; }
 .summary-line span { min-width: 0; line-height: 1.4; }
 .summary-line b { flex: none; color: var(--brand-teal); }
@@ -250,9 +242,7 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .standard-hint { color: var(--text-muted); }
 .configuration-card { margin-top: 12px; padding: 12px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: #fff; box-shadow: 0 6px 18px rgba(67,47,31,.05); }
 .configuration-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; }
-.configuration-head > div:first-child { display: grid; gap: 3px; }
 .configuration-head strong { color: var(--text-main); }
-.configuration-head span { color: var(--brand-orange); font-size: 12px; font-weight: 800; }
 .configuration-actions { display: flex; align-items: center; gap: 7px; }
 .remove-configuration { color: #9b2c2c; font-size: 12px; }
 .option-group { padding: 12px 0; border-top: 1px solid var(--border-soft); }
@@ -262,7 +252,7 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .option-grid button { min-height: 48px; padding: 8px 10px; display: grid; gap: 3px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); text-align: left; }
 .option-grid button.active { border-color: var(--brand-teal); background: #e6f2ef; color: var(--brand-teal); }
 .option-grid em { color: var(--brand-orange); font-size: 11px; font-style: normal; }
-.option-quantity-list { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.option-quantity-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
 .option-quantity-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); }
 .option-quantity-row.active { border-color: var(--brand-teal); background: #e6f2ef; }
 .option-name { min-width: 0; display: grid; gap: 3px; text-align: left; }
@@ -283,4 +273,7 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .qty-stepper input { width: 42px; height: 32px; padding: 0; border: 0; text-align: center; background: #fff; }
 .add-button { width: 100%; min-height: 44px; border-radius: 999px; color: #fff; background: var(--brand-teal); font-weight: 900; }
 .add-button:disabled { opacity: .55; }
+@media (max-width: 520px) {
+  .option-quantity-list { grid-template-columns: 1fr; }
+}
 </style>
