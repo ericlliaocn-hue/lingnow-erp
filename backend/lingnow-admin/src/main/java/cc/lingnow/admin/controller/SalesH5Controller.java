@@ -101,10 +101,31 @@ public class SalesH5Controller {
     @GetMapping("/categories")
     public Result<List<ErpMasterDataVO>> categories() {
         currentUser();
-        return Result.success(categoryService.list(new QueryWrapper<ErpProductCategory>()
+        List<ErpProductCategory> categories = categoryService.list(new QueryWrapper<ErpProductCategory>()
                         .eq("status", CommonConstants.STATUS_NORMAL)
-                        .orderByAsc("sort_order"))
-                .stream().map(item -> BeanUtil.copyProperties(item, ErpMasterDataVO.class)).toList());
+                        .orderByAsc("sort_order"));
+        Map<Long, ErpProductCategory> categoryById = new HashMap<>();
+        categories.forEach(category -> categoryById.put(category.getId(), category));
+
+        Set<Long> visibleCategoryIds = new HashSet<>();
+        productService.list(new QueryWrapper<ErpProduct>()
+                        .select("category_id")
+                        .eq("status", CommonConstants.STATUS_NORMAL)
+                        .isNotNull("category_id"))
+                .forEach(product -> {
+                    Long categoryId = product.getCategoryId();
+                    Set<Long> visited = new HashSet<>();
+                    while (categoryId != null && categoryId != 0L && visited.add(categoryId)) {
+                        visibleCategoryIds.add(categoryId);
+                        ErpProductCategory category = categoryById.get(categoryId);
+                        if (category == null) break;
+                        categoryId = category.getParentId();
+                    }
+                });
+
+        return Result.success(categories.stream()
+                .filter(item -> visibleCategoryIds.contains(item.getId()))
+                .map(item -> BeanUtil.copyProperties(item, ErpMasterDataVO.class)).toList());
     }
 
     @GetMapping("/products")

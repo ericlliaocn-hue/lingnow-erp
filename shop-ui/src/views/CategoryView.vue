@@ -3,14 +3,13 @@
     <header class="simple-header">
       <div class="page-inner">
         <h1>商品分类</h1>
-        <p>按一级、二级、三级分类快速选品</p>
+        <p>选择分类快速找到商品</p>
       </div>
     </header>
 
     <section class="page-inner category-layout">
       <CustomerPicker class="customer-row" />
-      <aside class="category-menu" aria-label="一级分类">
-        <span class="level-label">一级分类</span>
+      <aside class="category-menu" aria-label="商品分类">
         <button :class="{ active: activeLevel1 === 'all' }" type="button" @click="selectLevel1('all')">全部商品</button>
         <button
           v-for="item in rootCategories"
@@ -25,7 +24,6 @@
 
       <section class="category-content">
         <div v-if="level2Categories.length" class="subcategory-panel">
-          <span class="level-label">二级分类</span>
           <div class="subcategory-list">
             <button :class="{ active: !activeLevel2 }" type="button" @click="selectLevel2('')">全部</button>
             <button
@@ -41,7 +39,6 @@
         </div>
 
         <div v-if="level3Categories.length" class="subcategory-panel third-level">
-          <span class="level-label">三级分类</span>
           <div class="subcategory-list">
             <button :class="{ active: !activeLevel3 }" type="button" @click="selectLevel3('')">全部</button>
             <button
@@ -176,12 +173,11 @@ onMounted(async () => {
 .category-layout { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }
 .customer-row { grid-column: 1 / -1; }
 .category-menu { position: sticky; top: 12px; align-self: start; display: grid; gap: 8px; }
-.level-label { display: block; color: var(--text-muted); font-size: 11px; font-weight: 800; }
 .category-menu button { min-height: 42px; padding: 8px; border-radius: var(--radius); color: #6d5b4c; background: var(--bg-card); font-size: 13px; font-weight: 800; }
 .category-menu button.active { color: var(--brand-brown); background: var(--bg-cream-soft); box-shadow: inset 3px 0 0 var(--brand-orange); }
 .category-content { min-width: 0; display: grid; gap: 10px; align-content: start; }
 .subcategory-panel { padding: 10px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--bg-card); }
-.subcategory-list { display: flex; gap: 7px; overflow-x: auto; margin-top: 7px; padding-bottom: 2px; }
+.subcategory-list { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; }
 .subcategory-list button { flex: 0 0 auto; min-height: 32px; padding: 0 12px; border-radius: var(--radius-pill); color: var(--text-sub); background: var(--bg-muted); font-size: 12px; font-weight: 800; }
 .subcategory-list button.active { color: #fff; background: var(--brand-teal); }
 .third-level { background: #f7faf9; }

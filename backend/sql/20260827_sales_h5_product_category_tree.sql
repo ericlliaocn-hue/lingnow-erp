@@ -177,6 +177,16 @@ WHERE `del_flag` = 0
     'PRODUCT_CUSTOM_ENGRAVE_COLOR_WHITE', 'PRODUCT_CUSTOM_ENGRAVE_COLOR_SPECIAL'
   );
 
+-- 清理历史人工录入但未关联商品的孤立根分类，避免 H5 出现重复“衣钩”和错误一级分类。
+UPDATE `erp_product_category` c
+SET c.`status` = 0, c.`del_flag` = 1, c.`update_time` = NOW()
+WHERE c.`parent_id` = 0
+  AND ((c.`code` = '配件' AND c.`name` = '衣钩')
+    OR (c.`code` = '01' AND c.`name` = '10CM银色圆钩'))
+  AND NOT EXISTS (
+    SELECT 1 FROM `erp_product` p WHERE p.`category_id` = c.`id` AND p.`del_flag` = 0
+  );
+
 -- 验证：应无启用商品缺少分类，并展示各三级分类数量。
 SELECT COUNT(*) AS `active_product_without_category`
 FROM `erp_product` p

@@ -555,6 +555,7 @@ public class SchemaFixer implements CommandLineRunner {
 
             seedSalesH5CategoryTree();
             cleanupSeededProductCategoryOptions();
+            cleanupOrphanedProductCategoryRoots();
         } catch (Exception e) {
             log.error("预置商品分类树失败", e);
         }
@@ -610,6 +611,17 @@ public class SchemaFixer implements CommandLineRunner {
         jdbcTemplate.update(
                 "UPDATE erp_product_category SET status = 0, del_flag = 1 " +
                         "WHERE code IN (" + LEGACY_PRODUCT_CATEGORY_CODES + ")");
+    }
+
+    private void cleanupOrphanedProductCategoryRoots() {
+        if (!checkTableExists("erp_product")) {
+            return;
+        }
+        jdbcTemplate.update(
+                "UPDATE erp_product_category c SET c.status = 0, c.del_flag = 1, c.update_time = NOW() " +
+                        "WHERE c.parent_id = 0 AND ((c.code = '配件' AND c.name = '衣钩') " +
+                        "OR (c.code = '01' AND c.name = '10CM银色圆钩')) " +
+                        "AND NOT EXISTS (SELECT 1 FROM erp_product p WHERE p.category_id = c.id AND p.del_flag = 0)");
     }
 
     private Long ensureProductCategory(String code, String name, Long parentId, int sortOrder) {
