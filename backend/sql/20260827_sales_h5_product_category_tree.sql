@@ -37,7 +37,7 @@ CREATE TEMPORARY TABLE `tmp_sales_h5_category_definition` (
     `sort_order` int NOT NULL,
     `level_no` int NOT NULL,
     PRIMARY KEY (`code`)
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT INTO `tmp_sales_h5_category_definition`
 (`code`, `name`, `parent_code`, `attribute_ids`, `sort_order`, `level_no`) VALUES
