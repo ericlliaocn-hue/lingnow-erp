@@ -27,8 +27,8 @@
         </div>
       </section>
 
-      <!-- 真实分类树：一级分类 -->
-      <section class="category-strip" aria-label="一级分类">
+      <!-- 商品分类 -->
+      <section class="category-strip" aria-label="商品分类">
         <button
           v-for="item in rootCategories"
           :key="item.id"
@@ -41,8 +41,7 @@
         </button>
       </section>
 
-      <section v-if="level2Categories.length" class="subcategory-strip" aria-label="二级分类">
-        <span>二级</span>
+      <section v-if="level2Categories.length" class="subcategory-strip" aria-label="子分类">
         <button :class="{ active: !activeLevel2 }" type="button" @click="selectCategory(activeLevel1)">全部</button>
         <button
           v-for="item in level2Categories"
@@ -55,8 +54,7 @@
         </button>
       </section>
 
-      <section v-if="level3Categories.length" class="subcategory-strip third-level" aria-label="三级分类">
-        <span>三级</span>
+      <section v-if="level3Categories.length" class="subcategory-strip third-level" aria-label="子分类">
         <button :class="{ active: !activeLevel3 }" type="button" @click="selectCategory(activeLevel2)">全部</button>
         <button
           v-for="item in level3Categories"
@@ -357,13 +355,6 @@ onMounted(() => {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   background: var(--bg-card);
-}
-
-.subcategory-strip > span {
-  flex: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 900;
 }
 
 .subcategory-strip button {
