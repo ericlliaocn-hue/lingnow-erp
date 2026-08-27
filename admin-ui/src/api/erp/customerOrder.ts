@@ -14,6 +14,7 @@ export interface CustomerOrderItem {
   attributeText?: string
   optionAttributeIds?: string
   optionAttributeText?: string
+  optionAttributeQuantityJson?: string
   qty: number
   price: number
   amount: number

@@ -22,10 +22,10 @@
           <p>{{ group.spec || '多规格可选' }}</p>
           <p class="main-product-line"><strong>主商品合计</strong><span>× {{ group.totalQty }}</span></p>
 
-          <section v-for="(item, index) in group.items" :key="item.key" class="configuration-row">
+          <section v-for="item in group.items" :key="item.key" class="configuration-row">
             <div class="configuration-row-head">
-              <strong>配置 {{ index + 1 }}</strong>
-              <span>{{ priceLabel(item.price) }} / 件</span>
+              <strong>选配明细</strong>
+              <span>主商品 × {{ item.qty }}</span>
             </div>
             <div v-if="item.optionAttributeText" class="configured-options">
               <p v-for="part in configurationParts(item.optionAttributeText)" :key="part">{{ part }}</p>
@@ -33,7 +33,7 @@
             <p v-else class="standard-configuration">标准配置</p>
             <p v-if="item.logoImageUrl" class="logo-mark">已上传当前配置的 Logo / 图案</p>
             <p v-if="item.basePrice <= 0" class="price-warning">销售价未维护，暂不能提交订单</p>
-            <p v-else class="price-detail">基础价 ￥{{ money(item.basePrice) }}<template v-if="item.attributeExtraAmount > 0"> ＋ 选配 ￥{{ money(item.attributeExtraAmount) }}</template></p>
+            <p v-else class="price-detail">主商品 ￥{{ money(item.basePrice) }} × {{ item.qty }}<template v-if="item.attributeExtraAmount > 0"> ＋ 选配合计 ￥{{ money(item.attributeExtraAmount) }}</template></p>
             <div class="configuration-foot">
               <div class="qty-stepper">
                 <button type="button" @click="cart.updateQty(item.key, item.qty - 1)">−</button>
@@ -66,7 +66,6 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
-import { priceLabel } from '@/utils/label'
 import type { CartItem } from '@/stores/cart'
 import BottomNav from './components/BottomNav.vue'
 

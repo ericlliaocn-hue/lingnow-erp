@@ -38,7 +38,7 @@
           </button>
           <div v-else class="summary-img-empty">荣时</div>
           <div class="product-summary-info">
-            <span class="main-product-tag">主商品合计 × {{ productGroupTotal(item) }} · 当前配置 × {{ item.qty }}</span>
+            <span class="main-product-tag">主商品 × {{ item.qty }}</span>
             <strong>{{ productOf(item)?.name }}</strong>
             <p>{{ productSummary(productOf(item)) }}</p>
             <span class="price">￥{{ itemPrice(item).toFixed(2) }}</span>
@@ -51,24 +51,23 @@
         </div>
 
         <div v-for="group in attributeGroups(item)" :key="group.id" class="attribute-group">
-          <div class="attribute-title">{{ displayShopLabel(group.name) }} <small>每件商品配置</small></div>
-          <div class="attribute-options">
-            <button
-              v-for="option in group.options"
-              :key="option.id"
-              type="button"
-              :class="['option-button', item.selectedOptions[String(group.id)] === String(option.id) ? 'active' : '']"
-              @click="selectOption(item, String(group.id), String(option.id))"
-            >
-              {{ displayShopLabel(option.name) }}<span v-if="Number(option.extraAmount || 0) > 0"> +￥{{ money(option.extraAmount) }}</span>
-            </button>
+          <div class="attribute-title">{{ displayShopLabel(group.name) }} <small>每个选配项数量独立</small></div>
+          <div class="attribute-options option-quantity-options">
+            <div v-for="option in group.options" :key="option.id" :class="['option-quantity-row', optionQty(item, option.id) > 0 ? 'active' : '']">
+              <span>{{ displayShopLabel(option.name) }}<small v-if="Number(option.extraAmount || 0) > 0">每件 +￥{{ money(option.extraAmount) }}</small></span>
+              <div class="qty-stepper compact">
+                <button type="button" :disabled="optionQty(item, option.id) <= 0" @click="changeOptionQty(item, option.id, -1)">-</button>
+                <input :value="optionQty(item, option.id)" type="number" min="0" step="1" inputmode="numeric" @input="setOptionQty(item, option.id, ($event.target as HTMLInputElement).value)" />
+                <button type="button" @click="changeOptionQty(item, option.id, 1)">+</button>
+              </div>
+            </div>
           </div>
         </div>
 
         <div v-if="productOf(item)" class="composition-summary">
-          <div><strong>当前配置</strong><span>本配置数量可单独修改</span></div>
+          <div><strong>购买明细</strong><span>主商品和每个选配项数量独立</span></div>
           <p><span>{{ productOf(item)?.name }}</span><b>× {{ item.qty }}</b></p>
-          <p v-for="part in selectedConfiguration(item)" :key="part"><span>{{ part }}</span><b>× {{ item.qty }}</b></p>
+          <p v-for="part in selectedConfiguration(item)" :key="part.id"><span>{{ part.text }}</span><b>× {{ part.qty }}</b></p>
         </div>
 
         <label class="field">
@@ -126,7 +125,7 @@ interface DraftItem {
   key: string
   productId: string
   qty: number
-  selectedOptions: Record<string, string>
+  optionQuantities: Record<string, number>
   logoImageUrl: string
 }
 
@@ -152,7 +151,7 @@ const totalQty = computed(() => items.value.reduce((sum, item) => sum + Number(i
 const totalAmount = computed(() => items.value.reduce((sum, item) => sum + itemAmount(item), 0))
 
 function createItem(productId = ''): DraftItem {
-  return { key: `${Date.now()}-${Math.random()}`, productId, qty: 1, selectedOptions: {}, logoImageUrl: '' }
+  return { key: `${Date.now()}-${Math.random()}`, productId, qty: 1, optionQuantities: {}, logoImageUrl: '' }
 }
 
 function productOf(item: DraftItem) {
@@ -169,10 +168,6 @@ function duplicateProductCount(item: DraftItem) {
 
 function configurationIndex(item: DraftItem) {
   return sameProductItems(item).findIndex(record => record.key === item.key) + 1
-}
-
-function productGroupTotal(item: DraftItem) {
-  return sameProductItems(item).reduce((sum, record) => sum + Number(record.qty || 0), 0)
 }
 
 function productSummary(product?: ShopProduct) {
@@ -203,32 +198,42 @@ function attributeGroups(item: DraftItem) {
 }
 
 function selectedOptionIds(item: DraftItem) {
-  return Object.values(item.selectedOptions).filter(Boolean)
+  return Object.entries(item.optionQuantities).filter(([, qty]) => Number(qty || 0) > 0).map(([id]) => id)
 }
 
 function selectedConfiguration(item: DraftItem) {
-  return attributeGroups(item).map(group => {
-    const optionId = item.selectedOptions[String(group.id)]
-    const option = group.options.find(record => String(record.id) === String(optionId || ''))
-    return option ? `${displayShopLabel(group.name)}：${displayShopLabel(option.name)}` : ''
-  }).filter(Boolean)
+  return attributeGroups(item).flatMap(group => group.options.map(option => ({
+    id: String(option.id),
+    text: `${displayShopLabel(group.name)}：${displayShopLabel(option.name)}`,
+    qty: optionQty(item, option.id)
+  })).filter(option => option.qty > 0))
 }
 
 function itemPrice(item: DraftItem) {
-  const product = productOf(item)
-  const basePrice = Number(product?.salePrice || 0)
-  const extra = selectedOptionIds(item).reduce((sum, optionId) => sum + Number(attributeMap.value.get(optionId)?.extraAmount || 0), 0)
-  return basePrice + extra
+  return Number(productOf(item)?.salePrice || 0)
 }
 
 function itemAmount(item: DraftItem) {
-  return Number(item.qty || 0) * itemPrice(item)
+  const mainAmount = Number(item.qty || 0) * itemPrice(item)
+  const optionAmount = Object.entries(item.optionQuantities).reduce((sum, [id, qty]) => {
+    return sum + Number(attributeMap.value.get(id)?.extraAmount || 0) * Number(qty || 0)
+  }, 0)
+  return mainAmount + optionAmount
 }
 
-function selectOption(item: DraftItem, groupId: string, optionId: string) {
-  const normalizedGroupId = String(groupId)
-  const normalizedOptionId = String(optionId)
-  item.selectedOptions[normalizedGroupId] = item.selectedOptions[normalizedGroupId] === normalizedOptionId ? '' : normalizedOptionId
+function optionQty(item: DraftItem, optionId: string | number) {
+  return Math.max(0, Math.floor(Number(item.optionQuantities[String(optionId)] || 0)))
+}
+
+function setOptionQty(item: DraftItem, optionId: string | number, value: string | number) {
+  const id = String(optionId)
+  const qty = Math.max(0, Math.floor(Number(value || 0)))
+  if (qty > 0) item.optionQuantities[id] = qty
+  else delete item.optionQuantities[id]
+}
+
+function changeOptionQty(item: DraftItem, optionId: string | number, delta: number) {
+  setOptionQty(item, optionId, optionQty(item, optionId) + delta)
 }
 
 function normalizeQty(item: DraftItem) {
@@ -244,7 +249,7 @@ function increaseQty(item: DraftItem) {
 }
 
 function onProductChange(item: DraftItem) {
-  item.selectedOptions = {}
+  item.optionQuantities = {}
 }
 
 function addItem(productId = '') {
@@ -336,6 +341,7 @@ async function submit() {
       .map(item => ({
         productId: item.productId,
         optionAttributeIds: selectedOptionIds(item).join(','),
+        optionQuantities: selectedOptionIds(item).map(attributeId => ({ attributeId, qty: optionQty(item, attributeId) })),
         logoImageUrl: item.logoImageUrl,
         qty: Number(item.qty || 0)
       }))
@@ -374,12 +380,12 @@ async function loadData() {
   const ids = routeProductIds()
   if (route.query.fromCart === '1' && cart.items.length) {
     items.value = cart.items.map(record => {
-      const selectedOptions: Record<string, string> = {}
-      splitIds(record.optionAttributeIds).forEach(optionId => {
-        const option = attributes.value.find(item => String(item.id) === String(optionId))
-        if (option?.parentId) selectedOptions[String(option.parentId)] = String(optionId)
-      })
-      return { ...createItem(record.productId), qty: record.qty, selectedOptions, logoImageUrl: record.logoImageUrl || '' }
+      return {
+        ...createItem(record.productId),
+        qty: record.qty,
+        optionQuantities: { ...(record.optionQuantities || {}) },
+        logoImageUrl: record.logoImageUrl || ''
+      }
     })
   } else {
     items.value = ids.length ? ids.map(id => createItem(id)) : [createItem()]
@@ -444,7 +450,7 @@ function restoreDraft(ids: string[]) {
       items.value = draft.items.map(item => ({
         ...createItem(item.productId),
         ...item,
-        selectedOptions: item.selectedOptions || {}
+        optionQuantities: item.optionQuantities || {}
       }))
     }
   } catch {
@@ -685,6 +691,13 @@ onMounted(loadData)
   background: #e6f2ef;
   font-weight: 700;
 }
+
+.option-quantity-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.option-quantity-row { min-width: 0; display: grid; gap: 8px; padding: 9px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: #fff; }
+.option-quantity-row.active { border-color: var(--brand-teal); background: #e6f2ef; }
+.option-quantity-row > span { min-width: 0; display: grid; gap: 3px; color: var(--text-main); font-size: 12px; font-weight: 700; }
+.option-quantity-row small { color: var(--brand-orange); font-size: 10px; font-weight: 500; }
+.qty-stepper.compact { grid-template-columns: 28px 38px 28px; min-width: 94px; justify-self: end; }
 
 .file-input {
   padding: 8px;

@@ -125,9 +125,9 @@ function configure(item: ShopProduct) {
   configuringProduct.value = item
 }
 
-function addConfigured(configurations: ProductConfiguration[]) {
+function addConfigured(configuration: ProductConfiguration) {
   if (!configuringProduct.value) return
-  configurations.forEach(configuration => cart.addConfigured(configuringProduct.value!, configuration, configuration.qty))
+  cart.addConfigured(configuringProduct.value, configuration, configuration.qty)
   configuringProduct.value = null
 }
 

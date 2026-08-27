@@ -1193,6 +1193,7 @@ function clearRowProduct(row: BillItem) {
   row.productOptionsKeyword = ''
   row.optionAttributeIds = ''
   row.optionAttributeText = ''
+  row.optionAttributeQuantityJson = ''
   row.attributeText = ''
   calc()
 }
@@ -1279,16 +1280,30 @@ function syncRowSnapshot(row: BillItem) {
   row.attributeSelections = keepAllowedSelections(row, row.attributeSelections || {})
   const selectedIds = Object.values(row.attributeSelections).filter(Boolean)
   const byId = new Map(attributes.value.map(item => [String(item.id), item]))
+  const previousIds = splitIds(row.optionAttributeIds)
+  const quantities = parseOptionQuantityJson(row.optionAttributeQuantityJson)
+  const quantitiesStillMatch = previousIds.length === selectedIds.length
+    && previousIds.every(id => selectedIds.map(String).includes(String(id)))
+  if (!quantitiesStillMatch) row.optionAttributeQuantityJson = ''
   row.optionAttributeIds = selectedIds.join(',')
   row.optionAttributeText = selectedIds
     .map(id => {
       const option = byId.get(String(id))
       const group = option ? byId.get(String(option.parentId || '0')) : undefined
-      return option ? `${group?.name || '商品属性'}: ${option.name}` : ''
+      const qty = quantitiesStillMatch ? Number(quantities[String(id)] || 0) : 0
+      return option ? `${group?.name || '商品属性'}: ${option.name}${qty > 0 ? ` × ${qty}` : ''}` : ''
     })
     .filter(Boolean)
     .join(' / ')
   row.attributeText = rowLinePath(row)
+}
+function parseOptionQuantityJson(value?: string) {
+  if (!value) return {} as Record<string, number>
+  try {
+    return JSON.parse(value) as Record<string, number>
+  } catch {
+    return {} as Record<string, number>
+  }
 }
 function rowLinePath(row: BillItem) {
   return [row.optionAttributeText, row.remark].filter(Boolean).join(' / ')

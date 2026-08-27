@@ -10,6 +10,7 @@ import cc.lingnow.admin.service.ErpApprovalService;
 import cc.lingnow.admin.service.ErpAuditService;
 import cc.lingnow.admin.util.CsvExportUtil;
 import cc.lingnow.admin.util.StpAdminUtil;
+import cc.lingnow.admin.util.OptionAttributeQuantityUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
 import cc.lingnow.biz.notification.service.SysUserNotificationService;
@@ -43,6 +44,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -603,8 +605,11 @@ public class ErpBillController {
             }
             BigDecimal qty = nvl(source.getQty());
             BigDecimal price = nvl(source.getPrice());
+            LinkedHashMap<String, BigDecimal> optionQuantities = OptionAttributeQuantityUtil.parseOrLegacy(
+                    source.getOptionAttributeQuantityJson(), splitOptionIds(source.getOptionAttributeIds()), qty);
             BigDecimal attributeExtraAmount = billType != null && billType.startsWith("SALE")
-                    ? optionExtraAmount(source.getOptionAttributeIds())
+                    ? OptionAttributeQuantityUtil.perMainUnit(
+                    OptionAttributeQuantityUtil.totalExtraAmount(optionQuantities, optionAttributeMap()), qty)
                     : BigDecimal.ZERO;
             if (qty.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "数量必须大于0");
@@ -635,6 +640,7 @@ public class ErpBillController {
             item.setCategoryLevel2Name(source.getCategoryLevel2Name());
             item.setOptionAttributeIds(source.getOptionAttributeIds());
             item.setOptionAttributeText(source.getOptionAttributeText());
+            item.setOptionAttributeQuantityJson(OptionAttributeQuantityUtil.toJson(optionQuantities));
             item.setUnitId(product.getUnitId());
             item.setWarehouseId(source.getWarehouseId() == null ? defaultWarehouseId : source.getWarehouseId());
             item.setQty(qty);
@@ -714,6 +720,19 @@ public class ErpBillController {
         return attributeService.listByIds(ids).stream()
                 .map(item -> nvl(item.getExtraAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private Map<String, ErpProductAttribute> optionAttributeMap() {
+        Map<String, ErpProductAttribute> attributes = new LinkedHashMap<>();
+        attributeService.list().forEach(item -> attributes.put(String.valueOf(item.getId()), item));
+        return attributes;
+    }
+
+    private List<String> splitOptionIds(String value) {
+        if (StrUtil.isBlank(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(",")).map(String::trim).filter(StrUtil::isNotBlank).toList();
     }
 
     private List<Long> optionAttributeIds(String value) {

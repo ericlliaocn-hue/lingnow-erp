@@ -5,6 +5,7 @@ import cc.lingnow.admin.model.vo.erp.ErpCustomerOrderVO;
 import cc.lingnow.admin.model.vo.erp.ErpMasterDataVO;
 import cc.lingnow.admin.model.vo.shop.ShopProductVO;
 import cc.lingnow.admin.util.StpShopUtil;
+import cc.lingnow.admin.util.OptionAttributeQuantityUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.model.ErpAddressRegionVO;
 import cc.lingnow.biz.erp.service.*;
@@ -201,15 +202,25 @@ public class ShopOrderController {
 
     private List<ErpCustomerOrderItem> buildItems(List<ShopOrderSubmitBO.Item> sourceItems) {
         List<ErpCustomerOrderItem> items = new ArrayList<>();
+        Map<String, ErpProductAttribute> attributes = activeAttributeMap();
         for (ShopOrderSubmitBO.Item source : sourceItems) {
             ErpProduct product = requireEnabledProduct(source.getProductId());
             BigDecimal qty = nvl(source.getQty());
             if (qty.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "数量必须大于0");
             }
-            String allowedOptionIds = allowedOptionIds(product, source.getOptionAttributeIds());
-            BigDecimal price = nvl(product.getSalePrice()).add(attributeExtraAmount(allowedOptionIds));
-            BigDecimal amount = qty.multiply(price).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal basePrice = nvl(product.getSalePrice());
+            Map<String, BigDecimal> requested = requestedOptionQuantities(source);
+            LinkedHashMap<String, BigDecimal> optionQuantities = OptionAttributeQuantityUtil.normalize(
+                    requested, splitIds(source.getOptionAttributeIds()), qty,
+                    splitIds(product.getAttributeIds()), attributes);
+            if (requested != null && optionQuantities.size() != requested.size()) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "选配项不存在、已停用或不属于当前商品");
+            }
+            String allowedOptionIds = OptionAttributeQuantityUtil.ids(optionQuantities);
+            BigDecimal optionTotal = OptionAttributeQuantityUtil.totalExtraAmount(optionQuantities, attributes);
+            BigDecimal amount = basePrice.multiply(qty).add(optionTotal).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal price = amount.divide(qty, 4, RoundingMode.HALF_UP);
             ErpCustomerOrderItem item = new ErpCustomerOrderItem();
             item.setProductId(product.getId());
             item.setProductCode(product.getCode());
@@ -220,7 +231,8 @@ public class ShopOrderController {
             item.setAttributeText(product.getAttributeText());
             applyProductCategory(item, product);
             item.setOptionAttributeIds(allowedOptionIds);
-            item.setOptionAttributeText(optionText(item.getOptionAttributeIds()));
+            item.setOptionAttributeText(OptionAttributeQuantityUtil.snapshotText(optionQuantities, attributes));
+            item.setOptionAttributeQuantityJson(OptionAttributeQuantityUtil.toJson(optionQuantities));
             item.setUnitId(product.getUnitId());
             item.setQty(qty);
             item.setPrice(price);
@@ -229,6 +241,27 @@ public class ShopOrderController {
             items.add(item);
         }
         return items;
+    }
+
+    private Map<String, ErpProductAttribute> activeAttributeMap() {
+        Map<String, ErpProductAttribute> attributes = new LinkedHashMap<>();
+        attributeService.list(new QueryWrapper<ErpProductAttribute>().eq("status", CommonConstants.STATUS_NORMAL))
+                .forEach(item -> attributes.put(String.valueOf(item.getId()), item));
+        return attributes;
+    }
+
+    private Map<String, BigDecimal> requestedOptionQuantities(ShopOrderSubmitBO.Item source) {
+        if (source.getOptionQuantities() == null) {
+            return null;
+        }
+        Map<String, BigDecimal> requested = new LinkedHashMap<>();
+        for (ShopOrderSubmitBO.OptionQuantity option : source.getOptionQuantities()) {
+            if (option == null || option.getAttributeId() == null || nvl(option.getQty()).compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "选配项数量必须大于0");
+            }
+            requested.put(String.valueOf(option.getAttributeId()), option.getQty());
+        }
+        return requested;
     }
 
     private String allowedOptionIds(ErpProduct product, String optionIds) {

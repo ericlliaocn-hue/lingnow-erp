@@ -35,6 +35,7 @@ public class ErpBillItem extends BaseEntity implements Serializable {
     private String categoryLevel2Name;
     private String optionAttributeIds;
     private String optionAttributeText;
+    private String optionAttributeQuantityJson;
     private Long unitId;
     private Long warehouseId;
     private BigDecimal qty;

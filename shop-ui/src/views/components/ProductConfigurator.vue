@@ -5,7 +5,7 @@
         <div class="product-head">
           <img v-if="product.imageUrl" :src="product.imageUrl" alt="" />
           <div>
-            <span class="product-role">主商品 · 多配置组合</span>
+            <span class="product-role">主商品 · 独立选配</span>
             <h2>{{ product.name }}</h2>
             <p>{{ product.spec || '按下列选项配置' }}</p>
             <div v-if="priceValid" class="price-breakdown">
@@ -22,71 +22,56 @@
         <section class="purchase-summary">
           <div class="summary-heading">
             <strong>本次购买</strong>
-            <span :class="{ invalid: !quantityBalanced }">已分配 {{ assignedQty }} / {{ totalQty }} 件</span>
+            <span>主商品与选配数量独立</span>
           </div>
           <div class="summary-line main-line">
             <span>{{ product.name }}</span>
             <b>× {{ totalQty }}</b>
           </div>
-          <div v-for="(configuration, index) in configurations" :key="configuration.key" class="summary-line option-line">
-            <span>配置 {{ index + 1 }}：{{ configurationSummary(configuration) }}</span>
-            <b>× {{ configuration.qty }}</b>
+          <div v-for="item in selectedOptions" :key="item.id" class="summary-line option-line">
+            <span>{{ item.groupName }}：{{ item.name }}</span>
+            <b>× {{ item.qty }}</b>
           </div>
-          <p v-if="!quantityBalanced" class="quantity-warning">各配置数量合计必须等于主商品数量。</p>
+          <p v-if="!selectedOptions.length" class="standard-hint">未选择额外选配项</p>
         </section>
 
-        <section v-for="(configuration, index) in configurations" :key="configuration.key" class="configuration-card">
+        <section v-for="group in groups" :key="group.id" class="configuration-card option-group-card">
           <div class="configuration-head">
             <div>
-              <strong>配置 {{ index + 1 }}</strong>
-              <span>单价 ￥{{ configurationPrice(configuration).toFixed(2) }}</span>
-            </div>
-            <div class="configuration-actions">
-              <div class="qty-stepper compact">
-                <button type="button" @click="changeConfigurationQty(configuration, -1)">−</button>
-                <input
-                  v-model.number="configuration.qty"
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  @input="normalizeConfigurationQty(configuration)"
-                />
-                <button type="button" @click="changeConfigurationQty(configuration, 1)">＋</button>
-              </div>
-              <button v-if="configurations.length > 1" type="button" class="remove-configuration" @click="removeConfiguration(index)">删除</button>
+              <strong>{{ displayShopLabel(group.name) }}</strong>
+              <span>每个子项可单独填写数量</span>
             </div>
           </div>
-
-          <section v-for="group in groups" :key="`${configuration.key}-${group.id}`" class="option-group">
-            <h3>{{ displayShopLabel(group.name) }} <small>当前配置单选</small></h3>
-            <div class="option-grid">
-              <button
-                v-for="option in group.options"
-                :key="option.id"
-                type="button"
-                :class="configuration.selections[String(group.id)] === String(option.id) ? 'active' : ''"
-                @click="select(configuration, String(group.id), String(option.id))"
-              >
+          <div class="option-quantity-list">
+            <div v-for="option in group.options" :key="option.id" :class="['option-quantity-row', optionQty(option.id) > 0 ? 'active' : '']">
+              <button class="option-name" type="button" @click="changeOptionQty(option.id, optionQty(option.id) > 0 ? -optionQty(option.id) : 1)">
                 <span>{{ displayShopLabel(option.name) }}</span>
                 <em v-if="Number(option.extraAmount || 0)">每件 +￥{{ Number(option.extraAmount).toFixed(2) }}</em>
               </button>
+              <div class="qty-stepper compact" :aria-label="`${displayShopLabel(option.name)}数量`">
+                <button type="button" :disabled="optionQty(option.id) <= 0" @click="changeOptionQty(option.id, -1)">−</button>
+                <input
+                  :value="optionQty(option.id)"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  @input="setOptionQty(option.id, ($event.target as HTMLInputElement).value)"
+                />
+                <button type="button" @click="changeOptionQty(option.id, 1)">＋</button>
+              </div>
             </div>
-          </section>
-
-          <label class="logo-field">
-            <span>Logo / 定制图案（当前配置选填）</span>
-            <input type="file" accept="image/*" @change="uploadLogo($event, configuration)" />
-          </label>
-          <div v-if="configuration.logoImageUrl" class="logo-preview">
-            <img :src="configuration.logoImageUrl" alt="Logo预览" />
-            <button type="button" @click="configuration.logoImageUrl = ''">移除</button>
           </div>
         </section>
 
-        <button type="button" class="add-configuration" :disabled="configurations.length >= totalQty" @click="addConfiguration">
-          ＋ 增加另一种配置
-        </button>
+        <label class="logo-field">
+          <span>Logo / 定制图案（选填）</span>
+          <input type="file" accept="image/*" @change="uploadLogo" />
+        </label>
+        <div v-if="logoImageUrl" class="logo-preview">
+          <img :src="logoImageUrl" alt="Logo预览" />
+          <button type="button" @click="logoImageUrl = ''">移除</button>
+        </div>
       </div>
 
       <footer>
@@ -98,7 +83,7 @@
             <button type="button" @click="changeTotalQty(1)">＋</button>
           </div>
         </div>
-        <button type="button" class="add-button" :disabled="uploading || !priceValid || !quantityBalanced" @click="confirm">
+        <button type="button" class="add-button" :disabled="uploading || !priceValid" @click="confirm">
           {{ confirmButtonText }}
         </button>
       </footer>
@@ -115,17 +100,11 @@ import type { ShopAttribute, ShopProduct } from '@/types/shop'
 export interface ProductConfiguration {
   optionAttributeIds: string
   optionAttributeText: string
+  optionAttributeQuantityJson: string
+  optionQuantities: Record<string, number>
   attributeExtraAmount: number
   logoImageUrl?: string
   qty: number
-}
-
-interface ConfigurationDraft {
-  key: string
-  selections: Record<string, string>
-  logoImageUrl: string
-  qty: number
-  uploading: boolean
 }
 
 const props = withDefaults(defineProps<{ open: boolean; product?: ShopProduct | null; initialQty?: number }>(), {
@@ -133,11 +112,13 @@ const props = withDefaults(defineProps<{ open: boolean; product?: ShopProduct | 
 })
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'confirm', configurations: ProductConfiguration[]): void
+  (e: 'confirm', configuration: ProductConfiguration): void
 }>()
 const attributes = ref<ShopAttribute[]>([])
 const totalQty = ref(1)
-const configurations = ref<ConfigurationDraft[]>([])
+const optionQuantities = ref<Record<string, number>>({})
+const logoImageUrl = ref('')
+const uploading = ref(false)
 
 const groups = computed(() => {
   const groupIds = splitIds(props.product?.attributeIds)
@@ -147,17 +128,20 @@ const groups = computed(() => {
     return { ...group, options: attributes.value.filter(item => String(item.parentId || '') === groupId) }
   }).filter(Boolean) as Array<ShopAttribute & { options: ShopAttribute[] }>
 })
-const attributeMap = computed(() => new Map(attributes.value.map(item => [String(item.id), item])))
 const basePrice = computed(() => Number(props.product?.salePrice || 0))
 const priceValid = computed(() => basePrice.value > 0)
-const assignedQty = computed(() => configurations.value.reduce((sum, item) => sum + normalizePositive(item.qty), 0))
-const quantityBalanced = computed(() => assignedQty.value === totalQty.value)
-const uploading = computed(() => configurations.value.some(item => item.uploading))
-const totalAmount = computed(() => configurations.value.reduce((sum, item) => sum + configurationPrice(item) * normalizePositive(item.qty), 0))
+const selectedOptions = computed(() => groups.value.flatMap(group => group.options.map(option => ({
+  id: String(option.id),
+  groupName: displayShopLabel(group.name),
+  name: displayShopLabel(option.name),
+  qty: optionQty(option.id),
+  extraAmount: Number(option.extraAmount || 0)
+})).filter(option => option.qty > 0)))
+const optionExtraTotal = computed(() => selectedOptions.value.reduce((sum, item) => sum + item.extraAmount * item.qty, 0))
+const totalAmount = computed(() => basePrice.value * totalQty.value + optionExtraTotal.value)
 const confirmButtonText = computed(() => {
   if (uploading.value) return '图片上传中'
   if (!priceValid.value) return '销售价未维护，暂不能加入'
-  if (!quantityBalanced.value) return `已分配 ${assignedQty.value} / ${totalQty.value} 件`
   return `加入 ${totalQty.value} 件主商品 · ￥${totalAmount.value.toFixed(2)}`
 })
 
@@ -169,42 +153,19 @@ function normalizePositive(value: number) {
   return Math.max(1, Math.floor(Number(value || 1)))
 }
 
-function createConfiguration(qty = 1, source?: ConfigurationDraft): ConfigurationDraft {
-  return {
-    key: `${Date.now()}-${Math.random()}`,
-    selections: { ...(source?.selections || {}) },
-    logoImageUrl: source?.logoImageUrl || '',
-    qty: normalizePositive(qty),
-    uploading: false
-  }
+function optionQty(id: string | number) {
+  return Math.max(0, Math.floor(Number(optionQuantities.value[String(id)] || 0)))
 }
 
-function selectedOptionIds(configuration: ConfigurationDraft) {
-  return groups.value.map(group => configuration.selections[String(group.id)]).filter((id): id is string => Boolean(id))
+function setOptionQty(id: string | number, value: string | number) {
+  const key = String(id)
+  const qty = Math.max(0, Math.floor(Number(value || 0)))
+  if (qty > 0) optionQuantities.value[key] = qty
+  else delete optionQuantities.value[key]
 }
 
-function configurationExtraAmount(configuration: ConfigurationDraft) {
-  return selectedOptionIds(configuration).reduce((sum, id) => sum + Number(attributeMap.value.get(id)?.extraAmount || 0), 0)
-}
-
-function configurationPrice(configuration: ConfigurationDraft) {
-  return basePrice.value + configurationExtraAmount(configuration)
-}
-
-function configurationTextParts(configuration: ConfigurationDraft) {
-  return groups.value.map(group => {
-    const optionId = configuration.selections[String(group.id)]
-    const option = group.options.find(item => String(item.id) === optionId)
-    return option ? `${displayShopLabel(group.name)}：${displayShopLabel(option.name)}` : ''
-  }).filter(Boolean)
-}
-
-function configurationSummary(configuration: ConfigurationDraft) {
-  return configurationTextParts(configuration).join(' / ') || '标准配置'
-}
-
-function select(configuration: ConfigurationDraft, groupId: string, optionId: string) {
-  configuration.selections[groupId] = configuration.selections[groupId] === optionId ? '' : optionId
+function changeOptionQty(id: string | number, delta: number) {
+  setOptionQty(id, optionQty(id) + delta)
 }
 
 function close() {
@@ -212,77 +173,44 @@ function close() {
 }
 
 function changeTotalQty(delta: number) {
-  totalQty.value = Math.max(configurations.value.length || 1, normalizePositive(totalQty.value) + delta)
-  balanceConfigurationsToTotal()
+  totalQty.value = Math.max(1, normalizePositive(totalQty.value) + delta)
 }
 
 function normalizeTotalQty() {
-  totalQty.value = Math.max(configurations.value.length || 1, normalizePositive(totalQty.value))
-  balanceConfigurationsToTotal()
-}
-
-function balanceConfigurationsToTotal() {
-  if (!configurations.value.length) return
-  let difference = totalQty.value - assignedQty.value
-  if (difference > 0) {
-    configurations.value[0]!.qty += difference
-    return
-  }
-  for (let index = configurations.value.length - 1; index >= 0 && difference < 0; index -= 1) {
-    const configuration = configurations.value[index]!
-    const reducible = Math.min(configuration.qty - 1, Math.abs(difference))
-    configuration.qty -= reducible
-    difference += reducible
-  }
-}
-
-function changeConfigurationQty(configuration: ConfigurationDraft, delta: number) {
-  configuration.qty = Math.max(1, normalizePositive(configuration.qty) + delta)
-}
-
-function normalizeConfigurationQty(configuration: ConfigurationDraft) {
-  configuration.qty = normalizePositive(configuration.qty)
-}
-
-function addConfiguration() {
-  if (configurations.value.length >= totalQty.value) return
-  const source = configurations.value[0]
-  if (source && source.qty > 1) source.qty -= 1
-  configurations.value.push(createConfiguration(1, source))
-}
-
-function removeConfiguration(index: number) {
-  const [removed] = configurations.value.splice(index, 1)
-  if (removed && configurations.value[0]) configurations.value[0].qty += normalizePositive(removed.qty)
+  totalQty.value = normalizePositive(totalQty.value)
 }
 
 function confirm() {
-  if (!priceValid.value || !quantityBalanced.value) return
-  emit('confirm', configurations.value.map(configuration => ({
-    optionAttributeIds: selectedOptionIds(configuration).join(','),
-    optionAttributeText: configurationTextParts(configuration).join(' / '),
-    attributeExtraAmount: configurationExtraAmount(configuration),
-    logoImageUrl: configuration.logoImageUrl,
-    qty: normalizePositive(configuration.qty)
-  })))
+  if (!priceValid.value) return
+  const quantities = Object.fromEntries(selectedOptions.value.map(item => [item.id, item.qty]))
+  emit('confirm', {
+    optionAttributeIds: selectedOptions.value.map(item => item.id).join(','),
+    optionAttributeText: selectedOptions.value.map(item => `${item.groupName}：${item.name} × ${item.qty}`).join(' / '),
+    optionAttributeQuantityJson: JSON.stringify(quantities),
+    optionQuantities: quantities,
+    attributeExtraAmount: optionExtraTotal.value,
+    logoImageUrl: logoImageUrl.value,
+    qty: normalizePositive(totalQty.value)
+  })
 }
 
-async function uploadLogo(event: Event, configuration: ConfigurationDraft) {
+async function uploadLogo(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  configuration.uploading = true
+  uploading.value = true
   try {
-    configuration.logoImageUrl = await uploadImage(file)
+    logoImageUrl.value = await uploadImage(file)
   } finally {
-    configuration.uploading = false
+    uploading.value = false
   }
 }
 
 function reset() {
   totalQty.value = normalizePositive(props.initialQty)
-  configurations.value = [createConfiguration(totalQty.value)]
+  optionQuantities.value = {}
+  logoImageUrl.value = ''
 }
 
 watch(() => [props.open, props.product?.id], ([isOpen]) => {
@@ -319,6 +247,7 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .main-line { font-weight: 800; }
 .option-line { color: var(--text-sub); }
 .purchase-summary p { margin: 7px 0 0; font-size: 12px; }
+.standard-hint { color: var(--text-muted); }
 .configuration-card { margin-top: 12px; padding: 12px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: #fff; box-shadow: 0 6px 18px rgba(67,47,31,.05); }
 .configuration-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; }
 .configuration-head > div:first-child { display: grid; gap: 3px; }
@@ -333,6 +262,12 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .option-grid button { min-height: 48px; padding: 8px 10px; display: grid; gap: 3px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); text-align: left; }
 .option-grid button.active { border-color: var(--brand-teal); background: #e6f2ef; color: var(--brand-teal); }
 .option-grid em { color: var(--brand-orange); font-size: 11px; font-style: normal; }
+.option-quantity-list { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.option-quantity-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); }
+.option-quantity-row.active { border-color: var(--brand-teal); background: #e6f2ef; }
+.option-name { min-width: 0; display: grid; gap: 3px; text-align: left; }
+.option-name span { color: var(--text-main); font-weight: 800; }
+.option-name em { color: var(--brand-orange); font-size: 11px; font-style: normal; }
 .logo-field { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-soft); color: var(--text-main); font-size: 14px; font-weight: 700; }
 .logo-preview { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
 .logo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }

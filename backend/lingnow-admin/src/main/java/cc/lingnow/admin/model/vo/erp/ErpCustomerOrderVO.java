@@ -47,6 +47,7 @@ public class ErpCustomerOrderVO {
         private String attributeText;
         private String optionAttributeIds;
         private String optionAttributeText;
+        private String optionAttributeQuantityJson;
         private BigDecimal qty;
         private BigDecimal price;
         private BigDecimal amount;

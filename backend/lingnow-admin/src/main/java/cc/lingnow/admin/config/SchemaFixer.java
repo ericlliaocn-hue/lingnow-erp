@@ -495,6 +495,7 @@ public class SchemaFixer implements CommandLineRunner {
                     "category_level2_name varchar(128) DEFAULT NULL COMMENT '二级类目快照'," +
                     "option_attribute_ids varchar(500) DEFAULT NULL COMMENT '选项属性ID集合'," +
                     "option_attribute_text varchar(500) DEFAULT NULL COMMENT '选项属性快照'," +
+                    "option_attribute_quantity_json varchar(2000) DEFAULT NULL COMMENT '选配项独立数量JSON'," +
                     "unit_id bigint(20) DEFAULT NULL COMMENT '单位ID'," +
                     "qty decimal(18,4) NOT NULL DEFAULT '0.0000' COMMENT '数量'," +
                     "price decimal(18,4) NOT NULL DEFAULT '0.0000' COMMENT '单价'," +
@@ -509,6 +510,10 @@ public class SchemaFixer implements CommandLineRunner {
                     "KEY idx_customer_order_item_order (order_id)," +
                     "KEY idx_customer_order_item_product (product_id)" +
                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ERP客户H5订单明细'");
+            if (!checkColumnExists("erp_customer_order_item", "option_attribute_quantity_json")) {
+                log.info("表 erp_customer_order_item 缺少 option_attribute_quantity_json 列，创建中...");
+                jdbcTemplate.execute("ALTER TABLE erp_customer_order_item ADD column option_attribute_quantity_json varchar(2000) DEFAULT NULL COMMENT '选配项独立数量JSON' AFTER option_attribute_text");
+            }
         } catch (Exception e) {
             log.error("修复客户订单表失败", e);
         }
@@ -782,6 +787,10 @@ public class SchemaFixer implements CommandLineRunner {
             if (!checkColumnExists("erp_bill_item", "option_attribute_text")) {
                 log.info("表 erp_bill_item 缺少 option_attribute_text 列，创建中...");
                 jdbcTemplate.execute("ALTER TABLE erp_bill_item ADD column option_attribute_text varchar(500) DEFAULT NULL COMMENT '选项属性快照' AFTER option_attribute_ids");
+            }
+            if (!checkColumnExists("erp_bill_item", "option_attribute_quantity_json")) {
+                log.info("表 erp_bill_item 缺少 option_attribute_quantity_json 列，创建中...");
+                jdbcTemplate.execute("ALTER TABLE erp_bill_item ADD column option_attribute_quantity_json varchar(2000) DEFAULT NULL COMMENT '选配项独立数量JSON' AFTER option_attribute_text");
             }
         } catch (Exception e) {
             log.error("修复 erp_bill_item 失败", e);

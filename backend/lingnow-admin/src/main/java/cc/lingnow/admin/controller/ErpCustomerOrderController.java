@@ -7,6 +7,7 @@ import cc.lingnow.admin.model.enums.ErpApprovalStatus;
 import cc.lingnow.admin.model.vo.erp.ErpCustomerOrderVO;
 import cc.lingnow.admin.service.ErpAuditService;
 import cc.lingnow.admin.util.StpAdminUtil;
+import cc.lingnow.admin.util.OptionAttributeQuantityUtil;
 import cc.lingnow.biz.erp.entity.*;
 import cc.lingnow.biz.erp.service.*;
 import cc.lingnow.biz.notification.service.SysUserNotificationService;
@@ -35,7 +36,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -194,7 +197,11 @@ public class ErpCustomerOrderController {
     }
 
     private ErpBillItem toBillItem(ErpCustomerOrderItem source, Long billId, Long warehouseId) {
-        BigDecimal attributeExtraAmount = optionExtraAmount(source.getOptionAttributeIds());
+        Map<String, ErpProductAttribute> attributes = optionAttributeMap();
+        LinkedHashMap<String, BigDecimal> optionQuantities = OptionAttributeQuantityUtil.parseOrLegacy(
+                source.getOptionAttributeQuantityJson(), splitOptionIds(source.getOptionAttributeIds()), source.getQty());
+        BigDecimal attributeExtraAmount = OptionAttributeQuantityUtil.perMainUnit(
+                OptionAttributeQuantityUtil.totalExtraAmount(optionQuantities, attributes), source.getQty());
         ErpProduct product = productService.getById(source.getProductId());
         ErpBillItem item = new ErpBillItem();
         item.setBillId(billId);
@@ -211,6 +218,7 @@ public class ErpCustomerOrderController {
         item.setCategoryLevel2Name(source.getCategoryLevel2Name());
         item.setOptionAttributeIds(source.getOptionAttributeIds());
         item.setOptionAttributeText(source.getOptionAttributeText());
+        item.setOptionAttributeQuantityJson(OptionAttributeQuantityUtil.toJson(optionQuantities));
         item.setUnitId(source.getUnitId());
         item.setWarehouseId(warehouseId);
         item.setQty(nvl(source.getQty()));
@@ -224,6 +232,19 @@ public class ErpCustomerOrderController {
         item.setFinalAmount(nvl(source.getAmount()));
         item.setRemark(source.getRemark());
         return item;
+    }
+
+    private Map<String, ErpProductAttribute> optionAttributeMap() {
+        Map<String, ErpProductAttribute> attributes = new LinkedHashMap<>();
+        attributeService.list().forEach(item -> attributes.put(String.valueOf(item.getId()), item));
+        return attributes;
+    }
+
+    private List<String> splitOptionIds(String value) {
+        if (StrUtil.isBlank(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(",")).map(String::trim).filter(StrUtil::isNotBlank).toList();
     }
 
     private BigDecimal optionExtraAmount(String value) {

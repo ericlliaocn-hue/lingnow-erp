@@ -70,6 +70,7 @@ public class ErpBillVO {
         private String categoryLevel2Name;
         private String optionAttributeIds;
         private String optionAttributeText;
+        private String optionAttributeQuantityJson;
         private Long unitId;
         private String unitName;
         private Long warehouseId;

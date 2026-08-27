@@ -49,6 +49,7 @@ public class ErpBillSaveBO {
         private String categoryLevel2Name;
         private String optionAttributeIds;
         private String optionAttributeText;
+        private String optionAttributeQuantityJson;
         private String logoImageUrl;
         @NotNull(message = "数量不能为空")
         private BigDecimal qty;

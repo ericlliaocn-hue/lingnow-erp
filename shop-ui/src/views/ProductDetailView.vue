@@ -147,9 +147,9 @@ function buyNow() {
   configOpen.value = true
 }
 
-function addConfigured(configurations: ProductConfiguration[]) {
+function addConfigured(configuration: ProductConfiguration) {
   if (!product.value) return
-  configurations.forEach(configuration => cart.addConfigured(product.value!, configuration, configuration.qty))
+  cart.addConfigured(product.value, configuration, configuration.qty)
   configOpen.value = false
   router.push('/cart')
 }

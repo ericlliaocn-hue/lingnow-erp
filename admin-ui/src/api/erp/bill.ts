@@ -19,6 +19,7 @@ export interface BillItem {
   categoryLevel2Name?: string
   optionAttributeIds?: string
   optionAttributeText?: string
+  optionAttributeQuantityJson?: string
   attributeSelections?: Record<string, string>
   availableAttributeIds?: string
   availableAttributeText?: string

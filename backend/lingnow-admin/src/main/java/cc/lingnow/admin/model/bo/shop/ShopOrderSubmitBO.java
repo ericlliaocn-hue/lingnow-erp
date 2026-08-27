@@ -25,9 +25,19 @@ public class ShopOrderSubmitBO {
         @NotNull(message = "商品不能为空")
         private Long productId;
         private String optionAttributeIds;
+        @Valid
+        private List<OptionQuantity> optionQuantities;
         private String logoImageUrl;
         @NotNull(message = "数量不能为空")
         private BigDecimal qty;
         private String remark;
+    }
+
+    @Data
+    public static class OptionQuantity {
+        @NotNull(message = "选配项不能为空")
+        private Long attributeId;
+        @NotNull(message = "选配数量不能为空")
+        private BigDecimal qty;
     }
 }
