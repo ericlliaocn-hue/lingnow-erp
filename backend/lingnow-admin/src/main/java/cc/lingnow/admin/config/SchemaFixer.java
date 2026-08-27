@@ -38,7 +38,9 @@ public class SchemaFixer implements CommandLineRunner {
             "2230,2240,2231,2232,2233,2236,2237," +
             SALESPERSON_PRODUCTION_MENU_IDS + "," + SALESPERSON_CUSTOMER_ORDER_MENU_IDS;
     private static final String PRODUCT_ATTRIBUTE_IDS = "880000100001,880000100002,880000100003,880000100004";
-    private static final String LEGACY_PRODUCT_CATEGORY_CODES = "'PRODUCT_ROOT'," +
+    private static final String LEGACY_PRODUCT_CATEGORY_CODES = "'PRODUCT_FINISHED_HANGER'," +
+            "'PRODUCT_PARTS'," +
+            "'PRODUCT_ROOT'," +
             "'PRODUCT_STYLE'," +
             "'PRODUCT_CLOTHES_HOOK'," +
             "'PRODUCT_ACCESSORY'," +
@@ -551,33 +553,57 @@ public class SchemaFixer implements CommandLineRunner {
                 migrateLegacyProductAttributes(style, hook, accessory, custom);
             }
 
-            Long finishedHanger = ensureProductCategory("PRODUCT_FINISHED_HANGER", "成品衣架", 0L, 10, PRODUCT_ATTRIBUTE_IDS);
-            Long parts = ensureProductCategory("PRODUCT_PARTS", "配件", 0L, 20, PRODUCT_ATTRIBUTE_IDS);
-            migrateLegacyProductCategories(finishedHanger, parts);
+            seedSalesH5CategoryTree();
             cleanupSeededProductCategoryOptions();
         } catch (Exception e) {
             log.error("预置商品分类树失败", e);
         }
     }
 
-    private void migrateLegacyProductCategories(Long finishedHangerId, Long partsId) {
-        if (!checkTableExists("erp_product")) {
-            return;
+    private void seedSalesH5CategoryTree() {
+        Long hanger = ensureProductCategory("SALES_H5_HANGER", "衣架（含裤架）", 0L, 10, PRODUCT_ATTRIBUTE_IDS);
+        seedHangerMaterial(hanger, "CHILD", "童装", 10, "HANGER", "童装衣架", "PANTS", "裤架");
+        seedHangerMaterial(hanger, "LOTUS", "荷木", 20, "FEMALE", "女款衣架", "MALE", "男款衣架", "PANTS", "裤架");
+        seedHangerMaterial(hanger, "RUBBER", "橡胶木", 30, "FEMALE", "女款衣架", "MALE", "男款衣架", "PANTS", "裤架");
+        seedHangerMaterial(hanger, "BEECH", "榉木", 40, "FEMALE", "女款衣架", "PANTS", "裤架");
+        seedHangerMaterial(hanger, "RESIN", "树脂", 50, "HANGER", "通用衣架", "PANTS", "裤架");
+        seedHangerMaterial(hanger, "UNKNOWN", "材质待确认", 60, "FEMALE", "女款衣架", "MALE", "男款衣架", "PANTS", "裤架");
+
+        Long hook = ensureProductCategory("SALES_H5_HOOK", "衣钩", 0L, 20);
+        Long sHook = ensureProductCategory("SALES_H5_HOOK_S", "S钩", hook, 10);
+        ensureProductCategory("SALES_H5_HOOK_S_5CM", "5CM", sHook, 10);
+        ensureProductCategory("SALES_H5_HOOK_S_10CM", "10CM", sHook, 20);
+        ensureProductCategory("SALES_H5_HOOK_S_15CM", "15CM", sHook, 30);
+        Long uClip = ensureProductCategory("SALES_H5_HOOK_U_CLIP", "U型夹", hook, 20);
+        seedHookColors(uClip, "U_CLIP");
+        Long ring = ensureProductCategory("SALES_H5_HOOK_RING", "圈圈", hook, 30);
+        seedHookColors(ring, "RING");
+
+        Long accessory = ensureProductCategory("SALES_H5_ACCESSORY", "配件", 0L, 30);
+        Long antiSlip = ensureProductCategory("SALES_H5_ACCESSORY_ANTI_SLIP", "防滑贴", accessory, 10);
+        ensureProductCategory("SALES_H5_ACCESSORY_ANTI_SLIP_WHITE", "白色", antiSlip, 10);
+        ensureProductCategory("SALES_H5_ACCESSORY_ANTI_SLIP_BROWN", "棕色", antiSlip, 20);
+        ensureProductCategory("SALES_H5_ACCESSORY_ANTI_SLIP_CLEAR", "透明", antiSlip, 30);
+        Long cover = ensureProductCategory("SALES_H5_ACCESSORY_COVER", "布套", accessory, 20);
+        ensureProductCategory("SALES_H5_ACCESSORY_COVER_WHITE_HANGER", "白色衣架布套", cover, 10);
+        ensureProductCategory("SALES_H5_ACCESSORY_COVER_WHITE_PANTS", "白色裤架布套", cover, 20);
+        ensureProductCategory("SALES_H5_ACCESSORY_COVER_BEIGE_HANGER", "米白色衣架布套", cover, 30);
+        ensureProductCategory("SALES_H5_ACCESSORY_COVER_BEIGE_PANTS", "米白色裤架布套", cover, 40);
+    }
+
+    private void seedHangerMaterial(Long rootId, String codePart, String name, int sortOrder,
+                                    String... leafCodesAndNames) {
+        Long material = ensureProductCategory("SALES_H5_HANGER_" + codePart, name, rootId, sortOrder);
+        for (int index = 0; index + 1 < leafCodesAndNames.length; index += 2) {
+            ensureProductCategory("SALES_H5_HANGER_" + codePart + "_" + leafCodesAndNames[index],
+                    leafCodesAndNames[index + 1], material, (index / 2 + 1) * 10);
         }
-        jdbcTemplate.update(
-                "UPDATE erp_product SET category_id = ? " +
-                        "WHERE category_id IN (SELECT id FROM erp_product_category WHERE code IN (" +
-                        "'PRODUCT_ACCESSORY','PRODUCT_ACCESSORY_BLACK_HOOK','PRODUCT_ACCESSORY_SILVER_HOOK') AND del_flag = 0)",
-                partsId);
-        jdbcTemplate.update(
-                "UPDATE erp_product SET category_id = ? " +
-                        "WHERE category_id IN (SELECT id FROM erp_product_category WHERE code IN (" +
-                        "'PRODUCT_ROOT','PRODUCT_STYLE','PRODUCT_CLOTHES_HOOK','PRODUCT_CUSTOM'," +
-                        "'PRODUCT_STYLE_HANGER','PRODUCT_CLOTHES_HOOK_BULB','PRODUCT_CLOTHES_HOOK_ROUND'," +
-                        "'PRODUCT_CUSTOM_NO_ENGRAVE','PRODUCT_CUSTOM_ENGRAVE','PRODUCT_CUSTOM_ENGRAVE_COLOR'," +
-                        "'PRODUCT_CUSTOM_ENGRAVE_COLOR_RED','PRODUCT_CUSTOM_ENGRAVE_COLOR_BLACK'," +
-                        "'PRODUCT_CUSTOM_ENGRAVE_COLOR_WHITE','PRODUCT_CUSTOM_ENGRAVE_COLOR_SPECIAL') AND del_flag = 0)",
-                finishedHangerId);
+    }
+
+    private void seedHookColors(Long parentId, String codePart) {
+        ensureProductCategory("SALES_H5_HOOK_" + codePart + "_WHITE", "奶白色", parentId, 10);
+        ensureProductCategory("SALES_H5_HOOK_" + codePart + "_BLACK", "黑色", parentId, 20);
+        ensureProductCategory("SALES_H5_HOOK_" + codePart + "_WALNUT", "胡桃木色", parentId, 30);
     }
 
     private void cleanupSeededProductCategoryOptions() {

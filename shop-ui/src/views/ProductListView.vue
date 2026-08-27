@@ -27,17 +27,45 @@
         </div>
       </section>
 
-      <!-- 分类 pill -->
-      <section class="category-strip" aria-label="商品分类">
+      <!-- 真实分类树：一级分类 -->
+      <section class="category-strip" aria-label="一级分类">
         <button
-          v-for="item in categories"
+          v-for="item in rootCategories"
           :key="item.id"
           :class="['category-pill', activeCategory === item.id ? 'active' : '']"
           type="button"
-          @click="activeCategory = item.id"
+          @click="selectCategory(item.id)"
         >
           <span>{{ item.name }}</span>
           <small>{{ categoryCount(item.id) }}</small>
+        </button>
+      </section>
+
+      <section v-if="level2Categories.length" class="subcategory-strip" aria-label="二级分类">
+        <span>二级</span>
+        <button :class="{ active: !activeLevel2 }" type="button" @click="selectCategory(activeLevel1)">全部</button>
+        <button
+          v-for="item in level2Categories"
+          :key="item.id"
+          :class="{ active: activeLevel2 === item.id }"
+          type="button"
+          @click="selectCategory(item.id)"
+        >
+          {{ item.name }} <small>{{ categoryCount(item.id) }}</small>
+        </button>
+      </section>
+
+      <section v-if="level3Categories.length" class="subcategory-strip third-level" aria-label="三级分类">
+        <span>三级</span>
+        <button :class="{ active: !activeLevel3 }" type="button" @click="selectCategory(activeLevel2)">全部</button>
+        <button
+          v-for="item in level3Categories"
+          :key="item.id"
+          :class="{ active: activeLevel3 === item.id }"
+          type="button"
+          @click="selectCategory(item.id)"
+        >
+          {{ item.name }} <small>{{ categoryCount(item.id) }}</small>
         </button>
       </section>
 
@@ -46,6 +74,7 @@
         <div class="section-head">
           <div>
             <h2>{{ activeCategory === 'all' ? '全部商品' : categoryLabel(activeCategory) }}</h2>
+            <small v-if="activePathLabel" class="category-path">{{ activePathLabel }}</small>
             <p>{{ visibleProducts.length }} 款好物</p>
           </div>
           <button type="button" class="refresh-btn" @click="reload">换一批</button>
@@ -90,6 +119,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listCategories, listProducts } from '@/api/shop'
 import { useAuthStore } from '@/stores/auth'
+import { buildCategoryTree, categoryPath, descendantCategoryIds } from '@/utils/category'
 import { priceLabel, productSubtitle, productTags } from '@/utils/label'
 import type { ShopCategory, ShopProduct } from '@/types/shop'
 import BottomNav from './components/BottomNav.vue'
@@ -106,38 +136,35 @@ const loading = ref(false)
 const products = ref<ShopProduct[]>([])
 const activeCategory = ref('all')
 const categoryRecords = ref<ShopCategory[]>([])
-const categories = computed(() => [{ id: 'all', name: '全部' } as ShopCategory, ...categoryRecords.value])
+const categoryTree = computed(() => buildCategoryTree(categoryRecords.value))
+const selectedPath = computed(() => categoryPath(categoryRecords.value, activeCategory.value === 'all' ? '' : activeCategory.value))
+const activeLevel1 = computed(() => String(selectedPath.value[0]?.id || 'all'))
+const activeLevel2 = computed(() => String(selectedPath.value[1]?.id || ''))
+const activeLevel3 = computed(() => String(selectedPath.value[2]?.id || ''))
+const rootCategories = computed(() => [{ id: 'all', name: '全部', children: [] } as ReturnType<typeof buildCategoryTree>[number], ...categoryTree.value])
+const level2Categories = computed(() => categoryTree.value.find(item => item.id === activeLevel1.value)?.children || [])
+const level3Categories = computed(() => level2Categories.value.find(item => item.id === activeLevel2.value)?.children || [])
+const activePathLabel = computed(() => selectedPath.value.slice(0, -1).map(item => item.name).join(' / '))
 
 const hasMore = computed(() => products.value.length < total.value)
 const visibleProducts = computed(() => {
   if (activeCategory.value === 'all') return products.value
-  const ids = descendantCategoryIds(activeCategory.value)
+  const ids = descendantCategoryIds(categoryRecords.value, activeCategory.value)
   return products.value.filter(item => item.categoryId && ids.has(item.categoryId))
 })
 
 function categoryLabel(value: string) {
-  return categories.value.find(item => item.id === value)?.name || '全部商品'
-}
-
-function descendantCategoryIds(rootId: string) {
-  const ids = new Set([rootId])
-  let changed = true
-  while (changed) {
-    changed = false
-    categoryRecords.value.forEach(item => {
-      if (item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
-        ids.add(item.id)
-        changed = true
-      }
-    })
-  }
-  return ids
+  return selectedPath.value.find(item => String(item.id) === value)?.name || '全部商品'
 }
 
 function categoryCount(category: string) {
   if (category === 'all') return products.value.length
-  const ids = descendantCategoryIds(category)
+  const ids = descendantCategoryIds(categoryRecords.value, category)
   return products.value.filter(item => item.categoryId && ids.has(item.categoryId)).length
+}
+
+function selectCategory(id: string) {
+  activeCategory.value = id || 'all'
 }
 
 async function fetchList(reset = false) {
@@ -320,6 +347,44 @@ onMounted(() => {
   color: var(--brand-brown);
   background: var(--bg-cream-soft);
 }
+
+.subcategory-strip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 9px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.subcategory-strip > span {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.subcategory-strip button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  color: var(--text-sub);
+  background: var(--bg-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.subcategory-strip button.active {
+  color: #fff;
+  background: var(--brand-teal);
+}
+
+.subcategory-strip button small { font-size: 10px; opacity: .78; }
+.subcategory-strip.third-level { background: #f7faf9; }
+.category-path { display: block; margin-top: 3px; color: var(--text-muted); font-size: 11px; }
 
 .section-head {
   display: flex;

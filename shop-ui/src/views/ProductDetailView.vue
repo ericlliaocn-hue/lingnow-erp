@@ -85,7 +85,13 @@
         <button class="action-btn buy" type="button" @click="buyNow">立即购买</button>
       </div>
     </footer>
-    <ProductConfigurator :open="configOpen" :product="product" @close="configOpen = false" @confirm="addConfigured" />
+    <ProductConfigurator
+      :open="configOpen"
+      :product="product"
+      :initial-qty="qty"
+      @close="configOpen = false"
+      @confirm="addConfigured"
+    />
   </main>
 </template>
 
@@ -141,9 +147,9 @@ function buyNow() {
   configOpen.value = true
 }
 
-function addConfigured(configuration: ProductConfiguration) {
+function addConfigured(configurations: ProductConfiguration[]) {
   if (!product.value) return
-  cart.addConfigured(product.value, configuration, configuration.qty)
+  configurations.forEach(configuration => cart.addConfigured(product.value!, configuration, configuration.qty))
   configOpen.value = false
   router.push('/cart')
 }

@@ -5,13 +5,12 @@
         <div class="product-head">
           <img v-if="product.imageUrl" :src="product.imageUrl" alt="" />
           <div>
-            <span class="product-role">主商品 · 已包含</span>
+            <span class="product-role">主商品 · 多配置组合</span>
             <h2>{{ product.name }}</h2>
             <p>{{ product.spec || '按下列选项配置' }}</p>
             <div v-if="priceValid" class="price-breakdown">
               <span>基础价 ￥{{ basePrice.toFixed(2) }}</span>
-              <span v-if="extraAmount > 0">选配 +￥{{ extraAmount.toFixed(2) }}</span>
-              <strong>单价 ￥{{ totalPrice.toFixed(2) }}</strong>
+              <strong>合计 ￥{{ totalAmount.toFixed(2) }}</strong>
             </div>
             <strong v-else class="price-warning">销售价未维护</strong>
           </div>
@@ -23,53 +22,84 @@
         <section class="purchase-summary">
           <div class="summary-heading">
             <strong>本次购买</strong>
-            <span>配件数量跟随主商品</span>
+            <span :class="{ invalid: !quantityBalanced }">已分配 {{ assignedQty }} / {{ totalQty }} 件</span>
           </div>
           <div class="summary-line main-line">
             <span>{{ product.name }}</span>
-            <b>× {{ qty }}</b>
+            <b>× {{ totalQty }}</b>
           </div>
-          <div v-for="item in selectedConfigurations" :key="item.groupId" class="summary-line option-line">
-            <span>{{ item.groupName }}：{{ item.optionName }}</span>
-            <b>× {{ qty }}</b>
+          <div v-for="(configuration, index) in configurations" :key="configuration.key" class="summary-line option-line">
+            <span>配置 {{ index + 1 }}：{{ configurationSummary(configuration) }}</span>
+            <b>× {{ configuration.qty }}</b>
           </div>
-          <p v-if="selectedConfigurations.length === 0">请选择每件商品需要的款式、挂钩等配置。</p>
+          <p v-if="!quantityBalanced" class="quantity-warning">各配置数量合计必须等于主商品数量。</p>
         </section>
 
-        <section v-for="group in groups" :key="group.id" class="option-group">
-          <h3>{{ displayShopLabel(group.name) }} <small>每件商品单选</small></h3>
-          <div class="option-grid">
-            <button
-              v-for="option in group.options"
-              :key="option.id"
-              type="button"
-              :class="selections[String(group.id)] === String(option.id) ? 'active' : ''"
-              @click="select(group.id, option.id)"
-            >
-              <span>{{ displayShopLabel(option.name) }}</span>
-              <em v-if="Number(option.extraAmount || 0)">每件 +￥{{ Number(option.extraAmount).toFixed(2) }}</em>
-            </button>
+        <section v-for="(configuration, index) in configurations" :key="configuration.key" class="configuration-card">
+          <div class="configuration-head">
+            <div>
+              <strong>配置 {{ index + 1 }}</strong>
+              <span>单价 ￥{{ configurationPrice(configuration).toFixed(2) }}</span>
+            </div>
+            <div class="configuration-actions">
+              <div class="qty-stepper compact">
+                <button type="button" @click="changeConfigurationQty(configuration, -1)">−</button>
+                <input
+                  v-model.number="configuration.qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputmode="numeric"
+                  @input="normalizeConfigurationQty(configuration)"
+                />
+                <button type="button" @click="changeConfigurationQty(configuration, 1)">＋</button>
+              </div>
+              <button v-if="configurations.length > 1" type="button" class="remove-configuration" @click="removeConfiguration(index)">删除</button>
+            </div>
+          </div>
+
+          <section v-for="group in groups" :key="`${configuration.key}-${group.id}`" class="option-group">
+            <h3>{{ displayShopLabel(group.name) }} <small>当前配置单选</small></h3>
+            <div class="option-grid">
+              <button
+                v-for="option in group.options"
+                :key="option.id"
+                type="button"
+                :class="configuration.selections[String(group.id)] === String(option.id) ? 'active' : ''"
+                @click="select(configuration, String(group.id), String(option.id))"
+              >
+                <span>{{ displayShopLabel(option.name) }}</span>
+                <em v-if="Number(option.extraAmount || 0)">每件 +￥{{ Number(option.extraAmount).toFixed(2) }}</em>
+              </button>
+            </div>
+          </section>
+
+          <label class="logo-field">
+            <span>Logo / 定制图案（当前配置选填）</span>
+            <input type="file" accept="image/*" @change="uploadLogo($event, configuration)" />
+          </label>
+          <div v-if="configuration.logoImageUrl" class="logo-preview">
+            <img :src="configuration.logoImageUrl" alt="Logo预览" />
+            <button type="button" @click="configuration.logoImageUrl = ''">移除</button>
           </div>
         </section>
 
-        <label class="logo-field">
-          <span>Logo / 定制图案（选填）</span>
-          <input type="file" accept="image/*" @change="uploadLogo" />
-        </label>
-        <div v-if="logoImageUrl" class="logo-preview">
-          <img :src="logoImageUrl" alt="Logo预览" />
-          <button type="button" @click="logoImageUrl = ''">移除</button>
-        </div>
+        <button type="button" class="add-configuration" :disabled="configurations.length >= totalQty" @click="addConfiguration">
+          ＋ 增加另一种配置
+        </button>
       </div>
 
       <footer>
-        <div class="qty-stepper">
-          <button type="button" @click="qty = Math.max(1, qty - 1)">−</button>
-          <span>{{ qty }}</span>
-          <button type="button" @click="qty += 1">＋</button>
+        <div class="main-qty">
+          <span>主商品总数</span>
+          <div class="qty-stepper">
+            <button type="button" @click="changeTotalQty(-1)">−</button>
+            <input v-model.number="totalQty" type="number" min="1" step="1" inputmode="numeric" @input="normalizeTotalQty" />
+            <button type="button" @click="changeTotalQty(1)">＋</button>
+          </div>
         </div>
-        <button type="button" class="add-button" :disabled="uploading || !priceValid" @click="confirm">
-          {{ uploading ? '图片上传中' : priceValid ? `加入 ${qty} 件主商品 · ￥${(totalPrice * qty).toFixed(2)}` : '销售价未维护，暂不能加入' }}
+        <button type="button" class="add-button" :disabled="uploading || !priceValid || !quantityBalanced" @click="confirm">
+          {{ confirmButtonText }}
         </button>
       </footer>
     </section>
@@ -90,16 +120,24 @@ export interface ProductConfiguration {
   qty: number
 }
 
-const props = defineProps<{ open: boolean; product?: ShopProduct | null }>()
+interface ConfigurationDraft {
+  key: string
+  selections: Record<string, string>
+  logoImageUrl: string
+  qty: number
+  uploading: boolean
+}
+
+const props = withDefaults(defineProps<{ open: boolean; product?: ShopProduct | null; initialQty?: number }>(), {
+  initialQty: 1
+})
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'confirm', configuration: ProductConfiguration): void
+  (e: 'confirm', configurations: ProductConfiguration[]): void
 }>()
 const attributes = ref<ShopAttribute[]>([])
-const selections = ref<Record<string, string>>({})
-const qty = ref(1)
-const logoImageUrl = ref('')
-const uploading = ref(false)
+const totalQty = ref(1)
+const configurations = ref<ConfigurationDraft[]>([])
 
 const groups = computed(() => {
   const groupIds = splitIds(props.product?.attributeIds)
@@ -109,59 +147,144 @@ const groups = computed(() => {
     return { ...group, options: attributes.value.filter(item => String(item.parentId || '') === groupId) }
   }).filter(Boolean) as Array<ShopAttribute & { options: ShopAttribute[] }>
 })
-const selectedOptions = computed(() => Object.values(selections.value).filter(Boolean)
-  .map(id => attributes.value.find(item => String(item.id) === id)).filter(Boolean) as ShopAttribute[])
-const extraAmount = computed(() => selectedOptions.value.reduce((sum, item) => sum + Number(item.extraAmount || 0), 0))
+const attributeMap = computed(() => new Map(attributes.value.map(item => [String(item.id), item])))
 const basePrice = computed(() => Number(props.product?.salePrice || 0))
 const priceValid = computed(() => basePrice.value > 0)
-const totalPrice = computed(() => basePrice.value + extraAmount.value)
-const selectedConfigurations = computed(() => groups.value.map(group => {
-  const optionId = selections.value[String(group.id)]
-  const option = group.options.find(item => String(item.id) === optionId)
-  return option ? {
-    groupId: String(group.id),
-    groupName: displayShopLabel(group.name),
-    optionName: displayShopLabel(option.name)
-  } : null
-}).filter(Boolean) as Array<{ groupId: string; groupName: string; optionName: string }>)
+const assignedQty = computed(() => configurations.value.reduce((sum, item) => sum + normalizePositive(item.qty), 0))
+const quantityBalanced = computed(() => assignedQty.value === totalQty.value)
+const uploading = computed(() => configurations.value.some(item => item.uploading))
+const totalAmount = computed(() => configurations.value.reduce((sum, item) => sum + configurationPrice(item) * normalizePositive(item.qty), 0))
+const confirmButtonText = computed(() => {
+  if (uploading.value) return '图片上传中'
+  if (!priceValid.value) return '销售价未维护，暂不能加入'
+  if (!quantityBalanced.value) return `已分配 ${assignedQty.value} / ${totalQty.value} 件`
+  return `加入 ${totalQty.value} 件主商品 · ￥${totalAmount.value.toFixed(2)}`
+})
 
 function splitIds(value?: string) {
   return (value || '').split(',').map(item => item.trim()).filter(Boolean)
 }
-function select(groupId: string, optionId: string) {
-  const normalizedGroupId = String(groupId)
-  const normalizedOptionId = String(optionId)
-  selections.value[normalizedGroupId] = selections.value[normalizedGroupId] === normalizedOptionId ? '' : normalizedOptionId
+
+function normalizePositive(value: number) {
+  return Math.max(1, Math.floor(Number(value || 1)))
 }
-function close() { emit('close') }
+
+function createConfiguration(qty = 1, source?: ConfigurationDraft): ConfigurationDraft {
+  return {
+    key: `${Date.now()}-${Math.random()}`,
+    selections: { ...(source?.selections || {}) },
+    logoImageUrl: source?.logoImageUrl || '',
+    qty: normalizePositive(qty),
+    uploading: false
+  }
+}
+
+function selectedOptionIds(configuration: ConfigurationDraft) {
+  return groups.value.map(group => configuration.selections[String(group.id)]).filter((id): id is string => Boolean(id))
+}
+
+function configurationExtraAmount(configuration: ConfigurationDraft) {
+  return selectedOptionIds(configuration).reduce((sum, id) => sum + Number(attributeMap.value.get(id)?.extraAmount || 0), 0)
+}
+
+function configurationPrice(configuration: ConfigurationDraft) {
+  return basePrice.value + configurationExtraAmount(configuration)
+}
+
+function configurationTextParts(configuration: ConfigurationDraft) {
+  return groups.value.map(group => {
+    const optionId = configuration.selections[String(group.id)]
+    const option = group.options.find(item => String(item.id) === optionId)
+    return option ? `${displayShopLabel(group.name)}：${displayShopLabel(option.name)}` : ''
+  }).filter(Boolean)
+}
+
+function configurationSummary(configuration: ConfigurationDraft) {
+  return configurationTextParts(configuration).join(' / ') || '标准配置'
+}
+
+function select(configuration: ConfigurationDraft, groupId: string, optionId: string) {
+  configuration.selections[groupId] = configuration.selections[groupId] === optionId ? '' : optionId
+}
+
+function close() {
+  emit('close')
+}
+
+function changeTotalQty(delta: number) {
+  totalQty.value = Math.max(configurations.value.length || 1, normalizePositive(totalQty.value) + delta)
+  balanceConfigurationsToTotal()
+}
+
+function normalizeTotalQty() {
+  totalQty.value = Math.max(configurations.value.length || 1, normalizePositive(totalQty.value))
+  balanceConfigurationsToTotal()
+}
+
+function balanceConfigurationsToTotal() {
+  if (!configurations.value.length) return
+  let difference = totalQty.value - assignedQty.value
+  if (difference > 0) {
+    configurations.value[0]!.qty += difference
+    return
+  }
+  for (let index = configurations.value.length - 1; index >= 0 && difference < 0; index -= 1) {
+    const configuration = configurations.value[index]!
+    const reducible = Math.min(configuration.qty - 1, Math.abs(difference))
+    configuration.qty -= reducible
+    difference += reducible
+  }
+}
+
+function changeConfigurationQty(configuration: ConfigurationDraft, delta: number) {
+  configuration.qty = Math.max(1, normalizePositive(configuration.qty) + delta)
+}
+
+function normalizeConfigurationQty(configuration: ConfigurationDraft) {
+  configuration.qty = normalizePositive(configuration.qty)
+}
+
+function addConfiguration() {
+  if (configurations.value.length >= totalQty.value) return
+  const source = configurations.value[0]
+  if (source && source.qty > 1) source.qty -= 1
+  configurations.value.push(createConfiguration(1, source))
+}
+
+function removeConfiguration(index: number) {
+  const [removed] = configurations.value.splice(index, 1)
+  if (removed && configurations.value[0]) configurations.value[0].qty += normalizePositive(removed.qty)
+}
+
 function confirm() {
-  if (!priceValid.value) return
-  const byId = new Map(attributes.value.map(item => [String(item.id), item]))
-  const ids = groups.value.map(group => selections.value[String(group.id)]).filter((id): id is string => Boolean(id))
-  const text = ids.map(id => {
-    const option = byId.get(id)
-    const group = option ? byId.get(String(option.parentId || '')) : undefined
-    return option ? `${displayShopLabel(group?.name || '商品属性')}: ${displayShopLabel(option.name)}` : ''
-  }).filter(Boolean).join(' / ')
-  emit('confirm', {
-    optionAttributeIds: ids.join(','),
-    optionAttributeText: text,
-    attributeExtraAmount: extraAmount.value,
-    logoImageUrl: logoImageUrl.value,
-    qty: qty.value
-  })
+  if (!priceValid.value || !quantityBalanced.value) return
+  emit('confirm', configurations.value.map(configuration => ({
+    optionAttributeIds: selectedOptionIds(configuration).join(','),
+    optionAttributeText: configurationTextParts(configuration).join(' / '),
+    attributeExtraAmount: configurationExtraAmount(configuration),
+    logoImageUrl: configuration.logoImageUrl,
+    qty: normalizePositive(configuration.qty)
+  })))
 }
-async function uploadLogo(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+
+async function uploadLogo(event: Event, configuration: ConfigurationDraft) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
   if (!file) return
-  uploading.value = true
-  try { logoImageUrl.value = await uploadImage(file) } finally { uploading.value = false }
+  configuration.uploading = true
+  try {
+    configuration.logoImageUrl = await uploadImage(file)
+  } finally {
+    configuration.uploading = false
+  }
 }
+
 function reset() {
-  selections.value = {}
-  qty.value = 1
-  logoImageUrl.value = ''
+  totalQty.value = normalizePositive(props.initialQty)
+  configurations.value = [createConfiguration(totalQty.value)]
 }
+
 watch(() => [props.open, props.product?.id], ([isOpen]) => {
   if (isOpen) reset()
 })
@@ -171,12 +294,12 @@ onMounted(async () => { attributes.value = await listAttributes() })
 
 <style scoped>
 .config-mask { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; background: rgba(36,27,22,.52); }
-.config-sheet { width: 100%; max-width: 640px; max-height: 88vh; margin: 0 auto; display: grid; grid-template-rows: auto minmax(0,1fr) auto; border-radius: 22px 22px 0 0; background: #fff; overflow: hidden; }
+.config-sheet { width: 100%; max-width: 640px; max-height: 92vh; margin: 0 auto; display: grid; grid-template-rows: auto minmax(0,1fr) auto; border-radius: 22px 22px 0 0; background: #fff; overflow: hidden; }
 .config-sheet header { position: relative; padding: 16px; border-bottom: 1px solid var(--border-soft); }
 .product-head { display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: center; }
 .product-head img { width: 76px; height: 76px; object-fit: contain; border-radius: var(--radius); background: var(--bg-muted); }
 .product-role { display: inline-flex; margin-bottom: 4px; padding: 2px 7px; border-radius: 999px; color: var(--brand-teal); background: #e6f2ef; font-size: 11px; font-weight: 800; }
-.product-head h2 { margin: 0; font-size: 17px; }
+.product-head h2 { margin: 0; padding-right: 30px; font-size: 17px; }
 .product-head p { margin: 5px 0; color: var(--text-sub); font-size: 12px; }
 .price-breakdown { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; }
 .price-breakdown span { color: var(--text-sub); font-size: 11px; }
@@ -188,28 +311,41 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .summary-heading, .summary-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .summary-heading { margin-bottom: 9px; }
 .summary-heading strong { color: var(--text-main); font-size: 14px; }
-.summary-heading span { color: var(--brand-teal); font-size: 11px; }
+.summary-heading span { color: var(--brand-teal); font-size: 11px; font-weight: 800; }
+.summary-heading span.invalid, .quantity-warning { color: #b54708; }
 .summary-line { padding: 6px 0; border-top: 1px dashed #d2e4df; font-size: 13px; }
-.summary-line span { min-width: 0; }
+.summary-line span { min-width: 0; line-height: 1.4; }
 .summary-line b { flex: none; color: var(--brand-teal); }
 .main-line { font-weight: 800; }
 .option-line { color: var(--text-sub); }
-.purchase-summary p { margin: 7px 0 0; color: var(--text-sub); font-size: 12px; }
-.option-group { padding: 14px 0; border-bottom: 1px solid var(--border-soft); }
+.purchase-summary p { margin: 7px 0 0; font-size: 12px; }
+.configuration-card { margin-top: 12px; padding: 12px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: #fff; box-shadow: 0 6px 18px rgba(67,47,31,.05); }
+.configuration-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; }
+.configuration-head > div:first-child { display: grid; gap: 3px; }
+.configuration-head strong { color: var(--text-main); }
+.configuration-head span { color: var(--brand-orange); font-size: 12px; font-weight: 800; }
+.configuration-actions { display: flex; align-items: center; gap: 7px; }
+.remove-configuration { color: #9b2c2c; font-size: 12px; }
+.option-group { padding: 12px 0; border-top: 1px solid var(--border-soft); }
 .option-group h3 { margin: 0 0 10px; font-size: 15px; }
 .option-group h3 small { margin-left: 5px; color: var(--text-sub); font-weight: 400; }
 .option-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
 .option-grid button { min-height: 48px; padding: 8px 10px; display: grid; gap: 3px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); text-align: left; }
 .option-grid button.active { border-color: var(--brand-teal); background: #e6f2ef; color: var(--brand-teal); }
 .option-grid em { color: var(--brand-orange); font-size: 11px; font-style: normal; }
-.logo-field { display: grid; gap: 8px; padding-top: 14px; color: var(--text-main); font-size: 14px; font-weight: 700; }
+.logo-field { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-soft); color: var(--text-main); font-size: 14px; font-weight: 700; }
 .logo-preview { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
 .logo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
 .logo-preview button { color: #9b2c2c; }
-.config-sheet footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border-soft); }
+.add-configuration { width: 100%; min-height: 42px; margin-top: 12px; border: 1px dashed var(--brand-teal); border-radius: var(--radius); color: var(--brand-teal); background: #f2f8f6; font-weight: 900; }
+.add-configuration:disabled { opacity: .45; }
+.config-sheet footer { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: grid; gap: 8px; border-top: 1px solid var(--border-soft); background: #fff; }
+.main-qty { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.main-qty > span { color: var(--text-main); font-size: 13px; font-weight: 800; }
 .qty-stepper { display: flex; align-items: center; border: 1px solid var(--border-line); border-radius: 999px; overflow: hidden; }
-.qty-stepper button { width: 36px; height: 38px; background: var(--bg-muted); }
-.qty-stepper span { min-width: 32px; text-align: center; }
-.add-button { flex: 1; min-height: 44px; border-radius: 999px; color: #fff; background: var(--brand-teal); font-weight: 900; }
+.qty-stepper button { width: 36px; height: 36px; background: var(--bg-muted); }
+.qty-stepper.compact button { width: 30px; height: 32px; }
+.qty-stepper input { width: 42px; height: 32px; padding: 0; border: 0; text-align: center; background: #fff; }
+.add-button { width: 100%; min-height: 44px; border-radius: 999px; color: #fff; background: var(--brand-teal); font-weight: 900; }
 .add-button:disabled { opacity: .55; }
 </style>

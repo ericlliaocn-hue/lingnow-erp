@@ -406,18 +406,24 @@ public class SalesH5Controller {
 
     private void applyProductCategory(ErpCustomerOrderItem item, ErpProduct product) {
         if (product.getCategoryId() == null) return;
-        ErpProductCategory leaf = categoryService.getById(product.getCategoryId());
-        if (leaf == null) return;
-        ErpProductCategory parent = leaf.getParentId() == null || leaf.getParentId() == 0L
-                ? null : categoryService.getById(leaf.getParentId());
-        if (parent == null) {
-            item.setCategoryLevel1Id(leaf.getId());
-            item.setCategoryLevel1Name(leaf.getName());
-        } else {
-            item.setCategoryLevel1Id(parent.getId());
-            item.setCategoryLevel1Name(parent.getName());
-            item.setCategoryLevel2Id(leaf.getId());
-            item.setCategoryLevel2Name(leaf.getName());
+        List<ErpProductCategory> path = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        Long categoryId = product.getCategoryId();
+        while (categoryId != null && categoryId != 0L && visited.add(categoryId)) {
+            ErpProductCategory category = categoryService.getById(categoryId);
+            if (category == null) break;
+            path.add(category);
+            categoryId = category.getParentId();
+        }
+        if (path.isEmpty()) return;
+        Collections.reverse(path);
+        ErpProductCategory level1 = path.get(0);
+        item.setCategoryLevel1Id(level1.getId());
+        item.setCategoryLevel1Name(level1.getName());
+        if (path.size() > 1) {
+            ErpProductCategory level2 = path.get(1);
+            item.setCategoryLevel2Id(level2.getId());
+            item.setCategoryLevel2Name(level2.getName());
         }
     }
 

@@ -23,7 +23,7 @@
 
       <article v-for="(item, index) in items" :key="item.key" class="card order-item">
         <div class="item-head">
-          <strong>商品 {{ index + 1 }}</strong>
+          <strong>{{ duplicateProductCount(item) > 1 ? `配置明细 ${configurationIndex(item)}` : `商品 ${index + 1}` }}</strong>
           <button v-if="items.length > 1" class="remove-button" @click="removeItem(index)">移除</button>
         </div>
 
@@ -38,7 +38,7 @@
           </button>
           <div v-else class="summary-img-empty">荣时</div>
           <div class="product-summary-info">
-            <span class="main-product-tag">主商品 × {{ item.qty }}</span>
+            <span class="main-product-tag">主商品合计 × {{ productGroupTotal(item) }} · 当前配置 × {{ item.qty }}</span>
             <strong>{{ productOf(item)?.name }}</strong>
             <p>{{ productSummary(productOf(item)) }}</p>
             <span class="price">￥{{ itemPrice(item).toFixed(2) }}</span>
@@ -66,7 +66,7 @@
         </div>
 
         <div v-if="productOf(item)" class="composition-summary">
-          <div><strong>本次购买</strong><span>配置数量跟随主商品</span></div>
+          <div><strong>当前配置</strong><span>本配置数量可单独修改</span></div>
           <p><span>{{ productOf(item)?.name }}</span><b>× {{ item.qty }}</b></p>
           <p v-for="part in selectedConfiguration(item)" :key="part"><span>{{ part }}</span><b>× {{ item.qty }}</b></p>
         </div>
@@ -157,6 +157,22 @@ function createItem(productId = ''): DraftItem {
 
 function productOf(item: DraftItem) {
   return productMap.value.get(String(item.productId))
+}
+
+function sameProductItems(item: DraftItem) {
+  return items.value.filter(record => record.productId && record.productId === item.productId)
+}
+
+function duplicateProductCount(item: DraftItem) {
+  return sameProductItems(item).length
+}
+
+function configurationIndex(item: DraftItem) {
+  return sameProductItems(item).findIndex(record => record.key === item.key) + 1
+}
+
+function productGroupTotal(item: DraftItem) {
+  return sameProductItems(item).reduce((sum, record) => sum + Number(record.qty || 0), 0)
 }
 
 function productSummary(product?: ShopProduct) {
