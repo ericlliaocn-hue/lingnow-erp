@@ -13,6 +13,7 @@ export interface ErpProduct {
   unitId?: string
   unitName?: string
   attributeIds?: string
+  optionAttributeIds?: string
   attributeText?: string
   barcode?: string
   location?: string

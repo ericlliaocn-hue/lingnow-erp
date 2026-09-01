@@ -9,7 +9,6 @@ import type {
   ShopAddressPayload,
   ShopAttribute,
   ShopCategory,
-  ShopCustomer,
   ShopLoginVO,
   ShopProduct
 } from '@/types/shop'
@@ -24,10 +23,6 @@ export function logout() {
 
 export function me() {
   return request<ShopLoginVO>({ url: '/sales-h5/me', method: 'get' })
-}
-
-export function listCustomers(keyword?: string) {
-  return request<ShopCustomer[]>({ url: '/sales-h5/customers', method: 'get', params: { keyword } })
 }
 
 export function listCategories() {
@@ -71,28 +66,27 @@ export function parseAddress(rawText: string) {
 }
 
 export function listAddresses(keyword?: string) {
-  const customerId = selectedCustomerId()
   return request<ShopAddress[]>({
-    url: `/sales-h5/customers/${customerId}/addresses`,
+    url: '/sales-h5/addresses',
     method: 'get',
     params: { keyword }
   })
 }
 
 export function getAddress(id: string) {
-  return request<ShopAddress>({ url: `/sales-h5/customers/${selectedCustomerId()}/addresses/${id}`, method: 'get' })
+  return request<ShopAddress>({ url: `/sales-h5/addresses/${id}`, method: 'get' })
 }
 
 export function createAddress(data: ShopAddressPayload) {
-  return request<ShopAddress>({ url: `/sales-h5/customers/${selectedCustomerId()}/addresses`, method: 'post', data })
+  return request<ShopAddress>({ url: '/sales-h5/addresses', method: 'post', data })
 }
 
 export function updateAddress(id: string, data: ShopAddressPayload) {
-  return request<ShopAddress>({ url: `/sales-h5/customers/${selectedCustomerId()}/addresses/${id}`, method: 'put', data })
+  return request<ShopAddress>({ url: `/sales-h5/addresses/${id}`, method: 'put', data })
 }
 
 export function setDefaultAddress(id: string) {
-  return request<ShopAddress>({ url: `/sales-h5/customers/${selectedCustomerId()}/addresses/${id}/default`, method: 'post' })
+  return request<ShopAddress>({ url: `/sales-h5/addresses/${id}/default`, method: 'post' })
 }
 
 export function uploadImage(file: File) {
@@ -116,10 +110,4 @@ export function listOrders(params: { current: number; size: number }) {
 
 export function getOrder(id: string) {
   return request<CustomerOrder>({ url: `/sales-h5/orders/${id}`, method: 'get' })
-}
-
-function selectedCustomerId() {
-  const customerId = localStorage.getItem('sales-customer-id') || ''
-  if (!customerId) throw new Error('请先选择客户')
-  return customerId
 }

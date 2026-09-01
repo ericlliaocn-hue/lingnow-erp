@@ -8,7 +8,6 @@
     </header>
 
     <section class="page-inner category-layout">
-      <CustomerPicker class="customer-row" />
       <aside class="category-menu" aria-label="商品分类">
         <button :class="{ active: activeLevel1 === 'all' }" type="button" @click="selectLevel1('all')">全部商品</button>
         <button
@@ -93,7 +92,6 @@ import { buildCategoryTree, categoryPath } from '@/utils/category'
 import { priceLabel } from '@/utils/label'
 import type { ShopCategory, ShopProduct } from '@/types/shop'
 import BottomNav from './components/BottomNav.vue'
-import CustomerPicker from './components/CustomerPicker.vue'
 import ProductConfigurator, { type ProductConfiguration } from './components/ProductConfigurator.vue'
 
 const router = useRouter()
@@ -171,7 +169,6 @@ onMounted(async () => {
 .simple-header h1 { margin: 0; color: var(--text-main); font-size: 22px; }
 .simple-header p { margin: 4px 0 0; color: var(--text-sub); font-size: 13px; }
 .category-layout { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }
-.customer-row { grid-column: 1 / -1; }
 .category-menu { position: sticky; top: 12px; align-self: start; display: grid; gap: 8px; }
 .category-menu button { min-height: 42px; padding: 8px; border-radius: var(--radius); color: #6d5b4c; background: var(--bg-card); font-size: 13px; font-weight: 800; }
 .category-menu button.active { color: var(--brand-brown); background: var(--bg-cream-soft); box-shadow: inset 3px 0 0 var(--brand-orange); }

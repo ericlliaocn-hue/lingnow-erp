@@ -1011,6 +1011,7 @@ CREATE TABLE IF NOT EXISTS `erp_product`
     `brand_id`       bigint(20)              DEFAULT NULL COMMENT '品牌ID',
     `unit_id`        bigint(20)              DEFAULT NULL COMMENT '单位ID',
     `attribute_ids`  varchar(500)            DEFAULT NULL COMMENT '属性节点ID集合',
+    `option_attribute_ids` varchar(2000)     DEFAULT NULL COMMENT '商品可选项ID集合',
     `attribute_text` varchar(255)            DEFAULT NULL COMMENT '辅助属性',
     `barcode`        varchar(128)            DEFAULT NULL COMMENT '条码',
     `location`       varchar(128)            DEFAULT NULL COMMENT '货位',
@@ -1178,6 +1179,7 @@ CREATE TABLE IF NOT EXISTS `erp_customer_address`
     `id`             bigint(20)   NOT NULL COMMENT '客户地址ID',
     `customer_id`    bigint(20)   NOT NULL COMMENT '客户ID',
     `account_id`     bigint(20)            DEFAULT NULL COMMENT '客户账号ID（客户自助维护时使用）',
+    `sales_user_id`  bigint(20)            DEFAULT NULL COMMENT '销售H5业务员ID',
     `receiver_name`  varchar(64)  NOT NULL COMMENT '收货人',
     `receiver_phone` varchar(32)  NOT NULL COMMENT '收货电话',
     `province_code`  varchar(32)           DEFAULT NULL COMMENT '省编码',
@@ -1202,6 +1204,7 @@ CREATE TABLE IF NOT EXISTS `erp_customer_address`
     PRIMARY KEY (`id`),
     KEY `idx_customer_address_customer` (`customer_id`),
     KEY `idx_customer_address_account` (`account_id`),
+    KEY `idx_customer_address_sales_user` (`sales_user_id`),
     KEY `idx_customer_address_default` (`account_id`, `default_flag`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='ERP客户H5收货地址';

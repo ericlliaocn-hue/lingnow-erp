@@ -18,6 +18,7 @@ public class ErpProductVO {
     private Long unitId;
     private String unitName;
     private String attributeIds;
+    private String optionAttributeIds;
     private String attributeText;
     private String barcode;
     private String location;

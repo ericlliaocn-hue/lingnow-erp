@@ -153,6 +153,7 @@ public class ErpMasterDataController {
                 case "product-attribute" -> {
                     ensureNoMasterChild(productAttributeService, id, "属性存在下级节点，不能删除");
                     ensureNoFindSetProductRef("attribute_ids", id, "属性已被商品引用，不能删除，请停用");
+                    ensureNoFindSetProductRef("option_attribute_ids", id, "属性选项已被商品引用，不能删除，请停用");
                     ensureNoFindSetCategoryRef("attribute_ids", id, "属性已被商品分类引用，不能删除，请停用");
                     ensureNoFindSetBillItemRef("option_attribute_ids", id, "属性已被单据明细引用，不能删除，请停用");
                 }

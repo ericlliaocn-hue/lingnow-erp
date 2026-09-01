@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 商品选配项数量工具。主商品数量与每个选配项数量相互独立。
+ * 商品选配项数量工具。新订单中每个选配项均按主商品数量计数。
  */
 public final class OptionAttributeQuantityUtil {
 
@@ -32,7 +32,33 @@ public final class OptionAttributeQuantityUtil {
             legacyOptionIds.forEach(id -> putAllowed(result, id, legacyQty, allowedGroupIds, attributes));
             return result;
         }
-        requested.forEach((id, qty) -> putAllowed(result, id, qty, allowedGroupIds, attributes));
+        requested.keySet().forEach(id -> putAllowed(result, id, mainQty, allowedGroupIds, attributes));
+        return result;
+    }
+
+    public static LinkedHashMap<String, BigDecimal> normalizeRequested(
+            Map<String, BigDecimal> requested,
+            Collection<String> legacyOptionIds,
+            BigDecimal mainQty,
+            Set<String> allowedGroupIds,
+            Map<String, ErpProductAttribute> attributes) {
+        return normalizeRequested(requested, legacyOptionIds, mainQty, allowedGroupIds, Set.of(), attributes);
+    }
+
+    public static LinkedHashMap<String, BigDecimal> normalizeRequested(
+            Map<String, BigDecimal> requested,
+            Collection<String> legacyOptionIds,
+            BigDecimal mainQty,
+            Set<String> allowedGroupIds,
+            Set<String> allowedOptionIds,
+            Map<String, ErpProductAttribute> attributes) {
+        LinkedHashMap<String, BigDecimal> result = new LinkedHashMap<>();
+        if (requested == null) {
+            BigDecimal legacyQty = positive(mainQty);
+            legacyOptionIds.forEach(id -> putAllowed(result, id, legacyQty, allowedGroupIds, allowedOptionIds, attributes));
+            return result;
+        }
+        requested.forEach((id, qty) -> putAllowed(result, id, qty, allowedGroupIds, allowedOptionIds, attributes));
         return result;
     }
 
@@ -106,14 +132,25 @@ public final class OptionAttributeQuantityUtil {
             String id,
             BigDecimal qty,
             Set<String> allowedGroupIds,
+            Set<String> allowedOptionIds,
             Map<String, ErpProductAttribute> attributes) {
         ErpProductAttribute option = attributes.get(id);
         BigDecimal normalizedQty = decimal(qty);
         if (option != null
                 && allowedGroupIds.contains(String.valueOf(option.getParentId()))
+                && (allowedOptionIds.isEmpty() || allowedOptionIds.contains(id))
                 && normalizedQty.compareTo(BigDecimal.ZERO) > 0) {
             result.put(id, normalizedQty);
         }
+    }
+
+    private static void putAllowed(
+            Map<String, BigDecimal> result,
+            String id,
+            BigDecimal qty,
+            Set<String> allowedGroupIds,
+            Map<String, ErpProductAttribute> attributes) {
+        putAllowed(result, id, qty, allowedGroupIds, Set.of(), attributes);
     }
 
     private static BigDecimal positive(BigDecimal value) {

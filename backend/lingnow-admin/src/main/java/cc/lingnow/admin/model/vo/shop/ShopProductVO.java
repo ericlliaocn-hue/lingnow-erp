@@ -14,6 +14,7 @@ public class ShopProductVO {
     private Long categoryId;
     private String categoryName;
     private String attributeIds;
+    private String optionAttributeIds;
     private String attributeText;
     private BigDecimal salePrice;
     private String unitName;

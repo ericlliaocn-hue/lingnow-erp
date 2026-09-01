@@ -22,6 +22,7 @@ public class ErpCustomerAddress extends BaseEntity implements Serializable {
     private Long id;
     private Long customerId;
     private Long accountId;
+    private Long salesUserId;
     private String receiverName;
     private String receiverPhone;
     private String provinceCode;

@@ -40,8 +40,14 @@ export const useCartStore = defineStore('cart', {
     }, qty = 1) {
       const productId = String(product.id)
       const optionAttributeIds = configuration.optionAttributeIds || ''
-      const optionQuantities = configuration.optionQuantities || {}
-      const optionAttributeQuantityJson = configuration.optionAttributeQuantityJson || JSON.stringify(optionQuantities)
+      const configuredQuantities = configuration.optionQuantities || parseOptionQuantities(configuration.optionAttributeQuantityJson)
+      const hasConfiguredQuantities = Object.keys(configuredQuantities).length > 0
+      const selectedOptionIds = (optionAttributeIds || Object.keys(configuredQuantities).join(','))
+        .split(',').map(id => id.trim()).filter(Boolean)
+      const optionQuantities = Object.fromEntries(selectedOptionIds
+        .map(id => [id, Number(configuredQuantities[id] ?? (hasConfiguredQuantities ? 0 : qty))] as const)
+        .filter(([, optionQty]) => optionQty > 0))
+      const optionAttributeQuantityJson = JSON.stringify(optionQuantities)
       const signature = `${productId}|${optionAttributeQuantityJson}|${configuration.logoImageUrl || ''}`
       const current = this.items.find(item => item.key === signature)
       if (current) {
@@ -82,6 +88,7 @@ export const useCartStore = defineStore('cart', {
       const item = this.items.find(record => record.key === key)
       if (!item) return
       item.qty = Math.max(1, Number(qty || 1))
+      item.optionAttributeQuantityJson = JSON.stringify(item.optionQuantities)
       item.price = effectivePrice(item.basePrice, item.qty, item.attributeExtraAmount)
       this.persist()
     },

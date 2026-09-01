@@ -418,6 +418,7 @@ public class SchemaFixer implements CommandLineRunner {
                     "id bigint(20) NOT NULL COMMENT '客户地址ID'," +
                     "customer_id bigint(20) NOT NULL COMMENT '客户ID'," +
                     "account_id bigint(20) NOT NULL COMMENT '客户账号ID'," +
+                    "sales_user_id bigint(20) DEFAULT NULL COMMENT '销售H5业务员ID'," +
                     "receiver_name varchar(64) NOT NULL COMMENT '收货人'," +
                     "receiver_phone varchar(32) NOT NULL COMMENT '收货电话'," +
                     "province_code varchar(32) DEFAULT NULL COMMENT '省编码'," +
@@ -442,8 +443,14 @@ public class SchemaFixer implements CommandLineRunner {
                     "PRIMARY KEY (id)," +
                     "KEY idx_customer_address_customer (customer_id)," +
                     "KEY idx_customer_address_account (account_id)," +
+                    "KEY idx_customer_address_sales_user (sales_user_id)," +
                     "KEY idx_customer_address_default (account_id, default_flag)" +
                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ERP客户H5收货地址'");
+            if (!checkColumnExists("erp_customer_address", "sales_user_id")) {
+                log.info("表 erp_customer_address 缺少 sales_user_id 列，创建中...");
+                jdbcTemplate.execute("ALTER TABLE erp_customer_address ADD column sales_user_id bigint(20) DEFAULT NULL COMMENT '销售H5业务员ID' AFTER account_id");
+                jdbcTemplate.execute("ALTER TABLE erp_customer_address ADD KEY idx_customer_address_sales_user (sales_user_id)");
+            }
 
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS erp_customer_order (" +
                     "id bigint(20) NOT NULL COMMENT '客户订单ID'," +
@@ -731,6 +738,10 @@ public class SchemaFixer implements CommandLineRunner {
             if (!checkColumnExists("erp_product", "attribute_ids")) {
                 log.info("表 erp_product 缺少 attribute_ids 列，创建中...");
                 jdbcTemplate.execute("ALTER TABLE erp_product ADD column attribute_ids varchar(500) DEFAULT NULL COMMENT '属性节点ID集合' AFTER unit_id");
+            }
+            if (!checkColumnExists("erp_product", "option_attribute_ids")) {
+                log.info("表 erp_product 缺少 option_attribute_ids 列，创建中...");
+                jdbcTemplate.execute("ALTER TABLE erp_product ADD column option_attribute_ids varchar(2000) DEFAULT NULL COMMENT '商品可选项ID集合' AFTER attribute_ids");
             }
             if (!checkColumnExists("erp_product", "image_url")) {
                 log.info("表 erp_product 缺少 image_url 列，创建中...");

@@ -1,7 +1,6 @@
 <template>
   <main class="page order-page">
     <section class="page-inner">
-      <CustomerPicker @change="onCustomerChange" />
       <div class="card receiver-card" @click="openAddressList">
         <div class="card-title-row">
           <span>收货地址</span>
@@ -51,11 +50,19 @@
         </div>
 
         <div v-for="group in attributeGroups(item)" :key="group.id" class="attribute-group">
-          <div class="attribute-title">{{ displayShopLabel(group.name) }} <small>每个选配项数量独立</small></div>
-          <div class="attribute-options option-quantity-options">
+          <button class="attribute-title" type="button" :aria-expanded="isGroupExpanded(item, group.id)" @click="toggleGroup(item, group.id)">
+            <span>{{ displayShopLabel(group.name) }}</span>
+            <span class="attribute-title-meta">
+              <small v-if="selectedGroupOptionCount(item, group) > 0">已选 {{ selectedGroupOptionCount(item, group) }}</small>
+              <span>{{ isGroupExpanded(item, group.id) ? '收起' : '展开' }}⌄</span>
+            </span>
+          </button>
+          <div v-if="isGroupExpanded(item, group.id)" class="attribute-options option-quantity-options">
             <div v-for="option in group.options" :key="option.id" :class="['option-quantity-row', optionQty(item, option.id) > 0 ? 'active' : '']">
-              <span>{{ displayShopLabel(option.name) }}<small v-if="Number(option.extraAmount || 0) > 0">每件 +￥{{ money(option.extraAmount) }}</small></span>
-              <div class="qty-stepper compact">
+              <button class="option-name" type="button" @click="toggleOption(item, option.id)">
+                <span>{{ displayShopLabel(option.name) }}<small v-if="Number(option.extraAmount || 0) > 0">每件 +￥{{ money(option.extraAmount) }}</small></span>
+              </button>
+              <div class="qty-stepper compact" :aria-label="`${displayShopLabel(option.name)}数量`">
                 <button type="button" :disabled="optionQty(item, option.id) <= 0" @click="changeOptionQty(item, option.id, -1)">-</button>
                 <input :value="optionQty(item, option.id)" type="number" min="0" step="1" inputmode="numeric" @input="setOptionQty(item, option.id, ($event.target as HTMLInputElement).value)" />
                 <button type="button" @click="changeOptionQty(item, option.id, 1)">+</button>
@@ -65,7 +72,7 @@
         </div>
 
         <div v-if="productOf(item)" class="composition-summary">
-          <div><strong>购买明细</strong><span>主商品和每个选配项数量独立</span></div>
+          <div><strong>购买明细</strong></div>
           <p><span>{{ productOf(item)?.name }}</span><b>× {{ item.qty }}</b></p>
           <p v-for="part in selectedConfiguration(item)" :key="part.id"><span>{{ part.text }}</span><b>× {{ part.qty }}</b></p>
         </div>
@@ -116,9 +123,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAddress, listAddresses, listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
 import { displayShopLabel } from '@/utils/label'
-import type { OrderSubmitPayload, ShopAddress, ShopAttribute, ShopCustomer, ShopProduct } from '@/types/shop'
+import type { OrderSubmitPayload, ShopAddress, ShopAttribute, ShopProduct } from '@/types/shop'
 import ProductPicker from './components/ProductPicker.vue'
-import CustomerPicker from './components/CustomerPicker.vue'
 import { useCartStore } from '@/stores/cart'
 
 interface DraftItem {
@@ -142,6 +148,7 @@ const selectedAddress = ref<ShopAddress>()
 const saving = ref(false)
 const error = ref('')
 const previewImageUrl = ref('')
+const expandedGroups = reactive<Record<string, boolean>>({})
 const form = reactive({
   remark: ''
 })
@@ -190,11 +197,31 @@ function attributeGroups(item: DraftItem) {
   if (!product?.attributeIds) {
     return []
   }
+  const optionIds = new Set(splitIds(product.optionAttributeIds))
+  const hasSpecificOptions = optionIds.size > 0
   return splitIds(product.attributeIds).map(groupId => {
     const group = attributeMap.value.get(groupId)
-    const options = attributes.value.filter(attr => String(attr.parentId || '') === groupId)
-    return group ? { ...group, options } : null
+    const options = attributes.value.filter(attr => String(attr.parentId || '') === groupId
+      && (!hasSpecificOptions || optionIds.has(String(attr.id))))
+    return group && options.length ? { ...group, options } : null
   }).filter(Boolean) as Array<ShopAttribute & { options: ShopAttribute[] }>
+}
+
+function groupKey(item: DraftItem, groupId: string | number) {
+  return `${item.key}:${String(groupId)}`
+}
+
+function isGroupExpanded(item: DraftItem, groupId: string | number) {
+  return expandedGroups[groupKey(item, groupId)] === true
+}
+
+function toggleGroup(item: DraftItem, groupId: string | number) {
+  const key = groupKey(item, groupId)
+  expandedGroups[key] = !isGroupExpanded(item, groupId)
+}
+
+function selectedGroupOptionCount(item: DraftItem, group: { options: ShopAttribute[] }) {
+  return group.options.filter(option => optionQty(item, option.id) > 0).length
 }
 
 function selectedOptionIds(item: DraftItem) {
@@ -215,8 +242,8 @@ function itemPrice(item: DraftItem) {
 
 function itemAmount(item: DraftItem) {
   const mainAmount = Number(item.qty || 0) * itemPrice(item)
-  const optionAmount = Object.entries(item.optionQuantities).reduce((sum, [id, qty]) => {
-    return sum + Number(attributeMap.value.get(id)?.extraAmount || 0) * Number(qty || 0)
+  const optionAmount = selectedOptionIds(item).reduce((sum, id) => {
+    return sum + Number(attributeMap.value.get(id)?.extraAmount || 0) * Number(item.optionQuantities[id] || 0)
   }, 0)
   return mainAmount + optionAmount
 }
@@ -225,11 +252,19 @@ function optionQty(item: DraftItem, optionId: string | number) {
   return Math.max(0, Math.floor(Number(item.optionQuantities[String(optionId)] || 0)))
 }
 
+function toggleOption(item: DraftItem, optionId: string | number) {
+  const id = String(optionId)
+  if (item.optionQuantities[id]) delete item.optionQuantities[id]
+  else item.optionQuantities[id] = 1
+  saveDraft()
+}
+
 function setOptionQty(item: DraftItem, optionId: string | number, value: string | number) {
   const id = String(optionId)
   const qty = Math.max(0, Math.floor(Number(value || 0)))
   if (qty > 0) item.optionQuantities[id] = qty
   else delete item.optionQuantities[id]
+  saveDraft()
 }
 
 function changeOptionQty(item: DraftItem, optionId: string | number, delta: number) {
@@ -238,14 +273,17 @@ function changeOptionQty(item: DraftItem, optionId: string | number, delta: numb
 
 function normalizeQty(item: DraftItem) {
   item.qty = Math.max(1, Math.floor(Number(item.qty || 1)))
+  saveDraft()
 }
 
 function decreaseQty(item: DraftItem) {
   item.qty = Math.max(1, Math.floor(Number(item.qty || 1)) - 1)
+  saveDraft()
 }
 
 function increaseQty(item: DraftItem) {
   item.qty = Math.max(1, Math.floor(Number(item.qty || 1)) + 1)
+  saveDraft()
 }
 
 function onProductChange(item: DraftItem) {
@@ -320,17 +358,11 @@ function validate() {
 }
 
 async function submit() {
-  const customerId = localStorage.getItem('sales-customer-id') || ''
-  if (!customerId) {
-    error.value = '请先选择客户'
-    return
-  }
   error.value = validate()
   if (error.value) {
     return
   }
   const payload: OrderSubmitPayload = {
-    customerId,
     addressId: selectedAddress.value?.id,
     receiverName: selectedAddress.value?.receiverName,
     receiverPhone: selectedAddress.value?.receiverPhone,
@@ -380,9 +412,10 @@ async function loadData() {
   const ids = routeProductIds()
   if (route.query.fromCart === '1' && cart.items.length) {
     items.value = cart.items.map(record => {
+      const qty = Math.max(1, Math.floor(Number(record.qty || 1)))
       return {
         ...createItem(record.productId),
-        qty: record.qty,
+        qty,
         optionQuantities: { ...(record.optionQuantities || {}) },
         logoImageUrl: record.logoImageUrl || ''
       }
@@ -391,13 +424,6 @@ async function loadData() {
     items.value = ids.length ? ids.map(id => createItem(id)) : [createItem()]
   }
   if (route.query.fromCart !== '1') restoreDraft(ids)
-  if (localStorage.getItem('sales-customer-id')) {
-    await loadSelectedAddress(await listAddresses())
-  }
-}
-
-async function onCustomerChange(_customer: ShopCustomer) {
-  selectedAddress.value = undefined
   await loadSelectedAddress(await listAddresses())
 }
 
@@ -418,10 +444,7 @@ async function loadSelectedAddress(addressRecords: ShopAddress[]) {
 }
 
 function openAddressList() {
-  if (!localStorage.getItem('sales-customer-id')) {
-    error.value = '请先选择客户'
-    return
-  }
+  error.value = ''
   saveDraft()
   router.push({ path: '/addresses', query: { select: '1', redirect: route.fullPath } })
 }
@@ -450,7 +473,8 @@ function restoreDraft(ids: string[]) {
       items.value = draft.items.map(item => ({
         ...createItem(item.productId),
         ...item,
-        optionQuantities: item.optionQuantities || {}
+        qty: Math.max(1, Math.floor(Number(item.qty || 1))),
+        optionQuantities: Object.fromEntries(Object.entries(item.optionQuantities || {}).map(([id, qty]) => [id, Math.max(1, Math.floor(Number(qty || 1)))]))
       }))
     }
   } catch {
@@ -655,12 +679,24 @@ onMounted(loadData)
 }
 
 .attribute-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
   margin-bottom: 8px;
   color: var(--text-sub);
   font-size: 13px;
+  font-weight: 800;
+  text-align: left;
 }
 
-.attribute-title small { margin-left: 4px; color: var(--brand-teal); font-size: 11px; font-weight: 400; }
+.attribute-title-meta { display: inline-flex; align-items: center; gap: 8px; color: var(--brand-teal); font-size: 11px; font-weight: 600; }
+.attribute-title-meta small { color: var(--brand-orange); font-weight: 500; }
 
 .composition-summary { margin-bottom: 12px; padding: 10px; border: 1px solid #c8dfd9; border-radius: var(--radius-sm); background: #f2f8f6; }
 .composition-summary > div, .composition-summary p { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -693,11 +729,11 @@ onMounted(loadData)
 }
 
 .option-quantity-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.option-quantity-row { min-width: 0; display: grid; gap: 8px; padding: 9px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: #fff; }
+.option-quantity-row { width: 100%; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: #fff; color: var(--text-main); text-align: left; }
 .option-quantity-row.active { border-color: var(--brand-teal); background: #e6f2ef; }
-.option-quantity-row > span { min-width: 0; display: grid; gap: 3px; color: var(--text-main); font-size: 12px; font-weight: 700; }
-.option-quantity-row small { color: var(--brand-orange); font-size: 10px; font-weight: 500; }
-.qty-stepper.compact { grid-template-columns: 28px 38px 28px; min-width: 94px; justify-self: end; }
+.option-name { min-width: 0; display: grid; gap: 3px; padding: 0; color: var(--text-main); background: transparent; text-align: left; font-size: 12px; font-weight: 700; }
+.option-name span { min-width: 0; display: grid; gap: 3px; }
+.option-name small { color: var(--brand-orange); font-size: 10px; font-weight: 500; }
 
 .file-input {
   padding: 8px;

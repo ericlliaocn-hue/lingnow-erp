@@ -28,6 +28,7 @@ public class ErpProduct extends BaseEntity implements Serializable {
     private Long brandId;
     private Long unitId;
     private String attributeIds;
+    private String optionAttributeIds;
     private String attributeText;
     private String barcode;
     private String location;

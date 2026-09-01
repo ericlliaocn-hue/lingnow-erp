@@ -591,7 +591,7 @@ public class ErpProductController {
         product.setRetailPrice(nvl(product.getRetailPrice()));
         product.setMinStock(nvl(product.getMinStock()));
         product.setMaxStock(nvl(product.getMaxStock()));
-        product.setAttributeText(attributeText(product.getAttributeIds(), product.getAttributeText()));
+        product.setAttributeText(attributeText(product.getAttributeIds(), product.getOptionAttributeIds(), product.getAttributeText()));
         return product;
     }
 
@@ -600,7 +600,7 @@ public class ErpProductController {
         vo.setCategoryName(masterName(categoryService.getById(product.getCategoryId())));
         vo.setBrandName(masterName(brandService.getById(product.getBrandId())));
         vo.setUnitName(masterName(unitService.getById(product.getUnitId())));
-        vo.setAttributeText(attributeText(product.getAttributeIds(), product.getAttributeText()));
+        vo.setAttributeText(attributeText(product.getAttributeIds(), product.getOptionAttributeIds(), product.getAttributeText()));
         return vo;
     }
 
@@ -632,11 +632,12 @@ public class ErpProductController {
         return bo;
     }
 
-    private String attributeText(String attributeIds, String fallback) {
-        if (StrUtil.isBlank(attributeIds)) {
+    private String attributeText(String attributeIds, String optionAttributeIds, String fallback) {
+        String displayIds = StrUtil.isBlank(optionAttributeIds) ? attributeIds : optionAttributeIds;
+        if (StrUtil.isBlank(displayIds)) {
             return fallback;
         }
-        List<Long> ids = Arrays.stream(attributeIds.split(","))
+        List<Long> ids = Arrays.stream(displayIds.split(","))
                 .map(String::trim)
                 .filter(StrUtil::isNotBlank)
                 .map(value -> {

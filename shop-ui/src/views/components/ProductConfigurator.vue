@@ -24,38 +24,36 @@
           </div>
           <div class="summary-line main-line">
             <span>{{ product.name }}</span>
-            <b>× {{ totalQty }}</b>
+            <div class="qty-stepper" :aria-label="`${product.name}数量`">
+              <button type="button" @click="changeTotalQty(-1)">−</button>
+              <input v-model.number="totalQty" type="number" min="1" step="1" inputmode="numeric" @input="normalizeTotalQty" />
+              <button type="button" @click="changeTotalQty(1)">＋</button>
+            </div>
           </div>
           <div v-for="item in selectedOptions" :key="item.id" class="summary-line option-line">
             <span>{{ item.groupName }}：{{ item.name }}</span>
-            <b>× {{ item.qty }}</b>
+            <div class="qty-stepper compact" :aria-label="`${item.name}数量`">
+              <button type="button" :disabled="item.qty <= 0" @click="changeOptionQty(item.id, -1)">−</button>
+              <input :value="item.qty" type="number" min="0" step="1" inputmode="numeric" @input="setOptionQty(item.id, ($event.target as HTMLInputElement).value)" />
+              <button type="button" @click="changeOptionQty(item.id, 1)">＋</button>
+            </div>
           </div>
           <p v-if="!selectedOptions.length" class="standard-hint">未选择额外选配项</p>
         </section>
 
         <section v-for="group in groups" :key="group.id" class="configuration-card option-group-card">
-          <div class="configuration-head">
+          <button class="configuration-head" type="button" :aria-expanded="isGroupExpanded(group.id)" @click="toggleGroup(group.id)">
             <strong>{{ displayShopLabel(group.name) }}</strong>
-          </div>
-          <div class="option-quantity-list">
-            <div v-for="option in group.options" :key="option.id" :class="['option-quantity-row', optionQty(option.id) > 0 ? 'active' : '']">
-              <button class="option-name" type="button" @click="changeOptionQty(option.id, optionQty(option.id) > 0 ? -optionQty(option.id) : 1)">
+            <span>{{ isGroupExpanded(group.id) ? '收起⌃' : '展开⌄' }}</span>
+          </button>
+          <div v-if="isGroupExpanded(group.id)" class="option-quantity-list">
+            <button v-for="option in group.options" :key="option.id" type="button" :class="['option-quantity-row', optionQty(option.id) > 0 ? 'active' : '']" @click="toggleOption(option.id)">
+              <span class="option-name">
                 <span>{{ displayShopLabel(option.name) }}</span>
                 <em v-if="Number(option.extraAmount || 0)">每件 +￥{{ Number(option.extraAmount).toFixed(2) }}</em>
-              </button>
-              <div class="qty-stepper compact" :aria-label="`${displayShopLabel(option.name)}数量`">
-                <button type="button" :disabled="optionQty(option.id) <= 0" @click="changeOptionQty(option.id, -1)">−</button>
-                <input
-                  :value="optionQty(option.id)"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputmode="numeric"
-                  @input="setOptionQty(option.id, ($event.target as HTMLInputElement).value)"
-                />
-                <button type="button" @click="changeOptionQty(option.id, 1)">＋</button>
-              </div>
-            </div>
+              </span>
+              <span class="option-selected-mark">{{ optionQty(option.id) > 0 ? '已选' : '选择' }}</span>
+            </button>
           </div>
         </section>
 
@@ -70,14 +68,6 @@
       </div>
 
       <footer>
-        <div class="main-qty">
-          <span>主商品总数</span>
-          <div class="qty-stepper">
-            <button type="button" @click="changeTotalQty(-1)">−</button>
-            <input v-model.number="totalQty" type="number" min="1" step="1" inputmode="numeric" @input="normalizeTotalQty" />
-            <button type="button" @click="changeTotalQty(1)">＋</button>
-          </div>
-        </div>
         <button type="button" class="add-button" :disabled="uploading || !priceValid" @click="confirm">
           {{ confirmButtonText }}
         </button>
@@ -114,13 +104,18 @@ const totalQty = ref(1)
 const optionQuantities = ref<Record<string, number>>({})
 const logoImageUrl = ref('')
 const uploading = ref(false)
+const expandedGroups = ref<Record<string, boolean>>({})
 
 const groups = computed(() => {
   const groupIds = splitIds(props.product?.attributeIds)
+  const optionIds = new Set(splitIds(props.product?.optionAttributeIds))
+  const hasSpecificOptions = optionIds.size > 0
   return groupIds.map(groupId => {
     const group = attributes.value.find(item => String(item.id) === groupId)
     if (!group) return null
-    return { ...group, options: attributes.value.filter(item => String(item.parentId || '') === groupId) }
+    const options = attributes.value.filter(item => String(item.parentId || '') === groupId
+      && (!hasSpecificOptions || optionIds.has(String(item.id))))
+    return group && options.length ? { ...group, options } : null
   }).filter(Boolean) as Array<ShopAttribute & { options: ShopAttribute[] }>
 })
 const basePrice = computed(() => Number(props.product?.salePrice || 0))
@@ -150,6 +145,21 @@ function normalizePositive(value: number) {
 
 function optionQty(id: string | number) {
   return Math.max(0, Math.floor(Number(optionQuantities.value[String(id)] || 0)))
+}
+
+function isGroupExpanded(groupId: string | number) {
+  return expandedGroups.value[String(groupId)] === true
+}
+
+function toggleGroup(groupId: string | number) {
+  const key = String(groupId)
+  expandedGroups.value[key] = !isGroupExpanded(key)
+}
+
+function toggleOption(id: string | number) {
+  const key = String(id)
+  if (optionQuantities.value[key]) delete optionQuantities.value[key]
+  else optionQuantities.value[key] = 1
 }
 
 function setOptionQty(id: string | number, value: string | number) {
@@ -206,6 +216,7 @@ function reset() {
   totalQty.value = normalizePositive(props.initialQty)
   optionQuantities.value = {}
   logoImageUrl.value = ''
+  expandedGroups.value = {}
 }
 
 watch(() => [props.open, props.product?.id], ([isOpen]) => {
@@ -235,14 +246,15 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .summary-heading strong { color: var(--text-main); font-size: 14px; }
 .summary-line { padding: 6px 0; border-top: 1px dashed #d2e4df; font-size: 13px; }
 .summary-line span { min-width: 0; line-height: 1.4; }
-.summary-line b { flex: none; color: var(--brand-teal); }
+.summary-line .qty-stepper { flex: none; }
 .main-line { font-weight: 800; }
 .option-line { color: var(--text-sub); }
 .purchase-summary p { margin: 7px 0 0; font-size: 12px; }
 .standard-hint { color: var(--text-muted); }
 .configuration-card { margin-top: 12px; padding: 12px; border: 1px solid var(--border-soft); border-radius: var(--radius); background: #fff; box-shadow: 0 6px 18px rgba(67,47,31,.05); }
-.configuration-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; }
+.configuration-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 0 8px; border: 0; background: transparent; text-align: left; }
 .configuration-head strong { color: var(--text-main); }
+.configuration-head > span { color: var(--brand-teal); font-size: 12px; font-weight: 700; }
 .configuration-actions { display: flex; align-items: center; gap: 7px; }
 .remove-configuration { color: #9b2c2c; font-size: 12px; }
 .option-group { padding: 12px 0; border-top: 1px solid var(--border-soft); }
@@ -253,11 +265,12 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .option-grid button.active { border-color: var(--brand-teal); background: #e6f2ef; color: var(--brand-teal); }
 .option-grid em { color: var(--brand-orange); font-size: 11px; font-style: normal; }
 .option-quantity-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
-.option-quantity-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); }
+.option-quantity-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border-line); border-radius: var(--radius-sm); background: var(--bg-muted); text-align: left; }
 .option-quantity-row.active { border-color: var(--brand-teal); background: #e6f2ef; }
 .option-name { min-width: 0; display: grid; gap: 3px; text-align: left; }
 .option-name span { color: var(--text-main); font-weight: 800; }
 .option-name em { color: var(--brand-orange); font-size: 11px; font-style: normal; }
+.option-selected-mark { flex: none; color: var(--brand-teal); font-size: 12px; font-weight: 800; }
 .logo-field { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-soft); color: var(--text-main); font-size: 14px; font-weight: 700; }
 .logo-preview { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
 .logo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
@@ -265,8 +278,6 @@ onMounted(async () => { attributes.value = await listAttributes() })
 .add-configuration { width: 100%; min-height: 42px; margin-top: 12px; border: 1px dashed var(--brand-teal); border-radius: var(--radius); color: var(--brand-teal); background: #f2f8f6; font-weight: 900; }
 .add-configuration:disabled { opacity: .45; }
 .config-sheet footer { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: grid; gap: 8px; border-top: 1px solid var(--border-soft); background: #fff; }
-.main-qty { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.main-qty > span { color: var(--text-main); font-size: 13px; font-weight: 800; }
 .qty-stepper { display: flex; align-items: center; border: 1px solid var(--border-line); border-radius: 999px; overflow: hidden; }
 .qty-stepper button { width: 36px; height: 36px; background: var(--bg-muted); }
 .qty-stepper.compact button { width: 30px; height: 32px; }

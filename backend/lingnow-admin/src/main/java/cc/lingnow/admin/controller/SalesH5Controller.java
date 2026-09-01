@@ -41,7 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * 业务员代客下单 H5。使用 ERP 管理端账号鉴权，订单仍进入现有客户订单链路。
+ * 业务员下单 H5。使用 ERP 管理端账号鉴权，地址按业务员会话隔离，订单仍进入现有客户订单链路。
  */
 @RestController
 @RequestMapping("/sales-h5")
@@ -49,7 +49,6 @@ import java.util.*;
 public class SalesH5Controller {
 
     private final SysUserService userService;
-    private final ErpDataAuthService dataAuthService;
     private final ErpCustomerService customerService;
     private final ErpCustomerAddressService addressService;
     private final ErpProductService productService;
@@ -71,32 +70,6 @@ public class SalesH5Controller {
         vo.setNickname(StrUtil.blankToDefault(user.getNickname(), user.getUsername()));
         vo.setPermissions(StpAdminUtil.stpLogic.getPermissionList());
         return Result.success(vo);
-    }
-
-    @GetMapping("/customers")
-    public Result<List<Map<String, Object>>> customers(@RequestParam(required = false) String keyword) {
-        Long userId = currentUserId();
-        QueryWrapper<ErpCustomer> wrapper = new QueryWrapper<ErpCustomer>()
-                .eq("status", CommonConstants.STATUS_NORMAL)
-                .and(StrUtil.isNotBlank(keyword), item -> item.like("name", keyword)
-                        .or().like("contact", keyword)
-                        .or().like("phone", keyword))
-                .orderByAsc("sort_order")
-                .orderByDesc("create_time");
-        List<Long> authorizedIds = dataAuthService.authorizedIds(userId, "CUSTOMER");
-        if (!authorizedIds.isEmpty()) {
-            wrapper.in("id", authorizedIds);
-        }
-        return Result.success(customerService.list(wrapper).stream().map(item -> {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", item.getId());
-            row.put("code", item.getCode());
-            row.put("name", item.getName());
-            row.put("contact", item.getContact());
-            row.put("phone", item.getPhone());
-            row.put("address", item.getAddress());
-            return row;
-        }).toList());
     }
 
     @GetMapping("/categories")
@@ -163,12 +136,11 @@ public class SalesH5Controller {
                 .stream().map(item -> BeanUtil.copyProperties(item, ErpMasterDataVO.class)).toList());
     }
 
-    @GetMapping("/customers/{customerId}/addresses")
-    public Result<List<ShopAddressVO>> addresses(@PathVariable Long customerId,
-                                                 @RequestParam(required = false) String keyword) {
-        requireCustomer(customerId);
+    @GetMapping("/addresses")
+    public Result<List<ShopAddressVO>> addresses(@RequestParam(required = false) String keyword) {
+        Long salesUserId = currentUserId();
         QueryWrapper<ErpCustomerAddress> wrapper = new QueryWrapper<ErpCustomerAddress>()
-                .eq("customer_id", customerId)
+                .eq("sales_user_id", salesUserId)
                 .orderByDesc("default_flag").orderByDesc("update_time").orderByDesc("create_time");
         if (StrUtil.isNotBlank(keyword)) {
             wrapper.and(item -> item.like("receiver_name", keyword).or().like("receiver_phone", keyword)
@@ -177,49 +149,54 @@ public class SalesH5Controller {
         return Result.success(addressService.list(wrapper).stream().map(this::toAddressVO).toList());
     }
 
-    @GetMapping("/customers/{customerId}/addresses/{id}")
-    public Result<ShopAddressVO> address(@PathVariable Long customerId, @PathVariable Long id) {
-        requireCustomer(customerId);
-        return Result.success(toAddressVO(requireCustomerAddress(customerId, id)));
+    @GetMapping("/addresses/{id}")
+    public Result<ShopAddressVO> address(@PathVariable Long id) {
+        return Result.success(toAddressVO(requireSalesUserAddress(id)));
     }
 
-    @PostMapping("/customers/{customerId}/addresses")
+    @PostMapping("/addresses")
     @Transactional(rollbackFor = Exception.class)
-    public Result<ShopAddressVO> createAddress(@PathVariable Long customerId,
-                                               @Valid @RequestBody ShopAddressSaveBO bo) {
-        requireCustomer(customerId);
-        boolean first = addressService.count(new QueryWrapper<ErpCustomerAddress>().eq("customer_id", customerId)) == 0;
+    public Result<ShopAddressVO> createAddress(@Valid @RequestBody ShopAddressSaveBO bo) {
+        SysUser user = currentUser();
+        ErpCustomer customer = resolveOrCreateCustomer(bo.getReceiverName(), bo.getReceiverPhone(),
+                addressText(bo));
+        boolean first = addressService.count(new QueryWrapper<ErpCustomerAddress>()
+                .eq("sales_user_id", user.getUserId())) == 0;
         boolean makeDefault = first || Boolean.TRUE.equals(bo.getDefaultFlag());
-        if (makeDefault) clearCustomerDefaultAddress(customerId);
+        if (makeDefault) clearSalesUserDefaultAddress(user.getUserId());
         ErpCustomerAddress entity = new ErpCustomerAddress();
-        entity.setCustomerId(customerId);
+        entity.setCustomerId(customer.getId());
         entity.setAccountId(null);
+        entity.setSalesUserId(user.getUserId());
         applyAddress(entity, bo);
         entity.setDefaultFlag(makeDefault ? 1 : 0);
         addressService.save(entity);
         return Result.success(toAddressVO(entity));
     }
 
-    @PutMapping("/customers/{customerId}/addresses/{id}")
+    @PutMapping("/addresses/{id}")
     @Transactional(rollbackFor = Exception.class)
-    public Result<ShopAddressVO> updateAddress(@PathVariable Long customerId, @PathVariable Long id,
+    public Result<ShopAddressVO> updateAddress(@PathVariable Long id,
                                                @Valid @RequestBody ShopAddressSaveBO bo) {
-        requireCustomer(customerId);
-        ErpCustomerAddress entity = requireCustomerAddress(customerId, id);
-        if (Boolean.TRUE.equals(bo.getDefaultFlag())) clearCustomerDefaultAddress(customerId);
+        SysUser user = currentUser();
+        ErpCustomerAddress entity = requireSalesUserAddress(id);
+        ErpCustomer customer = resolveOrCreateCustomer(bo.getReceiverName(), bo.getReceiverPhone(),
+                addressText(bo));
+        if (Boolean.TRUE.equals(bo.getDefaultFlag())) clearSalesUserDefaultAddress(user.getUserId());
+        entity.setCustomerId(customer.getId());
         applyAddress(entity, bo);
         entity.setDefaultFlag(Boolean.TRUE.equals(bo.getDefaultFlag()) ? 1 : 0);
         addressService.updateById(entity);
-        ensureCustomerDefaultAddress(customerId, id);
+        ensureSalesUserDefaultAddress(user.getUserId(), id);
         return Result.success(toAddressVO(addressService.getById(id)));
     }
 
-    @PostMapping("/customers/{customerId}/addresses/{id}/default")
+    @PostMapping("/addresses/{id}/default")
     @Transactional(rollbackFor = Exception.class)
-    public Result<ShopAddressVO> setDefaultAddress(@PathVariable Long customerId, @PathVariable Long id) {
-        requireCustomer(customerId);
-        ErpCustomerAddress entity = requireCustomerAddress(customerId, id);
-        clearCustomerDefaultAddress(customerId);
+    public Result<ShopAddressVO> setDefaultAddress(@PathVariable Long id) {
+        SysUser user = currentUser();
+        ErpCustomerAddress entity = requireSalesUserAddress(id);
+        clearSalesUserDefaultAddress(user.getUserId());
         entity.setDefaultFlag(1);
         addressService.updateById(entity);
         return Result.success(toAddressVO(entity));
@@ -260,9 +237,9 @@ public class SalesH5Controller {
     @Transactional(rollbackFor = Exception.class)
     public Result<Long> submitOrder(@Valid @RequestBody ShopOrderSubmitBO bo) {
         SysUser user = currentUser();
-        ErpCustomer customer = requireCustomer(bo.getCustomerId());
         List<ErpCustomerOrderItem> items = buildItems(bo.getItems());
-        ReceiverSnapshot receiver = resolveReceiver(bo, customer.getId());
+        ReceiverSnapshot receiver = resolveReceiver(bo);
+        ErpCustomer customer = resolveOrCreateCustomer(receiver.name(), receiver.phone(), receiver.address());
         BigDecimal totalQty = items.stream().map(item -> nvl(item.getQty())).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalAmount = items.stream().map(item -> nvl(item.getAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -324,9 +301,9 @@ public class SalesH5Controller {
                         product.getName() + "销售价未维护，请先在商品管理中补全");
             }
             Map<String, BigDecimal> requested = requestedOptionQuantities(source);
-            LinkedHashMap<String, BigDecimal> optionQuantities = OptionAttributeQuantityUtil.normalize(
+            LinkedHashMap<String, BigDecimal> optionQuantities = OptionAttributeQuantityUtil.normalizeRequested(
                     requested, splitIds(source.getOptionAttributeIds()), qty,
-                    splitIds(effectiveAttributeIds(product)), attributes);
+                    splitIds(effectiveAttributeIds(product)), splitIds(product.getOptionAttributeIds()), attributes);
             if (requested != null && optionQuantities.size() != requested.size()) {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "选配项不存在、已停用或不属于当前商品");
             }
@@ -407,9 +384,9 @@ public class SalesH5Controller {
         }).reduce((left, right) -> left + " / " + right).orElse("");
     }
 
-    private ReceiverSnapshot resolveReceiver(ShopOrderSubmitBO bo, Long customerId) {
+    private ReceiverSnapshot resolveReceiver(ShopOrderSubmitBO bo) {
         if (bo.getAddressId() != null) {
-            ErpCustomerAddress address = requireCustomerAddress(customerId, bo.getAddressId());
+            ErpCustomerAddress address = requireSalesUserAddress(bo.getAddressId());
             return new ReceiverSnapshot(address.getReceiverName(), address.getReceiverPhone(),
                     StrUtil.blankToDefault(address.getFullAddress(), address.getDetailAddress()));
         }
@@ -490,20 +467,6 @@ public class SalesH5Controller {
         return vo;
     }
 
-    private ErpCustomer requireCustomer(Long id) {
-        currentUser();
-        if (id == null) throw new BusinessException(ErrorCode.PARAM_ERROR, "请选择客户");
-        ErpCustomer customer = customerService.getById(id);
-        if (customer == null || !Integer.valueOf(CommonConstants.STATUS_NORMAL).equals(customer.getStatus())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "客户不存在或已停用");
-        }
-        List<Long> authorizedIds = dataAuthService.authorizedIds(currentUserId(), "CUSTOMER");
-        if (!authorizedIds.isEmpty() && !authorizedIds.contains(id)) {
-            throw new BusinessException(ErrorCode.NO_AUTH, "无权为该客户下单");
-        }
-        return customer;
-    }
-
     private ErpProduct requireProduct(Long id) {
         ErpProduct product = productService.getById(id);
         if (product == null || !Integer.valueOf(CommonConstants.STATUS_NORMAL).equals(product.getStatus())) {
@@ -512,9 +475,9 @@ public class SalesH5Controller {
         return product;
     }
 
-    private ErpCustomerAddress requireCustomerAddress(Long customerId, Long id) {
+    private ErpCustomerAddress requireSalesUserAddress(Long id) {
         ErpCustomerAddress address = addressService.getById(id);
-        if (address == null || !Objects.equals(address.getCustomerId(), customerId)) {
+        if (address == null || !Objects.equals(address.getSalesUserId(), currentUserId())) {
             throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "收货地址不存在");
         }
         return address;
@@ -564,15 +527,56 @@ public class SalesH5Controller {
         return vo;
     }
 
-    private void clearCustomerDefaultAddress(Long customerId) {
-        addressService.update(new UpdateWrapper<ErpCustomerAddress>().eq("customer_id", customerId).set("default_flag", 0));
+    private void clearSalesUserDefaultAddress(Long salesUserId) {
+        addressService.update(new UpdateWrapper<ErpCustomerAddress>().eq("sales_user_id", salesUserId).set("default_flag", 0));
     }
 
-    private void ensureCustomerDefaultAddress(Long customerId, Long fallbackId) {
-        if (addressService.count(new QueryWrapper<ErpCustomerAddress>().eq("customer_id", customerId).eq("default_flag", 1)) == 0) {
+    private void ensureSalesUserDefaultAddress(Long salesUserId, Long fallbackId) {
+        if (addressService.count(new QueryWrapper<ErpCustomerAddress>().eq("sales_user_id", salesUserId).eq("default_flag", 1)) == 0) {
             addressService.update(new UpdateWrapper<ErpCustomerAddress>().eq("id", fallbackId)
-                    .eq("customer_id", customerId).set("default_flag", 1));
+                    .eq("sales_user_id", salesUserId).set("default_flag", 1));
         }
+    }
+
+    private ErpCustomer resolveOrCreateCustomer(String name, String phone, String address) {
+        String normalizedPhone = StrUtil.trim(phone);
+        ErpCustomer existing = customerService.getOne(new QueryWrapper<ErpCustomer>()
+                .eq("phone", normalizedPhone)
+                .eq("status", CommonConstants.STATUS_NORMAL)
+                .orderByDesc("create_time")
+                .last("limit 1"));
+        if (existing != null) {
+            return existing;
+        }
+        ErpCustomer customer = new ErpCustomer();
+        customer.setCode(nextCustomerCode());
+        customer.setName(StrUtil.trim(name));
+        customer.setContact(StrUtil.trim(name));
+        customer.setPhone(normalizedPhone);
+        customer.setAddress(StrUtil.trim(address));
+        customer.setParentId(0L);
+        customer.setStatus(CommonConstants.STATUS_NORMAL);
+        customer.setSortOrder(0);
+        customer.setRemark("销售H5自动创建");
+        customerService.save(customer);
+        return customer;
+    }
+
+    private String addressText(ShopAddressSaveBO bo) {
+        List<String> names = normalize(bo.getRegionPathNames());
+        String regionText = String.join("", names.stream()
+                .filter(item -> !"市辖区".equals(item) && !"县".equals(item)).toList());
+        return StrUtil.trim(regionText + StrUtil.blankToDefault(bo.getDetailAddress(), ""));
+    }
+
+    private String nextCustomerCode() {
+        String prefix = "KH" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        String code = prefix;
+        int index = 1;
+        while (customerService.count(new QueryWrapper<ErpCustomer>().eq("code", code)) > 0) {
+            code = prefix + index++;
+        }
+        return code;
     }
 
     private List<String> normalize(List<String> values) {

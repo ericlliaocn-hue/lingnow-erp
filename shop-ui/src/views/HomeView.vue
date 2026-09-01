@@ -14,7 +14,6 @@
     </header>
 
     <section class="page-inner home-content">
-      <CustomerPicker />
       <!-- Banner 轮播 -->
       <section v-if="banners.length" class="banner-section">
         <div class="banner-track" :style="{ transform: `translateX(-${bannerIndex * 100}%)` }">
@@ -127,7 +126,6 @@ import { listProducts } from '@/api/shop'
 import { priceLabel, productSubtitle, productTags } from '@/utils/label'
 import type { ShopProduct } from '@/types/shop'
 import BottomNav from './components/BottomNav.vue'
-import CustomerPicker from './components/CustomerPicker.vue'
 
 const router = useRouter()
 const current = ref(1)

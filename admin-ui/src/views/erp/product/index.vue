@@ -132,24 +132,27 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="可选规格组">
-              <div class="attribute-group-picker">
-                <el-select
-                  v-model="selectedAttributeIds"
-                  multiple
-                  clearable
-                  filterable
-                  placeholder="请选择该商品可选规格组"
-                  style="width: 100%"
-                  @change="attributeGroupsChanged"
-                >
-                  <el-option v-for="item in availableAttributeGroups" :key="item.id" :label="item.name" :value="String(item.id)" />
-                </el-select>
-                <div v-if="selectedAttributeGroups.length" class="selected-attribute-tags">
-                  <el-tag v-for="item in selectedAttributeGroups" :key="item.id" type="success" closable @close="removeSelectedAttribute(String(item.id))">
-                    已选 {{ item.name }}
-                  </el-tag>
+            <el-form-item label="可选规格">
+              <div class="attribute-option-picker">
+                <div v-for="group in attributeGroupsWithOptions" :key="group.id" class="attribute-option-group">
+                  <div class="attribute-option-group-head">
+                    <strong>{{ group.name }}</strong>
+                    <el-checkbox
+                      :model-value="isAllOptionsSelected(group)"
+                      :indeterminate="isSomeOptionsSelected(group)"
+                      @change="toggleGroupOptions(group, $event)"
+                    >全选</el-checkbox>
+                  </div>
+                  <el-checkbox-group v-model="selectedOptionIds" class="attribute-option-list">
+                    <el-checkbox v-for="option in group.options" :key="option.id" :value="String(option.id)">
+                      {{ option.name }}<small v-if="Number(option.extraAmount || 0) > 0"> +￥{{ Number(option.extraAmount).toFixed(2) }}</small>
+                    </el-checkbox>
+                  </el-checkbox-group>
                 </div>
+                <p v-if="legacyAttributeIds.length && !selectedOptionIds.length" class="muted attribute-option-hint">
+                  当前商品是旧数据，仅关联规格组；请选择具体规格后保存。
+                </p>
+                <p v-else class="muted attribute-option-hint">只勾选这个商品实际可用的规格，未勾选的规格不会出现在下单页。</p>
               </div>
             </el-form-item>
           </el-col>
@@ -268,8 +271,8 @@ const categories = ref<ErpMasterVO[]>([])
 const brands = ref<ErpMasterVO[]>([])
 const units = ref<ErpMasterVO[]>([])
 const attributes = ref<ErpMasterVO[]>([])
-const selectedAttributeIds = ref<string[]>([])
-const pendingDefaultAttributeSelection = ref(false)
+const selectedOptionIds = ref<string[]>([])
+const legacyAttributeIds = ref<string[]>([])
 const importOpen = ref(false)
 const importFile = ref<File | null>(null)
 const importResult = ref<{ success: number; fail: number; errors: string[] } | null>(null)
@@ -318,19 +321,14 @@ function loadOptions() {
     listMaster('product-brand', { current: 1, size: 200 }).then(res => brands.value = res.records),
     listMaster('unit', { current: 1, size: 200 }).then(res => units.value = res.records),
     listMaster('product-attribute', { current: 1, size: 500 }).then(res => attributes.value = res.records)
-  ]).then(() => {
-    if (pendingDefaultAttributeSelection.value && open.value && !form.value.id) {
-      selectAllAttributeGroups()
-    }
-  })
+  ])
 }
 
 const attributeGroups = computed(() => uniqueById(attributes.value.filter(item => String(item.parentId || '0') === '0' && item.status === 1)))
-const availableAttributeGroups = computed(() => attributeGroups.value)
-const selectedAttributeGroups = computed(() => {
-  const selected = new Set(selectedAttributeIds.value.map(String))
-  return attributeGroups.value.filter(item => selected.has(String(item.id)))
-})
+const attributeGroupsWithOptions = computed(() => attributeGroups.value.map(group => ({
+  ...group,
+  options: attributes.value.filter(item => String(item.parentId || '') === String(group.id) && item.status === 1)
+})).filter(group => group.options.length))
 const canEditCostPrice = computed(() => {
   try {
     const permissions = JSON.parse(localStorage.getItem('permissions') || '[]') as string[]
@@ -342,7 +340,8 @@ const canEditCostPrice = computed(() => {
 
 function reset() {
   form.value = { code: '', name: '', purchasePrice: 0, salePrice: 0, retailPrice: 0, minStock: 0, maxStock: 0, sortOrder: 0, status: 1 }
-  selectedAttributeIds.value = []
+  selectedOptionIds.value = []
+  legacyAttributeIds.value = []
   formRef.value?.resetFields()
 }
 
@@ -364,8 +363,6 @@ function handleSelectionChange(selection: ErpProduct[]) {
 
 function handleAdd() {
   reset()
-  pendingDefaultAttributeSelection.value = true
-  selectAllAttributeGroups()
   dialogTitle.value = '新增商品'
   open.value = true
 }
@@ -375,7 +372,8 @@ function handleUpdate(row?: ErpProduct) {
   const id = row?.id || ids.value[0]
   getProduct(id!).then(res => {
     form.value = res
-    selectedAttributeIds.value = uniqueIds(splitIds(res.attributeIds))
+    legacyAttributeIds.value = uniqueIds(splitIds(res.attributeIds))
+    selectedOptionIds.value = uniqueIds(splitIds(res.optionAttributeIds))
     syncAttributeText()
     dialogTitle.value = '修改商品'
     open.value = true
@@ -385,8 +383,12 @@ function handleUpdate(row?: ErpProduct) {
 function submitForm() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
-    selectedAttributeIds.value = uniqueIds(selectedAttributeIds.value)
-    form.value.attributeIds = selectedAttributeIds.value.join(',')
+    const selectedOptions = uniqueIds(selectedOptionIds.value)
+    const optionMap = new Map(attributes.value.map(item => [String(item.id), item]))
+    const derivedGroups = uniqueIds(selectedOptions.map(id => optionMap.get(id)?.parentId))
+    const groupIds = selectedOptions.length ? derivedGroups : legacyAttributeIds.value
+    form.value.optionAttributeIds = selectedOptions.join(',')
+    form.value.attributeIds = groupIds.join(',')
     syncAttributeText()
     const payload: ErpProduct = { ...form.value }
     if (!canEditCostPrice.value) {
@@ -420,18 +422,18 @@ function uniqueById(records: ErpMasterVO[]) {
 }
 
 function syncAttributeText() {
-  selectedAttributeIds.value = uniqueIds(selectedAttributeIds.value)
-  const names = selectedAttributeIds.value
+  const groupIds = selectedOptionGroupIds()
+  const names = groupIds
     .map(attributePathName)
     .filter(Boolean) as string[]
-  form.value.attributeIds = selectedAttributeIds.value.join(',')
+  form.value.attributeIds = groupIds.join(',')
   form.value.attributeText = names.length ? names.join(' / ') : ''
 }
 
-function selectAllAttributeGroups() {
-  selectedAttributeIds.value = availableAttributeGroups.value.map(item => String(item.id))
-  syncAttributeText()
-  pendingDefaultAttributeSelection.value = availableAttributeGroups.value.length === 0
+function selectedOptionGroupIds() {
+  if (!selectedOptionIds.value.length) return legacyAttributeIds.value
+  const optionMap = new Map(attributes.value.map(item => [String(item.id), item]))
+  return uniqueIds(selectedOptionIds.value.map(id => optionMap.get(id)?.parentId))
 }
 
 function attributePathName(attributeId: string) {
@@ -439,16 +441,22 @@ function attributePathName(attributeId: string) {
   return byId.get(String(attributeId))?.name || ''
 }
 
-function attributeGroupsChanged() {
-  pendingDefaultAttributeSelection.value = false
-  selectedAttributeIds.value = uniqueIds(selectedAttributeIds.value)
-  syncAttributeText()
+function isAllOptionsSelected(group: { options: ErpMasterVO[] }) {
+  return group.options.every(option => selectedOptionIds.value.includes(String(option.id)))
 }
 
-function removeSelectedAttribute(id: string) {
-  pendingDefaultAttributeSelection.value = false
-  selectedAttributeIds.value = selectedAttributeIds.value.filter(item => String(item) !== String(id))
-  syncAttributeText()
+function isSomeOptionsSelected(group: { options: ErpMasterVO[] }) {
+  const count = group.options.filter(option => selectedOptionIds.value.includes(String(option.id))).length
+  return count > 0 && count < group.options.length
+}
+
+function toggleGroupOptions(group: { options: ErpMasterVO[] }, checked: string | number | boolean) {
+  const groupOptionIds = group.options.map(option => String(option.id))
+  if (checked) {
+    selectedOptionIds.value = uniqueIds([...selectedOptionIds.value, ...groupOptionIds])
+  } else {
+    selectedOptionIds.value = selectedOptionIds.value.filter(id => !groupOptionIds.includes(id))
+  }
 }
 
 async function uploadProductImage(options: any) {
@@ -566,7 +574,6 @@ function submitImport() {
 }
 
 function cancel() {
-  pendingDefaultAttributeSelection.value = false
   open.value = false
   reset()
 }
@@ -719,14 +726,36 @@ onMounted(() => {
   height: 22px;
   padding: 0;
 }
-.attribute-group-picker {
+.attribute-option-picker {
   width: 100%;
+  display: grid;
+  gap: 10px;
 }
-.selected-attribute-tags {
+.attribute-option-group {
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+}
+.attribute-option-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.attribute-option-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 2px 14px;
+  padding-top: 8px;
+}
+.attribute-option-list small {
+  color: var(--el-color-warning);
+}
+.attribute-option-hint {
+  margin: 0;
 }
 .import-result { margin-top: 16px; }
 .import-errors { margin: 12px 0 0; padding-left: 18px; color: var(--el-color-danger); max-height: 180px; overflow: auto; }

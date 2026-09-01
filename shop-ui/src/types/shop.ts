@@ -12,15 +12,6 @@ export interface ShopLoginVO {
   permissions?: string[]
 }
 
-export interface ShopCustomer {
-  id: string
-  code?: string
-  name: string
-  contact?: string
-  phone?: string
-  address?: string
-}
-
 export interface ShopCategory {
   id: string
   code?: string
@@ -47,6 +38,7 @@ export interface ShopProduct {
   categoryId?: string
   categoryName?: string
   attributeIds?: string
+  optionAttributeIds?: string
   attributeText?: string
   salePrice?: number
   unitName?: string
@@ -171,7 +163,6 @@ export interface OrderSubmitItem {
 }
 
 export interface OrderSubmitPayload {
-  customerId: string
   addressId?: string
   receiverName?: string
   receiverPhone?: string
