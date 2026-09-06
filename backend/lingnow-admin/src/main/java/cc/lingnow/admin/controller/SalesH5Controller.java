@@ -390,11 +390,10 @@ public class SalesH5Controller {
             return new ReceiverSnapshot(address.getReceiverName(), address.getReceiverPhone(),
                     StrUtil.blankToDefault(address.getFullAddress(), address.getDetailAddress()));
         }
-        if (StrUtil.isBlank(bo.getReceiverName()) || StrUtil.isBlank(bo.getReceiverPhone())
-                || StrUtil.isBlank(bo.getReceiverAddress())) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "收货信息不能为空");
+        if (StrUtil.isBlank(bo.getReceiverAddress())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "请填写完整收货信息");
         }
-        return new ReceiverSnapshot(bo.getReceiverName(), bo.getReceiverPhone(), bo.getReceiverAddress());
+        return new ReceiverSnapshot("收货信息", "", StrUtil.trim(bo.getReceiverAddress()));
     }
 
     private ShopProductVO toProductVO(ErpProduct product) {
@@ -540,6 +539,26 @@ public class SalesH5Controller {
 
     private ErpCustomer resolveOrCreateCustomer(String name, String phone, String address) {
         String normalizedPhone = StrUtil.trim(phone);
+        if (StrUtil.isBlank(normalizedPhone)) {
+            ErpCustomer guest = customerService.getOne(new QueryWrapper<ErpCustomer>()
+                    .eq("code", "SALES_H5_GUEST")
+                    .eq("status", CommonConstants.STATUS_NORMAL)
+                    .last("limit 1"));
+            if (guest != null) {
+                return guest;
+            }
+            ErpCustomer customer = new ErpCustomer();
+            customer.setCode("SALES_H5_GUEST");
+            customer.setName("销售H5散客");
+            customer.setContact("销售H5散客");
+            customer.setAddress("收货信息见订单原文");
+            customer.setParentId(0L);
+            customer.setStatus(CommonConstants.STATUS_NORMAL);
+            customer.setSortOrder(0);
+            customer.setRemark("销售H5直接填写收货信息");
+            customerService.save(customer);
+            return customer;
+        }
         ErpCustomer existing = customerService.getOne(new QueryWrapper<ErpCustomer>()
                 .eq("phone", normalizedPhone)
                 .eq("status", CommonConstants.STATUS_NORMAL)

@@ -1,24 +1,13 @@
 <template>
   <main class="page order-page">
     <section class="page-inner">
-      <div class="card receiver-card" @click="openAddressList">
+      <section class="card receiver-card">
         <div class="card-title-row">
-          <span>收货地址</span>
-          <button type="button">{{ selectedAddress ? '更换' : '新增' }}</button>
+          <span>收货信息</span>
         </div>
-        <template v-if="selectedAddress">
-          <div class="receiver-title">
-            <strong>{{ selectedAddress.receiverName }}</strong>
-            <span>{{ selectedAddress.receiverPhone }}</span>
-          </div>
-          <p>{{ selectedAddress.fullAddress || selectedAddress.detailAddress }}</p>
-          <em v-if="selectedAddress.addressLabel">{{ selectedAddress.addressLabel }}</em>
-        </template>
-        <div v-else class="receiver-empty">
-          <strong>请选择收货地址</strong>
-          <p>新增或选择一个地址后再提交订单。</p>
-        </div>
-      </div>
+        <textarea v-model.trim="form.receiverText" class="textarea receiver-input" placeholder="请直接输入完整收货信息，例如：屁屁 18852273038 江苏省无锡市梁溪区某某街道 云福大厦一楼Lucky女装店" @input="saveDraft"></textarea>
+        <p class="receiver-hint">输入什么就按什么发货，不识别、不拆分。</p>
+      </section>
 
       <article v-for="(item, index) in items" :key="item.key" class="card order-item">
         <div class="item-head">
@@ -121,9 +110,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getAddress, listAddresses, listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
+import { listAttributes, listProducts, submitOrder, uploadImage } from '@/api/shop'
 import { displayShopLabel } from '@/utils/label'
-import type { OrderSubmitPayload, ShopAddress, ShopAttribute, ShopProduct } from '@/types/shop'
+import type { OrderSubmitPayload, ShopAttribute, ShopProduct } from '@/types/shop'
 import ProductPicker from './components/ProductPicker.vue'
 import { useCartStore } from '@/stores/cart'
 
@@ -135,7 +124,6 @@ interface DraftItem {
   logoImageUrl: string
 }
 
-const SELECTED_ADDRESS_KEY = 'rs-checkout-address-id'
 const CHECKOUT_DRAFT_KEY = 'rs-checkout-draft'
 
 const route = useRoute()
@@ -144,12 +132,12 @@ const cart = useCartStore()
 const products = ref<ShopProduct[]>([])
 const attributes = ref<ShopAttribute[]>([])
 const items = ref<DraftItem[]>([])
-const selectedAddress = ref<ShopAddress>()
 const saving = ref(false)
 const error = ref('')
 const previewImageUrl = ref('')
 const expandedGroups = reactive<Record<string, boolean>>({})
 const form = reactive({
+  receiverText: '',
   remark: ''
 })
 const productMap = computed(() => new Map(products.value.map(item => [String(item.id), item])))
@@ -340,8 +328,8 @@ async function uploadLogo(event: Event, item: DraftItem) {
 }
 
 function validate() {
-  if (!selectedAddress.value?.id) {
-    return '请选择收货地址'
+  if (!form.receiverText.trim()) {
+    return '请填写完整收货信息'
   }
   const validItems = items.value.filter(item => item.productId && Number(item.qty || 0) > 0)
   if (validItems.length === 0) {
@@ -363,10 +351,7 @@ async function submit() {
     return
   }
   const payload: OrderSubmitPayload = {
-    addressId: selectedAddress.value?.id,
-    receiverName: selectedAddress.value?.receiverName,
-    receiverPhone: selectedAddress.value?.receiverPhone,
-    receiverAddress: selectedAddress.value?.fullAddress || selectedAddress.value?.detailAddress,
+    receiverAddress: form.receiverText,
     remark: form.remark,
     items: items.value
       .filter(item => item.productId)
@@ -424,35 +409,13 @@ async function loadData() {
     items.value = ids.length ? ids.map(id => createItem(id)) : [createItem()]
   }
   if (route.query.fromCart !== '1') restoreDraft(ids)
-  await loadSelectedAddress(await listAddresses())
-}
-
-async function loadSelectedAddress(addressRecords: ShopAddress[]) {
-  const storedId = sessionStorage.getItem(SELECTED_ADDRESS_KEY)
-  if (storedId) {
-    try {
-      selectedAddress.value = await getAddress(storedId)
-      return
-    } catch {
-      sessionStorage.removeItem(SELECTED_ADDRESS_KEY)
-    }
-  }
-  selectedAddress.value = addressRecords.find(item => item.defaultFlag) || addressRecords[0]
-  if (selectedAddress.value?.id) {
-    sessionStorage.setItem(SELECTED_ADDRESS_KEY, selectedAddress.value.id)
-  }
-}
-
-function openAddressList() {
-  error.value = ''
-  saveDraft()
-  router.push({ path: '/addresses', query: { select: '1', redirect: route.fullPath } })
 }
 
 function saveDraft() {
   const ids = routeProductIds()
   sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({
     productIds: ids,
+    receiverText: form.receiverText,
     remark: form.remark,
     items: items.value
   }))
@@ -464,10 +427,11 @@ function restoreDraft(ids: string[]) {
     return
   }
   try {
-    const draft = JSON.parse(raw) as { productIds?: string[]; remark?: string; items?: DraftItem[] }
+    const draft = JSON.parse(raw) as { productIds?: string[]; receiverText?: string; remark?: string; items?: DraftItem[] }
     if ((draft.productIds || []).join(',') !== ids.join(',')) {
       return
     }
+    form.receiverText = draft.receiverText || ''
     form.remark = draft.remark || ''
     if (Array.isArray(draft.items) && draft.items.length) {
       items.value = draft.items.map(item => ({
@@ -492,7 +456,11 @@ onMounted(loadData)
 
 .receiver-card {
   border: 1px solid var(--border-soft);
-  cursor: pointer;
+}
+
+.receiver-input {
+  min-height: 118px;
+  resize: vertical;
 }
 
 .card-title-row {
@@ -506,56 +474,11 @@ onMounted(loadData)
   font-weight: 900;
 }
 
-.card-title-row button {
-  min-height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  color: var(--brand-teal);
-  background: #e6f2ef;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.receiver-title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.receiver-title strong {
-  color: var(--text-main);
-  font-size: 17px;
-}
-
-.receiver-title span {
-  color: var(--text-sub);
-  font-size: 13px;
-}
-
-.receiver-card p,
-.receiver-empty p {
+.receiver-hint {
   margin: 8px 0 0;
-  color: var(--text-main);
-  line-height: 1.5;
-}
-
-.receiver-card em {
-  display: inline-flex;
-  margin-top: 8px;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  color: var(--brand-brown);
-  background: var(--bg-cream-soft);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.receiver-empty strong {
-  color: var(--text-main);
-}
-
-.receiver-empty p {
   color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .item-head {
