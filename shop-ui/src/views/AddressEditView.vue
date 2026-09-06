@@ -7,18 +7,6 @@
     </header>
 
     <section class="edit-content">
-      <section class="card parse-card">
-        <div class="card-title">地址识别</div>
-        <textarea
-          v-model.trim="rawText"
-          class="textarea"
-          placeholder="粘贴收货信息，自动识别姓名、手机号和地址，例如：张三 13800000000 广东省广州市海珠区..."
-        ></textarea>
-        <button class="secondary-button" type="button" :disabled="parsing" @click="parseRawAddress">
-          {{ parsing ? '识别中...' : '识别并填入' }}
-        </button>
-      </section>
-
       <section class="card form-card">
         <label class="field">
           <span>收货人</span>
@@ -29,12 +17,8 @@
           <input v-model.trim="form.receiverPhone" class="input" inputmode="tel" placeholder="请输入手机号" />
         </label>
         <label class="field">
-          <span>所在地区</span>
-          <AddressRegionPicker v-model:path="addressPath" v-model:path-names="addressPathNames" />
-        </label>
-        <label class="field">
-          <span>详细地址</span>
-          <textarea v-model.trim="form.detailAddress" class="textarea" placeholder="门牌号、楼栋、公司、房间号等"></textarea>
+          <span>收货地址</span>
+          <textarea v-model.trim="form.detailAddress" class="textarea address-input" placeholder="请输入完整收货地址，例如：江苏省南京市秦淮区某某街道某某号某栋某室"></textarea>
         </label>
 
         <div class="field">
@@ -59,7 +43,6 @@
           <span>设为默认地址</span>
         </label>
 
-        <div v-if="fullAddressPreview" class="address-preview">{{ fullAddressPreview }}</div>
       </section>
 
       <p v-if="error" class="error-text">{{ error }}</p>
@@ -69,62 +52,25 @@
       <button class="primary-button" type="button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存地址' }}</button>
     </footer>
 
-    <div v-if="confirmOpen && pendingParse" class="confirm-mask">
-      <div class="confirm-sheet">
-        <h2>请确认识别结果</h2>
-        <p v-if="pendingParse.warnings?.length" class="confirm-warning">{{ pendingParse.warnings.join('，') }}</p>
-        <div v-if="candidateOptions.length > 1" class="candidate-box">
-          <span>收货人可能是</span>
-          <div class="candidate-list">
-            <button
-              v-for="item in candidateOptions"
-              :key="item"
-              type="button"
-              :class="selectedCandidate === item ? 'active' : ''"
-              @click="selectedCandidate = item"
-            >
-              {{ item }}
-            </button>
-          </div>
-        </div>
-        <div class="confirm-lines">
-          <div><span>手机号</span><strong>{{ pendingParse.phone || '-' }}</strong></div>
-          <div><span>地区</span><strong>{{ parseRegionText(pendingParse) || '-' }}</strong></div>
-          <div><span>详细地址</span><strong>{{ pendingParse.detailAddress || '-' }}</strong></div>
-        </div>
-        <div class="confirm-actions">
-          <button type="button" @click="confirmOpen = false">取消</button>
-          <button type="button" class="primary" @click="applyPendingParse">确认填入</button>
-        </div>
-      </div>
-    </div>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createAddress, getAddress, parseAddress, updateAddress } from '@/api/shop'
-import type { AddressParseResult, ShopAddressPayload } from '@/types/shop'
-import AddressRegionPicker from './components/AddressRegionPicker.vue'
+import { createAddress, getAddress, updateAddress } from '@/api/shop'
+import type { ShopAddressPayload } from '@/types/shop'
 
 const SELECTED_ADDRESS_KEY = 'rs-checkout-address-id'
 const labelOptions = ['家', '公司', '学校', '父母', '朋友']
 
 const route = useRoute()
 const router = useRouter()
-const rawText = ref('')
-const parsing = ref(false)
 const saving = ref(false)
 const error = ref('')
-const addressPath = ref<string[]>([])
-const addressPathNames = ref<string[]>([])
 const currentLabel = ref('')
 const customLabel = ref('')
 const customLabelMode = ref(false)
-const pendingParse = ref<AddressParseResult>()
-const confirmOpen = ref(false)
-const selectedCandidate = ref('')
 const form = reactive({
   receiverName: '',
   receiverPhone: '',
@@ -136,14 +82,6 @@ const id = computed(() => typeof route.params.id === 'string' ? route.params.id 
 const isEdit = computed(() => Boolean(id.value))
 const selectMode = computed(() => route.query.select === '1')
 const redirectPath = computed(() => typeof route.query.redirect === 'string' ? route.query.redirect : '/orders/new')
-const candidateOptions = computed(() => {
-  const values = pendingParse.value?.contactCandidates || []
-  return Array.from(new Set(values.map(item => String(item || '').trim()).filter(Boolean)))
-})
-const fullAddressPreview = computed(() => {
-  const regionText = visibleRegionNames(addressPathNames.value).join('')
-  return `${regionText}${form.detailAddress}`.trim()
-})
 
 function goBack() {
   if (window.history.length > 1) {
@@ -160,60 +98,9 @@ async function loadAddress() {
   const data = await getAddress(id.value)
   form.receiverName = data.receiverName || ''
   form.receiverPhone = data.receiverPhone || ''
-  form.detailAddress = data.detailAddress || ''
+  form.detailAddress = data.fullAddress || data.detailAddress || ''
   form.defaultFlag = Boolean(data.defaultFlag)
-  addressPath.value = [...(data.regionPath || [])]
-  addressPathNames.value = [...(data.regionPathNames || [])]
   setLabel(data.addressLabel || '')
-}
-
-async function parseRawAddress() {
-  if (!rawText.value.trim()) {
-    error.value = '请先粘贴需要识别的地址'
-    return
-  }
-  parsing.value = true
-  error.value = ''
-  try {
-    const result = await parseAddress(rawText.value)
-    pendingParse.value = result
-    selectedCandidate.value = result.contactName || candidateOptions.value[0] || ''
-    if (needsConfirm(result)) {
-      confirmOpen.value = true
-    } else {
-      applyParseResult(result)
-    }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '识别失败'
-  } finally {
-    parsing.value = false
-  }
-}
-
-function needsConfirm(result: AddressParseResult) {
-  return candidateOptions.value.length > 1 || Boolean(result.warnings?.length) || Number(result.confidence || 0) < 80
-}
-
-function applyPendingParse() {
-  if (!pendingParse.value) {
-    return
-  }
-  applyParseResult({ ...pendingParse.value, contactName: selectedCandidate.value || pendingParse.value.contactName })
-  confirmOpen.value = false
-}
-
-function applyParseResult(result: AddressParseResult) {
-  if (result.contactName) form.receiverName = result.contactName
-  if (result.phone) form.receiverPhone = result.phone
-  addressPath.value = [...(result.regionPath || [])]
-  addressPathNames.value = [...(result.regionPathNames || visibleRegionNames([
-    result.province,
-    result.city,
-    result.district,
-    result.street,
-    result.village
-  ]))]
-  if (result.detailAddress) form.detailAddress = result.detailAddress
 }
 
 function chooseLabel(label: string) {
@@ -250,7 +137,6 @@ function currentAddressLabel() {
 function validate() {
   if (!form.receiverName.trim()) return '请填写收货人'
   if (!form.receiverPhone.trim()) return '请填写手机号'
-  if (addressPath.value.length < 3) return '请选择省市区'
   if (!form.detailAddress.trim()) return '请填写详细地址'
   return ''
 }
@@ -263,8 +149,6 @@ async function save() {
   const payload: ShopAddressPayload = {
     receiverName: form.receiverName,
     receiverPhone: form.receiverPhone,
-    regionPath: addressPath.value,
-    regionPathNames: addressPathNames.value,
     detailAddress: form.detailAddress,
     addressLabel: currentAddressLabel(),
     defaultFlag: form.defaultFlag
@@ -283,14 +167,6 @@ async function save() {
   } finally {
     saving.value = false
   }
-}
-
-function visibleRegionNames(values: Array<string | undefined>) {
-  return values.filter(Boolean).filter((item, index) => !(index === 1 && ['市辖区', '县'].includes(String(item)))) as string[]
-}
-
-function parseRegionText(result: AddressParseResult) {
-  return visibleRegionNames([result.province, result.city, result.district, result.street, result.village]).join(' / ')
 }
 
 onMounted(loadAddress)
