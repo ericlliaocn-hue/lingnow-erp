@@ -1,15 +1,25 @@
 <template>
   <main class="page order-page">
     <section class="page-inner">
-      <section class="card receiver-card">
-        <div class="card-title-row">
-          <span>收货信息</span>
-        </div>
-        <textarea v-model.trim="form.receiverText" class="textarea receiver-input" placeholder="请直接输入完整收货信息，例如：屁屁 18852273038 江苏省无锡市梁溪区某某街道 云福大厦一楼Lucky女装店" @input="saveDraft"></textarea>
-        <p class="receiver-hint">输入什么就按什么发货，不识别、不拆分。</p>
-      </section>
+      <div class="order-layout">
+        <aside class="order-sidebar">
+          <section class="card receiver-card">
+            <div class="card-title-row">
+              <span>收货信息</span>
+            </div>
+            <textarea v-model.trim="form.receiverText" class="textarea receiver-input" placeholder="请输入完整收货信息"></textarea>
+          </section>
 
-      <article v-for="(item, index) in items" :key="item.key" class="card order-item">
+          <div class="card remark-card">
+            <label class="field">
+              <span>订单留言</span>
+              <textarea v-model.trim="form.remark" class="textarea" placeholder="选填，说明订单需求"></textarea>
+            </label>
+          </div>
+        </aside>
+
+        <section class="order-main">
+          <article v-for="(item, index) in items" :key="item.key" class="card order-item">
         <div class="item-head">
           <strong>{{ duplicateProductCount(item) > 1 ? `配置明细 ${configurationIndex(item)}` : `商品 ${index + 1}` }}</strong>
           <button v-if="items.length > 1" class="remove-button" @click="removeItem(index)">移除</button>
@@ -77,21 +87,16 @@
           <button class="remove-button" @click="removeLogo(item)">移除图片</button>
         </div>
         <div class="line-total">小计：<strong class="price">￥{{ itemAmount(item).toFixed(2) }}</strong></div>
-      </article>
+          </article>
 
-      <div class="card remark-card">
-        <label class="field">
-          <span>订单留言</span>
-          <textarea v-model.trim="form.remark" class="textarea" placeholder="选填，说明订单需求"></textarea>
-        </label>
+          <div class="card summary">
+            <div><span>共 {{ totalQty }} 件</span><strong>{{ totalQty }} 件</strong></div>
+            <div><span>合计</span><strong class="price">￥{{ totalAmount.toFixed(2) }}</strong></div>
+          </div>
+
+          <p v-if="error" class="error-text">{{ error }}</p>
+        </section>
       </div>
-
-      <div class="card summary">
-        <div><span>共 {{ totalQty }} 件</span><strong>{{ totalQty }} 件</strong></div>
-        <div><span>合计</span><strong class="price">￥{{ totalAmount.toFixed(2) }}</strong></div>
-      </div>
-
-      <p v-if="error" class="error-text">{{ error }}</p>
       <div class="submit-bar">
         <div>
           <span>合计</span>
@@ -451,7 +456,27 @@ onMounted(loadData)
 
 <style scoped>
 .order-page {
+  width: min(100%, 1180px);
   background: var(--bg-page);
+}
+
+.order-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.order-sidebar,
+.order-main {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.order-sidebar {
+  position: sticky;
+  top: 14px;
 }
 
 .receiver-card {
@@ -472,13 +497,6 @@ onMounted(loadData)
   color: var(--text-main);
   font-size: 15px;
   font-weight: 900;
-}
-
-.receiver-hint {
-  margin: 8px 0 0;
-  color: var(--text-sub);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .item-head {
@@ -790,5 +808,19 @@ onMounted(loadData)
   color: #fff;
   background: rgba(255, 255, 255, 0.18);
   font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .order-page {
+    width: min(100%, 640px);
+  }
+
+  .order-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .order-sidebar {
+    position: static;
+  }
 }
 </style>
